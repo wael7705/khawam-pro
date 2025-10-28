@@ -1,9 +1,9 @@
 [phases.setup]
-nixPkgs = ['nodejs_20', 'python39', 'pip']
+nixPkgs = ['nodejs_20', 'python39']
 
 [phases.install]
 cmds = [
-  'pip install -r backend/requirements.txt'
+  'python3 -m pip install -r backend/requirements.txt'
 ]
 
 [start]

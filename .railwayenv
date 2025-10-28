@@ -1,0 +1,6 @@
+# Railway Environment Variables for Frontend Service
+# This file helps configure the Frontend service
+
+VITE_API_URL=https://khawam-pro-production.up.railway.app
+NODE_ENV=production
+

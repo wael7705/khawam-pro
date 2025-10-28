@@ -9,10 +9,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS
+# CORS - Allow all origins for Railway deployment
+import os
+allowed_origins = [
+    "http://localhost:5173",
+    os.getenv("FRONTEND_URL", ""),
+    "*"  # Allow all in production
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

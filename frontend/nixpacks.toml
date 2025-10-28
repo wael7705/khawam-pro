@@ -1,3 +1,6 @@
+[providers]
+nixpacks = true
+
 [phases.setup]
 nixPkgs = ['nodejs_20']
 
@@ -8,5 +11,5 @@ cmds = ['pnpm install']
 cmds = ['pnpm run build']
 
 [start]
-cmd = 'vite preview --host 0.0.0.0 --port ${{PORT}}'
+cmd = 'vite preview --host 0.0.0.0 --port $PORT'
 

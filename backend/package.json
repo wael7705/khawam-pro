@@ -1,0 +1,9 @@
+{
+  "name": "khawam-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cd backend ; python main.py",
+    "start": "python main.py"
+  }
+}
+

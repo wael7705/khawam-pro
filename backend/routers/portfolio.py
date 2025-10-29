@@ -9,22 +9,22 @@ router = APIRouter()
 async def get_portfolio_works(db: Session = Depends(get_db)):
     try:
         works = db.query(PortfolioWork).filter(
-            PortfolioWork.is_visible == True,
-            PortfolioWork.is_active == True
+            PortfolioWork.is_visible == True
         ).order_by(PortfolioWork.display_order).all()
         works_list = []
         for w in works:
             works_list.append({
                 "id": w.id,
                 "title_ar": w.title_ar or "",
-                "title": w.title_en or w.title_ar or "",
-                "title_en": w.title_en or "",
+                "title": w.title or w.title_ar or "",
+                "title_en": w.title or "",
                 "description_ar": w.description_ar or "",
-                "description_en": w.description_en or "",
+                "description_en": w.description or "",
+                "description": w.description or "",
                 "image_url": w.image_url or "",
                 "category_ar": w.category_ar or "",
-                "category_en": w.category_en or "",
-                "category": w.category_ar or "",
+                "category_en": w.category or "",
+                "category": w.category or w.category_ar or "",
                 "is_featured": w.is_featured if hasattr(w, 'is_featured') else False,
                 "is_visible": w.is_visible if hasattr(w, 'is_visible') else True
             })
@@ -40,7 +40,6 @@ async def get_featured_works(db: Session = Depends(get_db)):
     try:
         works = db.query(PortfolioWork).filter(
             PortfolioWork.is_visible == True,
-            PortfolioWork.is_active == True,
             PortfolioWork.is_featured == True
         ).order_by(PortfolioWork.display_order).all()
         works_list = []
@@ -48,14 +47,15 @@ async def get_featured_works(db: Session = Depends(get_db)):
             works_list.append({
                 "id": w.id,
                 "title_ar": w.title_ar or "",
-                "title": w.title_en or w.title_ar or "",
-                "title_en": w.title_en or "",
+                "title": w.title or w.title_ar or "",
+                "title_en": w.title or "",
                 "description_ar": w.description_ar or "",
-                "description_en": w.description_en or "",
+                "description_en": w.description or "",
+                "description": w.description or "",
                 "image_url": w.image_url or "",
                 "category_ar": w.category_ar or "",
-                "category_en": w.category_en or "",
-                "category": w.category_ar or "",
+                "category_en": w.category or "",
+                "category": w.category or w.category_ar or "",
                 "is_featured": True
             })
         return works_list

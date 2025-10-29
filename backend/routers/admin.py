@@ -302,13 +302,14 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
         title_en = work.title or work.title_ar
         
         new_work = PortfolioWork(
+            title=title_en,  # title - العمود الفعلي في قاعدة البيانات
             title_ar=work.title_ar,
-            title_en=title_en,
-            description_ar=work.description_ar,
+            description=work.description_ar or "",  # description - العمود الفعلي
+            description_ar=work.description_ar or "",
             image_url=work.image_url or "",
+            category=work.category_ar or "",  # category - العمود الفعلي
             category_ar=work.category_ar or "",
             is_visible=work.is_visible,
-            is_active=True,
             is_featured=work.is_featured,
             display_order=work.display_order
         )

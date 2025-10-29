@@ -127,9 +127,11 @@
     border-radius: 3px;
   }
   
+  /* نفس الأبعاد على الموبايل - الحفاظ على aspect-ratio 1:1 */
   .products-horizontal > * {
-    flex: 0 0 180px;
-    min-width: 180px;
+    flex: 0 0 280px;
+    min-width: 280px;
+    max-width: 280px;
   }
 }
 

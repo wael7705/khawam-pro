@@ -298,23 +298,37 @@ async def get_all_works(db: Session = Depends(get_db)):
 async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
     """Create a new portfolio work"""
     try:
+        # استخدام title كـ title_en
+        title_en = work.title or work.title_ar
+        
         new_work = PortfolioWork(
             title_ar=work.title_ar,
-            title=work.title,
+            title_en=title_en,
             description_ar=work.description_ar,
-            image_url=work.image_url,
-            category_ar=work.category_ar,
+            image_url=work.image_url or "",
+            category_ar=work.category_ar or "",
             is_visible=work.is_visible,
+            is_active=True,
             is_featured=work.is_featured,
             display_order=work.display_order
         )
         db.add(new_work)
         db.commit()
         db.refresh(new_work)
-        return {"success": True, "work": new_work}
+        return {
+            "success": True,
+            "work": {
+                "id": new_work.id,
+                "title_ar": new_work.title_ar,
+                "title_en": new_work.title_en,
+                "image_url": new_work.image_url,
+                "is_featured": new_work.is_featured
+            }
+        }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error creating work: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في إنشاء العمل: {str(e)}")
 
 @router.put("/works/{work_id}")
 async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_db)):

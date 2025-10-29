@@ -14,6 +14,18 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
+class ProductCategory(Base):
+    __tablename__ = "product_categories"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name_ar = Column(String(100), nullable=False)
+    name_en = Column(String(100))
+    description_ar = Column(Text)
+    description_en = Column(Text)
+    is_active = Column(Boolean, default=True)
+    display_order = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
 class Product(Base):
     __tablename__ = "products"
     
@@ -55,13 +67,14 @@ class PortfolioWork(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     title_ar = Column(String(200), nullable=False)
-    title = Column(String(200), nullable=False)
+    title_en = Column(String(200))
     description_ar = Column(Text)
-    description = Column(Text)
+    description_en = Column(Text)
     image_url = Column(Text, nullable=False)
     category_ar = Column(String(100))
-    category = Column(String(100))
+    category_en = Column(String(100))
     is_featured = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     is_visible = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
     created_at = Column(TIMESTAMP, server_default=func.now())

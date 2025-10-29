@@ -35,23 +35,35 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
     setLoading(true)
     
     try {
-      if (product?.id) {
-        // تحديث منتج موجود
-        await adminAPI.products.update(product.id, formData)
-      } else {
-        // إضافة منتج جديد
-        await adminAPI.products.create(formData)
+      // إعداد البيانات للإرسال
+      const submitData = {
+        name_ar: formData.name_ar.trim(),
+        name: formData.name.trim() || formData.name_ar.trim(), // إذا كان فارغاً، استخدم الاسم العربي
+        price: parseFloat(formData.price.toString()),
+        category_id: formData.category_id || 1,
+        is_visible: formData.is_visible,
+        is_featured: formData.is_featured,
+        display_order: 0
       }
       
-      if (image && image) {
+      if (product?.id) {
+        // تحديث منتج موجود
+        await adminAPI.products.update(product.id, submitData)
+      } else {
+        // إضافة منتج جديد
+        await adminAPI.products.create(submitData)
+      }
+      
+      if (image) {
         // يمكن إضافة رفع الصورة لاحقاً
         console.log('Image upload to be implemented')
       }
       
       onSuccess()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error)
-      alert('حدث خطأ في حفظ المنتج')
+      const errorMessage = error.response?.data?.detail || error.message || 'حدث خطأ في حفظ المنتج'
+      alert(`خطأ: ${errorMessage}`)
     } finally {
       setLoading(false)
     }

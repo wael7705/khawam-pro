@@ -13,7 +13,7 @@ router = APIRouter()
 # Pydantic models for request/response
 class ProductCreate(BaseModel):
     name_ar: str = Field(..., min_length=1, max_length=200)
-    name: str = Field(..., min_length=1, max_length=200)
+    name: Optional[str] = Field(None, max_length=200)
     price: float = Field(..., gt=0)
     image_url: Optional[str] = None
     category_id: Optional[int] = None
@@ -25,9 +25,13 @@ class ProductCreate(BaseModel):
     def validate_price(cls, v):
         return validate_price(v)
     
-    @validator('name_ar', 'name')
-    def validate_name(cls, v):
-        return validate_string(v, "الاسم", 1, 200)
+    @validator('name_ar')
+    def validate_name_ar(cls, v):
+        return validate_string(v, "الاسم العربي", 1, 200)
+    
+    @validator('name')
+    def set_name_default(cls, v):
+        return v if v else ''
 
 class ProductUpdate(BaseModel):
     name_ar: Optional[str] = None
@@ -108,12 +112,15 @@ async def get_all_products(db: Session = Depends(get_db)):
 async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     """Create a new product"""
     try:
+        # إذا كان name فارغاً، استخدم name_ar
+        final_name = product.name or product.name_ar
+        
         new_product = Product(
             name_ar=product.name_ar,
-            name=product.name,
+            name=final_name,
             price=product.price,
             image_url=product.image_url,
-            category_id=product.category_id,
+            category_id=product.category_id or 1,
             is_visible=product.is_visible,
             is_featured=product.is_featured,
             display_order=product.display_order
@@ -121,10 +128,21 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
         db.add(new_product)
         db.commit()
         db.refresh(new_product)
-        return {"success": True, "product": new_product}
+        return {
+            "success": True,
+            "product": {
+                "id": new_product.id,
+                "name_ar": new_product.name_ar,
+                "name": new_product.name,
+                "price": float(new_product.price) if new_product.price else 0,
+                "is_visible": new_product.is_visible,
+                "is_featured": new_product.is_featured
+            }
+        }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error creating product: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في إنشاء المنتج: {str(e)}")
 
 @router.put("/products/{product_id}")
 async def update_product(product_id: int, product: ProductUpdate, db: Session = Depends(get_db)):

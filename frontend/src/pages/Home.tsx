@@ -149,6 +149,7 @@ export default function Home() {
 }
 
 function FeaturedWorksSection() {
+  const navigate = useNavigate()
   const [works, setWorks] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -215,7 +216,12 @@ function FeaturedWorksSection() {
               <div className="works-carousel">
                 {works && works.length > 0 ? (
                   works.map((work) => (
-                    <div key={work.id} className="work-card-mini">
+                    <div 
+                      key={work.id} 
+                      className="work-card-mini"
+                      onClick={() => navigate(`/work/${work.id}`)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <div className="work-image-mini">
                         {work.image_url ? (
                           <img 

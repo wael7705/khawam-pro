@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Services from './pages/Services'
 import Products from './pages/Products'
 import Portfolio from './pages/Portfolio'
+import WorkDetail from './pages/WorkDetail'
 import Contact from './pages/Contact'
 import Studio from './pages/Studio'
 import Dashboard from './pages/Dashboard'
@@ -26,6 +27,7 @@ function App() {
           <Route path="/services" element={<Services />} />
           <Route path="/products" element={<Products />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/work/:id" element={<WorkDetail />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/dashboard/*" element={<Dashboard />} />

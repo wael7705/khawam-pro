@@ -66,6 +66,7 @@ class WorkCreate(BaseModel):
     title: str
     description_ar: Optional[str] = None
     image_url: Optional[str] = None
+    images: Optional[list[str]] = None  # الصور الثانوية
     category_ar: Optional[str] = None
     is_visible: bool = True
     is_featured: bool = False
@@ -76,6 +77,7 @@ class WorkUpdate(BaseModel):
     title: Optional[str] = None
     description_ar: Optional[str] = None
     image_url: Optional[str] = None
+    images: Optional[list[str]] = None  # الصور الثانوية
     category_ar: Optional[str] = None
     is_visible: Optional[bool] = None
     is_featured: Optional[bool] = None
@@ -307,6 +309,7 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
             description=work.description_ar or "",  # description - العمود الفعلي
             description_ar=work.description_ar or "",
             image_url=work.image_url or "",
+            images=work.images if work.images else [],  # الصور الثانوية
             category=work.category_ar or "",  # category - العمود الفعلي
             category_ar=work.category_ar or "",
             is_visible=work.is_visible,
@@ -353,6 +356,8 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
             existing_work.description_ar = work.description_ar
         if work.image_url is not None:
             existing_work.image_url = work.image_url
+        if work.images is not None:
+            existing_work.images = work.images
         if work.category_ar is not None:
             existing_work.category = work.category_ar
             existing_work.category_ar = work.category_ar

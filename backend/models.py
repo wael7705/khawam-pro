@@ -70,7 +70,8 @@ class PortfolioWork(Base):
     title_ar = Column(String(200), nullable=False)  # العنوان العربي
     description = Column(Text)  # الوصف الإنجليزي - العمود الفعلي في DB
     description_ar = Column(Text)  # الوصف العربي
-    image_url = Column(Text, nullable=False)
+    image_url = Column(Text, nullable=False)  # الصورة الأساسية
+    images = Column(ARRAY(Text))  # الصور الثانوية/المرافقة
     category = Column(String(100))  # الفئة الإنجليزية - العمود الفعلي في DB
     category_ar = Column(String(100))  # الفئة العربية
     is_featured = Column(Boolean, default=False)

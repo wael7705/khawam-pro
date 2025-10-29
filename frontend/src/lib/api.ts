@@ -28,17 +28,21 @@ export const servicesAPI = {
   },
 }
 
-// Portfolio API
-export const portfolioAPI = {
-  getAll: async () => {
-    const response = await api.get('/portfolio/')
-    return { data: Array.isArray(response.data) ? response.data : [] }
-  },
-  getFeatured: async () => {
-    const response = await api.get('/portfolio/featured')
-    return { data: Array.isArray(response.data) ? response.data : [] }
-  },
-}
+  // Portfolio API
+  export const portfolioAPI = {
+    getAll: async () => {
+      const response = await api.get('/portfolio/')
+      return { data: Array.isArray(response.data) ? response.data : [] }
+    },
+    getFeatured: async () => {
+      const response = await api.get('/portfolio/featured')
+      return { data: Array.isArray(response.data) ? response.data : [] }
+    },
+    getById: async (id: number) => {
+      const response = await api.get(`/portfolio/${id}`)
+      return { data: response.data }
+    },
+  }
 
 // Orders API
 export const ordersAPI = {

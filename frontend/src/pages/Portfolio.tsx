@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { portfolioAPI } from '../lib/api'
 import './Portfolio.css'
 
@@ -13,6 +14,7 @@ interface Work {
 }
 
 export default function Portfolio() {
+  const navigate = useNavigate()
   const [works, setWorks] = useState<Work[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -54,7 +56,11 @@ export default function Portfolio() {
         ) : (
           <div className="portfolio-grid">
             {works.map((work) => (
-              <div key={work.id} className="work-card">
+              <div 
+                key={work.id} 
+                className="work-card"
+                onClick={() => navigate(`/work/${work.id}`)}
+              >
                 <div className="work-image">
                   {work.image_url ? (
                     <img 

@@ -101,6 +101,10 @@
 }
 
 @media (max-width: 768px) {
+  .portfolio-page {
+    padding: 40px 15px;
+  }
+  
   .portfolio-grid {
     grid-template-columns: 1fr;
     gap: 20px;
@@ -108,5 +112,89 @@
 
   .page-title {
     font-size: 2rem;
+  }
+  
+  .page-subtitle {
+    font-size: 1rem;
+    margin-bottom: 30px;
+  }
+  
+  /* Zoom Out Effect - تقليل الحجم الكلي مع الحفاظ على الأبعاد */
+  .work-card {
+    transform: scale(0.95);
+    transform-origin: center;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  
+  .work-image {
+    aspect-ratio: 16/9; /* الحفاظ على نفس النسبة */
+  }
+  
+  .work-content {
+    padding: 15px;
+  }
+  
+  .work-content h3 {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+  }
+  
+  .work-content p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  
+  .work-category {
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .portfolio-page {
+    padding: 30px 10px;
+  }
+  
+  .page-title {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+  }
+  
+  .page-subtitle {
+    font-size: 0.9rem;
+    margin-bottom: 25px;
+  }
+  
+  /* Zoom Out أكثر على الشاشات الصغيرة جداً */
+  .work-card {
+    transform: scale(0.9);
+    border-radius: 12px;
+  }
+  
+  .work-image {
+    /* تقليل ارتفاع الصورة قليلاً */
+    aspect-ratio: 16/10;
+  }
+  
+  .work-content {
+    padding: 12px;
+  }
+  
+  .work-content h3 {
+    font-size: 1rem;
+    margin-bottom: 5px;
+  }
+  
+  .work-content p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+  
+  .work-category {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    margin-bottom: 6px;
   }
 }

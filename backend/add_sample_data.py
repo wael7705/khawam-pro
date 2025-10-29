@@ -6,6 +6,10 @@ from models import *
 from sqlalchemy.orm import Session
 import os
 
+# إصلاح مشكلة connection
+import psycopg2
+from psycopg2 import sql
+
 def add_sample_data():
     """إضافة بيانات تجريبية"""
     db = SessionLocal()

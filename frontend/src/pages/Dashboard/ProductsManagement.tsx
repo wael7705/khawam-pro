@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Eye, EyeOff, Trash2, Upload } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
+import ProductForm from '../../components/ProductForm'
 import './ProductsManagement.css'
 
 interface Product {
@@ -116,54 +117,11 @@ export default function ProductsManagement() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>{editingProduct ? 'تعديل منتج' : 'إضافة منتج جديد'}</h2>
             
-            <form className="product-form">
-              <div className="form-group">
-                <label>اسم المنتج (عربي)</label>
-                <input type="text" defaultValue={editingProduct?.name_ar} />
-              </div>
-
-              <div className="form-group">
-                <label>اسم المنتج (إنجليزي)</label>
-                <input type="text" defaultValue={editingProduct?.name} />
-              </div>
-
-              <div className="form-group">
-                <label>السعر</label>
-                <input type="number" defaultValue={editingProduct?.price} />
-              </div>
-
-              <div className="form-group">
-                <label>الصورة</label>
-                <div className="upload-area">
-                  <Upload size={24} />
-                  <span>انقر للرفع أو اسحب الملف هنا</span>
-                  <input type="file" accept="image/*" className="hidden" />
-                </div>
-              </div>
-
-              <div className="form-group checkbox-group">
-                <label>
-                  <input type="checkbox" defaultChecked={editingProduct?.is_visible} />
-                  <span>المنتج ظاهر</span>
-                </label>
-              </div>
-
-              <div className="form-group checkbox-group">
-                <label>
-                  <input type="checkbox" defaultChecked={editingProduct?.is_featured} />
-                  <span>منتج مميز</span>
-                </label>
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => { setIsAdding(false); setEditingProduct(null) }}>
-                  إلغاء
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingProduct ? 'تحديث' : 'إضافة'}
-                </button>
-              </div>
-            </form>
+            <ProductForm 
+              product={editingProduct}
+              onCancel={() => { setIsAdding(false); setEditingProduct(null) }}
+              onSuccess={() => { setIsAdding(false); setEditingProduct(null); loadProducts() }}
+            />
           </div>
         </div>
       )}

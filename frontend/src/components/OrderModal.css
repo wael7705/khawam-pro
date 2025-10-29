@@ -4,7 +4,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,13 +14,14 @@
 }
 
 .order-modal {
-  background: var(--bg);
-  border-radius: 20px;
-  max-width: 600px;
+  background: linear-gradient(135deg, #ffffff 0%, #fff5f0 100%);
+  border-radius: 24px;
+  max-width: 700px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+  border: 3px solid rgba(249, 115, 22, 0.2);
 }
 
 .modal-header {
@@ -33,6 +35,10 @@
 .modal-header h2 {
   font-size: 1.5rem;
   font-weight: 700;
+  background: linear-gradient(135deg, #F97316 0%, #EF4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .close-btn {
@@ -100,19 +106,21 @@
 
 .form-input {
   width: 100%;
-  padding: 12px;
-  border: 2px solid var(--gray);
-  border-radius: 8px;
-  font-size: 1rem;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
   font-family: inherit;
-  background: var(--bg);
-  color: var(--text);
-  transition: all 0.3s;
+  background: #ffffff;
+  color: #1a202c;
+  transition: all 0.3s ease;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: #F97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  background: #fff5f0;
 }
 
 /* Upload Area */

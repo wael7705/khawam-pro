@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Eye, EyeOff, Trash2, Upload, Star } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
+import WorkForm from '../../components/WorkForm'
 import './WorksManagement.css'
 
 interface Work {
@@ -76,8 +77,18 @@ export default function WorksManagement() {
           <div key={work.id} className="work-card">
             <div className="work-image">
               {work.image_url ? (
-                <img src={work.image_url} alt={work.title} />
-              ) : (
+                <img 
+                  src={work.image_url.startsWith('http') ? work.image_url : `https://khawam-pro-production.up.railway.app${work.image_url}`}
+                  alt={work.title_ar}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const placeholder = target.nextElementSibling as HTMLElement;
+                    if (placeholder) placeholder.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              {!work.image_url && (
                 <div className="placeholder-image">بدون صورة</div>
               )}
               <div className="work-badges">
@@ -130,63 +141,11 @@ export default function WorksManagement() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>{editingWork ? 'تعديل عمل' : 'إضافة عمل جديد'}</h2>
             
-            <form className="work-form">
-              <div className="form-group">
-                <label>عنوان العمل (عربي)</label>
-                <input type="text" defaultValue={editingWork?.title_ar} />
-              </div>
-
-              <div className="form-group">
-                <label>عنوان العمل (إنجليزي)</label>
-                <input type="text" defaultValue={editingWork?.title} />
-              </div>
-
-              <div className="form-group">
-                <label>الوصف</label>
-                <textarea 
-                  rows={3} 
-                  defaultValue={editingWork?.description_ar}
-                  className="form-textarea"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>الفئة</label>
-                <input type="text" defaultValue={editingWork?.category_ar} />
-              </div>
-
-              <div className="form-group">
-                <label>الصورة</label>
-                <div className="upload-area">
-                  <Upload size={24} />
-                  <span>انقر للرفع أو اسحب الملف هنا</span>
-                  <input type="file" accept="image/*" className="hidden" />
-                </div>
-              </div>
-
-              <div className="form-group checkbox-group">
-                <label>
-                  <input type="checkbox" defaultChecked={editingWork?.is_visible} />
-                  <span>العمل ظاهر</span>
-                </label>
-              </div>
-
-              <div className="form-group checkbox-group">
-                <label>
-                  <input type="checkbox" defaultChecked={editingWork?.is_featured} />
-                  <span>عمل مميز</span>
-                </label>
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => { setIsAdding(false); setEditingWork(null) }}>
-                  إلغاء
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingWork ? 'تحديث' : 'إضافة'}
-                </button>
-              </div>
-            </form>
+            <WorkForm 
+              work={editingWork}
+              onCancel={() => { setIsAdding(false); setEditingWork(null) }}
+              onSuccess={() => { setIsAdding(false); setEditingWork(null); loadWorks() }}
+            />
           </div>
         </div>
       )}

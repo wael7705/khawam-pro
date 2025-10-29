@@ -403,20 +403,32 @@ async def update_order_status(order_id: int, status: str, db: Session = Depends(
 async def upload_image(file: UploadFile = File(...)):
     """Upload an image"""
     try:
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
         upload_dir = "uploads/"
         os.makedirs(upload_dir, exist_ok=True)
         
         # Generate unique filename
-        file_ext = os.path.splitext(file.filename)[1]
+        file_ext = os.path.splitext(file.filename)[1] or '.jpg'
         unique_filename = f"{uuid.uuid4()}{file_ext}"
         file_path = os.path.join(upload_dir, unique_filename)
         
         # Save file
+        content = await file.read()
         with open(file_path, "wb") as buffer:
-            buffer.write(await file.read())
+            buffer.write(content)
         
-        # Return URL
+        # Return URL (relative path - will be served via StaticFiles)
         image_url = f"/uploads/{unique_filename}"
-        return {"success": True, "image_url": image_url}
+        return {
+            "success": True,
+            "url": image_url,
+            "image_url": image_url,
+            "filename": unique_filename
+        }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"خطأ في رفع الصورة: {str(e)}")

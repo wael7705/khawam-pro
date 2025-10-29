@@ -88,6 +88,49 @@
   margin-top: 40px;
 }
 
+/* Products Carousel */
+.products-carousel-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  margin: 30px 0;
+}
+
+.products-carousel {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  padding: 20px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+}
+
+.products-carousel::-webkit-scrollbar {
+  height: 8px;
+}
+
+.products-carousel::-webkit-scrollbar-track {
+  background: var(--gray);
+  border-radius: 4px;
+}
+
+.products-carousel::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 4px;
+}
+
+.products-carousel::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.products-carousel > * {
+  flex: 0 0 300px;
+  min-width: 300px;
+}
+
 /* Featured Works Section */
 .featured-works-section {
   margin-top: 80px;
@@ -99,6 +142,48 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 25px;
+}
+
+/* Works Carousel */
+.works-carousel-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  margin: 30px 0;
+}
+
+.works-carousel {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  padding: 20px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+
+.works-carousel::-webkit-scrollbar {
+  height: 8px;
+}
+
+.works-carousel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.works-carousel::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 4px;
+}
+
+.works-carousel::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.works-carousel > * {
+  flex: 0 0 280px;
+  min-width: 280px;
 }
 
 .work-card-mini {
@@ -118,12 +203,30 @@
   width: 100%;
   aspect-ratio: 16/9;
   overflow: hidden;
+  background: #f0f0f0;
+  position: relative;
+}
+
+.work-image-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.work-image-mini .hidden {
+  display: none;
 }
 
 .placeholder-mini {
   width: 100%;
   height: 100%;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.8rem;
 }
 
 .work-info-mini {

@@ -1,31 +1,33 @@
 import { useState } from 'react'
 import { adminAPI } from '../lib/api'
 
-interface Product {
+interface Work {
   id?: number
-  name_ar: string
-  name: string
-  price: number
+  title_ar: string
+  title_en?: string
+  description_ar?: string
   image_url?: string
+  category_ar?: string
+  category_en?: string
   is_visible: boolean
   is_featured: boolean
-  category_id?: number
 }
 
-interface ProductFormProps {
-  product?: Product | null
+interface WorkFormProps {
+  work?: Work | null
   onCancel: () => void
   onSuccess: () => void
 }
 
-export default function ProductForm({ product, onCancel, onSuccess }: ProductFormProps) {
+export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
   const [formData, setFormData] = useState({
-    name_ar: product?.name_ar || '',
-    name: product?.name || '',
-    price: product?.price || 0,
-    is_visible: product?.is_visible ?? true,
-    is_featured: product?.is_featured ?? false,
-    category_id: 1
+    title_ar: work?.title_ar || '',
+    title_en: work?.title_en || '',
+    description_ar: work?.description_ar || '',
+    category_ar: work?.category_ar || '',
+    category_en: work?.category_en || '',
+    is_visible: work?.is_visible ?? true,
+    is_featured: work?.is_featured ?? false,
   })
   const [loading, setLoading] = useState(false)
   const [image, setImage] = useState<File | null>(null)
@@ -35,7 +37,7 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
     setLoading(true)
     
     try {
-      let imageUrl = product?.image_url
+      let imageUrl = work?.image_url
       
       // رفع الصورة إذا كانت موجودة
       if (image) {
@@ -45,34 +47,35 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
           console.log('✅ تم رفع الصورة:', imageUrl)
         } catch (uploadError: any) {
           console.error('خطأ في رفع الصورة:', uploadError)
-          alert('فشل رفع الصورة. سيتم حفظ المنتج بدون صورة.')
+          alert('فشل رفع الصورة. سيتم حفظ العمل بدون صورة.')
         }
       }
       
       // إعداد البيانات للإرسال
       const submitData = {
-        name_ar: formData.name_ar.trim(),
-        name: formData.name.trim() || formData.name_ar.trim(),
-        price: parseFloat(formData.price.toString()),
-        category_id: formData.category_id || 1,
+        title_ar: formData.title_ar.trim(),
+        title_en: formData.title_en.trim() || formData.title_ar.trim(),
+        description_ar: formData.description_ar.trim(),
         image_url: imageUrl || null,
+        category_ar: formData.category_ar.trim(),
+        category_en: formData.category_en.trim() || formData.category_ar.trim(),
         is_visible: formData.is_visible,
         is_featured: formData.is_featured,
         display_order: 0
       }
       
-      if (product?.id) {
-        // تحديث منتج موجود
-        await adminAPI.products.update(product.id, submitData)
+      if (work?.id) {
+        // تحديث عمل موجود
+        await adminAPI.works.update(work.id, submitData)
       } else {
-        // إضافة منتج جديد
-        await adminAPI.products.create(submitData)
+        // إضافة عمل جديد
+        await adminAPI.works.create(submitData)
       }
       
       onSuccess()
     } catch (error: any) {
-      console.error('Error saving product:', error)
-      const errorMessage = error.response?.data?.detail || error.message || 'حدث خطأ في حفظ المنتج'
+      console.error('Error saving work:', error)
+      const errorMessage = error.response?.data?.detail || error.message || 'حدث خطأ في حفظ العمل'
       alert(`خطأ: ${errorMessage}`)
     } finally {
       setLoading(false)
@@ -80,41 +83,42 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
   }
 
   return (
-    <form className="product-form" onSubmit={handleSubmit}>
+    <form className="work-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label>اسم المنتج (عربي) *</label>
+        <label>عنوان العمل (عربي) *</label>
         <input 
           type="text" 
-          value={formData.name_ar}
-          onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+          value={formData.title_ar}
+          onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
           required
         />
       </div>
 
       <div className="form-group">
-        <label>اسم المنتج (إنجليزي)</label>
+        <label>عنوان العمل (إنجليزي)</label>
         <input 
           type="text" 
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          value={formData.title_en}
+          onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
         />
       </div>
 
       <div className="form-group">
-        <label>السعر (ل.س) *</label>
-        <input 
-          type="number" 
-          value={formData.price}
-          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-          required
-        />
-      </div>
-
-      <div className="form-group">
-        <label>وصف المنتج (عربي)</label>
+        <label>الوصف</label>
         <textarea 
-          rows={3}
+          rows={4}
+          value={formData.description_ar}
+          onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
           className="form-textarea"
+        />
+      </div>
+
+      <div className="form-group">
+        <label>الفئة (عربي)</label>
+        <input 
+          type="text" 
+          value={formData.category_ar}
+          onChange={(e) => setFormData({ ...formData, category_ar: e.target.value })}
         />
       </div>
 
@@ -125,12 +129,17 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
             type="file" 
             accept="image/*" 
             className="hidden" 
-            id="product-image"
+            id="work-image"
             onChange={(e) => setImage(e.target.files?.[0] || null)}
           />
-          <label htmlFor="product-image" className="upload-label">
+          <label htmlFor="work-image" className="upload-label">
             {image ? image.name : 'انقر للرفع أو اسحب الملف هنا'}
           </label>
+          {image && (
+            <div className="image-preview">
+              <img src={URL.createObjectURL(image)} alt="Preview" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -141,7 +150,7 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
             checked={formData.is_visible}
             onChange={(e) => setFormData({ ...formData, is_visible: e.target.checked })}
           />
-          <span>المنتج ظاهر</span>
+          <span>العمل ظاهر</span>
         </label>
       </div>
 
@@ -152,7 +161,7 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
             checked={formData.is_featured}
             onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
           />
-          <span>منتج مميز</span>
+          <span>عمل مميز</span>
         </label>
       </div>
 
@@ -170,7 +179,7 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
           className="btn btn-primary"
           disabled={loading}
         >
-          {loading ? 'جاري الحفظ...' : (product ? 'تحديث' : 'إضافة')}
+          {loading ? 'جاري الحفظ...' : (work ? 'تحديث' : 'إضافة')}
         </button>
       </div>
     </form>

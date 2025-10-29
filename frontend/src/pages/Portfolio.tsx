@@ -56,11 +56,22 @@ export default function Portfolio() {
             {works.map((work) => (
               <div key={work.id} className="work-card">
                 <div className="work-image">
-                  <div className="placeholder-work-image"></div>
+                  {work.image_url ? (
+                    <img 
+                      src={work.image_url.startsWith('http') ? work.image_url : `https://khawam-pro-production.up.railway.app${work.image_url}`}
+                      alt={work.title_ar}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`placeholder-work-image ${work.image_url ? 'hidden' : ''}`}></div>
                 </div>
                 <div className="work-content">
-                  <span className="work-category">{work.category_ar}</span>
-                  <h3>{work.title_ar}</h3>
+                  {work.category_ar && <span className="work-category">{work.category_ar}</span>}
+                  <h3>{work.title_ar || work.title}</h3>
                   {work.description_ar && <p>{work.description_ar}</p>}
                 </div>
               </div>

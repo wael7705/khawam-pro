@@ -8,7 +8,7 @@ interface Work {
   title?: string
   description_ar?: string
   image_url?: string
-  images?: string[]  # الصور الثانوية
+  images?: string[]  // الصور الثانوية
   category_ar?: string
   category_en?: string
   is_visible: boolean

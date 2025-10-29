@@ -339,18 +339,50 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
         if not existing_work:
             raise HTTPException(status_code=404, detail="Work not found")
         
-        update_data = work.dict(exclude_unset=True)
-        for key, value in update_data.items():
-            setattr(existing_work, key, value)
+        # تحديث الحقول يدوياً لضمان التوافق مع قاعدة البيانات
+        if work.title_ar is not None:
+            existing_work.title_ar = work.title_ar
+        if work.title is not None:
+            existing_work.title = work.title
+        elif work.title_ar is not None:
+            # إذا تم تحديث title_ar بدون title، استخدم title_ar كـ title
+            existing_work.title = work.title_ar
+        
+        if work.description_ar is not None:
+            existing_work.description = work.description_ar
+            existing_work.description_ar = work.description_ar
+        if work.image_url is not None:
+            existing_work.image_url = work.image_url
+        if work.category_ar is not None:
+            existing_work.category = work.category_ar
+            existing_work.category_ar = work.category_ar
+        
+        # الحقول الأخرى
+        if hasattr(work, 'is_visible') and work.is_visible is not None:
+            existing_work.is_visible = work.is_visible
+        if hasattr(work, 'is_featured') and work.is_featured is not None:
+            existing_work.is_featured = work.is_featured
+        if hasattr(work, 'display_order') and work.display_order is not None:
+            existing_work.display_order = work.display_order
         
         db.commit()
         db.refresh(existing_work)
-        return {"success": True, "work": existing_work}
+        return {
+            "success": True,
+            "work": {
+                "id": existing_work.id,
+                "title_ar": existing_work.title_ar,
+                "title": existing_work.title,
+                "image_url": existing_work.image_url,
+                "is_featured": existing_work.is_featured
+            }
+        }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error updating work: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في تحديث العمل: {str(e)}")
 
 @router.delete("/works/{work_id}")
 async def delete_work(work_id: int, db: Session = Depends(get_db)):

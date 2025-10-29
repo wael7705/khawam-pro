@@ -54,11 +54,10 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
       // إعداد البيانات للإرسال
       const submitData = {
         title_ar: formData.title_ar.trim(),
-        title_en: formData.title_en.trim() || formData.title_ar.trim(),
+        title: formData.title_en.trim() || formData.title_ar.trim(), // Backend يتوقع title وليس title_en
         description_ar: formData.description_ar.trim(),
         image_url: imageUrl || null,
         category_ar: formData.category_ar.trim(),
-        category_en: formData.category_en.trim() || formData.category_ar.trim(),
         is_visible: formData.is_visible,
         is_featured: formData.is_featured,
         display_order: 0
@@ -75,7 +74,33 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
       onSuccess()
     } catch (error: any) {
       console.error('Error saving work:', error)
-      const errorMessage = error.response?.data?.detail || error.message || 'حدث خطأ في حفظ العمل'
+      
+      // معالجة أخطاء مختلفة
+      let errorMessage = 'حدث خطأ في حفظ العمل'
+      
+      if (error.response) {
+        // خطأ من السيرفر
+        const data = error.response.data
+        if (data?.detail) {
+          // إذا كان detail نص
+          if (typeof data.detail === 'string') {
+            errorMessage = data.detail
+          } 
+          // إذا كان detail array (validation errors)
+          else if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((err: any) => err.msg || err.message || JSON.stringify(err)).join(', ')
+          }
+          // إذا كان detail object
+          else if (typeof data.detail === 'object') {
+            errorMessage = JSON.stringify(data.detail)
+          }
+        } else {
+          errorMessage = `خطأ ${error.response.status}: ${error.response.statusText || 'خطأ غير معروف'}`
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       alert(`خطأ: ${errorMessage}`)
     } finally {
       setLoading(false)

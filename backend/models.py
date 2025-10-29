@@ -77,23 +77,6 @@ class PortfolioWork(Base):
     is_visible = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
     created_at = Column(TIMESTAMP, server_default=func.now())
-    
-    # خصائص افتراضية للتوافق مع الكود القديم
-    @property
-    def title_en(self):
-        return self.title
-    
-    @property
-    def description_en(self):
-        return self.description
-    
-    @property
-    def category_en(self):
-        return self.category
-    
-    @property
-    def is_active(self):
-        return self.is_visible  # افتراضياً is_visible يعمل كـ is_active
 
 class Order(Base):
     __tablename__ = "orders"

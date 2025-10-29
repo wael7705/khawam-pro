@@ -103,11 +103,21 @@
 @media (max-width: 768px) {
   .portfolio-page {
     padding: 40px 15px;
+    overflow-x: hidden; /* منع التمرير الأفقي */
+  }
+  
+  .container {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    overflow-x: hidden;
   }
   
   .portfolio-grid {
     grid-template-columns: 1fr;
     gap: 20px;
+    width: 100%;
+    overflow-x: hidden;
   }
 
   .page-title {
@@ -121,34 +131,46 @@
   
   /* Zoom Out Effect - تقليل الحجم الكلي مع الحفاظ على الأبعاد */
   .work-card {
-    transform: scale(0.95);
-    transform-origin: center;
+    width: 100%;
     max-width: 100%;
-    margin: 0 auto;
+    transform: scale(1);
+    transform-origin: center;
+    margin: 0;
+    overflow: visible;
   }
   
   .work-image {
-    aspect-ratio: 16/9; /* الحفاظ على نفس النسبة */
+    aspect-ratio: 16/9;
+    width: 100%;
+    overflow: hidden;
   }
   
   .work-content {
     padding: 15px;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .work-content h3 {
     font-size: 1.1rem;
     margin-bottom: 6px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .work-content p {
     font-size: 0.85rem;
     line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .work-category {
     font-size: 0.75rem;
     padding: 3px 10px;
     margin-bottom: 8px;
+    display: inline-block;
+    white-space: nowrap;
   }
 }
 

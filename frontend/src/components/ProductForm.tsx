@@ -103,11 +103,20 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
       <div className="form-group">
         <label>السعر (ل.س) *</label>
         <input 
-          type="number" 
-          value={formData.price}
-          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+          type="text" 
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={formData.price > 0 ? formData.price : ''}
+          onChange={(e) => {
+            const value = e.target.value.replace(/[^0-9]/g, '');
+            setFormData({ ...formData, price: value ? parseFloat(value) : 0 });
+          }}
+          placeholder="أدخل السعر بالليرة السورية"
           required
         />
+        <small style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+          السعر بالليرة السورية (ل.س)
+        </small>
       </div>
 
       <div className="form-group">

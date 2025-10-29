@@ -134,16 +134,14 @@
   border-color: #EF4444;
 }
 
-/* Modal Styles */
+/* Modal Styles - غير شفاف مع خلفية ملونة */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -213,6 +211,17 @@
   color: #1a202c;
   font-size: 15px;
   transition: all 0.3s ease;
+}
+
+/* إخفاء أزرار الزيادة والنقصان في input number */
+.form-group input[type="number"]::-webkit-inner-spin-button,
+.form-group input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.form-group input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 .form-group input:focus,

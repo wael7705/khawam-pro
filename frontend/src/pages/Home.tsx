@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import ProductCard from '../components/ProductCard'
 import { productsAPI, portfolioAPI } from '../lib/api'
 import './Home.css'
@@ -78,16 +79,40 @@ export default function Home() {
           {loading ? (
             <div className="loading">جاري التحميل...</div>
           ) : (
-            <div className="products-carousel-container">
-              <div className="products-carousel">
-                {products.length > 0 ? (
-                  products.map((product, index) => (
-                    <ProductCard key={product.id} product={product} index={index} />
-                  ))
-                ) : (
-                  <div className="loading">لا توجد منتجات حالياً</div>
-                )}
+            <div className="products-carousel-wrapper">
+              <button 
+                className="scroll-btn scroll-btn-left"
+                onClick={() => {
+                  const container = document.querySelector('.products-carousel') as HTMLElement;
+                  if (container) container.scrollBy({ left: -400, behavior: 'smooth' });
+                }}
+                aria-label="تمرير لليسار"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              
+              <div className="products-carousel-container">
+                <div className="products-carousel">
+                  {products.length > 0 ? (
+                    products.map((product, index) => (
+                      <ProductCard key={product.id} product={product} index={index} />
+                    ))
+                  ) : (
+                    <div className="loading">لا توجد منتجات حالياً</div>
+                  )}
+                </div>
               </div>
+              
+              <button 
+                className="scroll-btn scroll-btn-right"
+                onClick={() => {
+                  const container = document.querySelector('.products-carousel') as HTMLElement;
+                  if (container) container.scrollBy({ left: 400, behavior: 'smooth' });
+                }}
+                aria-label="تمرير لليمين"
+              >
+                <ChevronRight size={24} />
+              </button>
             </div>
           )}
           <div className="text-center mt-40">

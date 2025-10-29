@@ -21,14 +21,10 @@
   margin-bottom: 60px;
 }
 
-/* Horizontal Scroll Wrapper with Arrows - Full Width */
+/* Horizontal Scroll Wrapper with Arrows */
 .products-horizontal-wrapper {
   position: relative;
   margin: 40px 0;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
-  padding: 0 60px;
 }
 
 .products-horizontal-container {
@@ -104,17 +100,13 @@
 
 /* Mobile: Hide buttons, enable touch scroll with visible scrollbar */
 @media (max-width: 678px) {
-  .products-horizontal-wrapper {
-    padding: 0 15px;
-  }
-  
   .scroll-btn {
     display: none;
   }
   
   .products-horizontal {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 20px;
+    padding-right: 20px;
     gap: 15px;
     scrollbar-width: thin;
     -ms-overflow-style: auto;
@@ -136,14 +128,8 @@
   }
   
   .products-horizontal > * {
-    flex: 0 0 220px;
-    min-width: 220px;
-  }
-}
-
-@media (max-width: 768px) {
-  .products-horizontal-wrapper {
-    padding: 0 20px;
+    flex: 0 0 180px;
+    min-width: 180px;
   }
 }
 

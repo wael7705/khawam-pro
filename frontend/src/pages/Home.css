@@ -175,8 +175,8 @@
   }
   
   .products-carousel > * {
-    flex: 0 0 240px;
-    min-width: 240px;
+    flex: 0 0 180px;
+    min-width: 180px;
   }
   
   .products-carousel::-webkit-scrollbar {
@@ -190,6 +190,41 @@
   }
   
   .products-carousel::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 3px;
+  }
+  
+  /* Works Carousel Mobile */
+  .works-carousel-wrapper {
+    padding: 0 15px;
+  }
+  
+  .works-carousel-wrapper .scroll-btn {
+    display: none;
+  }
+  
+  .works-carousel {
+    scrollbar-width: thin;
+    -ms-overflow-style: auto;
+    gap: 15px;
+  }
+  
+  .works-carousel > * {
+    flex: 0 0 240px;
+    min-width: 240px;
+  }
+  
+  .works-carousel::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+  }
+  
+  .works-carousel::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+  }
+  
+  .works-carousel::-webkit-scrollbar-thumb {
     background: linear-gradient(135deg, var(--primary), var(--secondary));
     border-radius: 3px;
   }
@@ -214,46 +249,75 @@
   gap: 25px;
 }
 
-/* Works Carousel */
+/* Works Carousel - Same Style as Products but Larger */
+.works-carousel-wrapper {
+  position: relative;
+  margin: 30px 0;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  padding: 0 60px;
+}
+
 .works-carousel-container {
   width: 100%;
   overflow: hidden;
   position: relative;
-  margin: 30px 0;
 }
 
 .works-carousel {
   display: flex;
-  gap: 24px;
+  gap: 30px;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;
   padding: 20px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary) transparent;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .works-carousel::-webkit-scrollbar {
-  height: 8px;
-}
-
-.works-carousel::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-}
-
-.works-carousel::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border-radius: 4px;
-}
-
-.works-carousel::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
+  display: none;
 }
 
 .works-carousel > * {
-  flex: 0 0 280px;
-  min-width: 280px;
+  flex: 0 0 380px;
+  min-width: 380px;
+  scroll-snap-align: center;
+}
+
+/* Scroll Buttons for Works Carousel */
+.works-carousel-wrapper .scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.works-carousel-wrapper .scroll-btn:hover {
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.works-carousel-wrapper .scroll-btn-left {
+  left: -25px;
+}
+
+.works-carousel-wrapper .scroll-btn-right {
+  right: -25px;
 }
 
 .work-card-mini {

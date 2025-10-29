@@ -199,36 +199,60 @@ function FeaturedWorksSection() {
         {loading ? (
           <div className="loading">جاري التحميل...</div>
         ) : (
-          <div className="works-carousel-container">
-            <div className="works-carousel">
-              {works && works.length > 0 ? (
-                works.map((work) => (
-                  <div key={work.id} className="work-card-mini">
-                    <div className="work-image-mini">
-                      {work.image_url ? (
-                        <img 
-                          src={work.image_url.startsWith('http') ? work.image_url : `https://khawam-pro-production.up.railway.app${work.image_url}`}
-                          alt={work.title_ar || work.title}
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const placeholder = target.nextElementSibling as HTMLElement;
-                            if (placeholder) placeholder.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div className={`placeholder-mini ${work.image_url ? 'hidden' : ''}`}></div>
+          <div className="works-carousel-wrapper">
+            <button 
+              className="scroll-btn scroll-btn-left"
+              onClick={() => {
+                const container = document.querySelector('.works-carousel') as HTMLElement;
+                if (container) container.scrollBy({ left: -450, behavior: 'smooth' });
+              }}
+              aria-label="تمرير لليسار"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            
+            <div className="works-carousel-container">
+              <div className="works-carousel">
+                {works && works.length > 0 ? (
+                  works.map((work) => (
+                    <div key={work.id} className="work-card-mini">
+                      <div className="work-image-mini">
+                        {work.image_url ? (
+                          <img 
+                            src={work.image_url.startsWith('http') ? work.image_url : `https://khawam-pro-production.up.railway.app${work.image_url}`}
+                            alt={work.title_ar || work.title}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const placeholder = target.nextElementSibling as HTMLElement;
+                              if (placeholder) placeholder.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div className={`placeholder-mini ${work.image_url ? 'hidden' : ''}`}></div>
+                      </div>
+                      <div className="work-info-mini">
+                        <span className="work-category-mini">{work.category_ar || 'عام'}</span>
+                        <h4>{work.title_ar || work.title}</h4>
+                      </div>
                     </div>
-                    <div className="work-info-mini">
-                      <span className="work-category-mini">{work.category_ar || 'عام'}</span>
-                      <h4>{work.title_ar || work.title}</h4>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="loading">لا توجد أعمال للعرض حالياً</div>
-              )}
+                  ))
+                ) : (
+                  <div className="loading">لا توجد أعمال للعرض حالياً</div>
+                )}
+              </div>
             </div>
+            
+            <button 
+              className="scroll-btn scroll-btn-right"
+              onClick={() => {
+                const container = document.querySelector('.works-carousel') as HTMLElement;
+                if (container) container.scrollBy({ left: 450, behavior: 'smooth' });
+              }}
+              aria-label="تمرير لليمين"
+            >
+              <ChevronRight size={24} />
+            </button>
           </div>
         )}
       </div>

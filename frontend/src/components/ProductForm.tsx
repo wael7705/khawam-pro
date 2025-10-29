@@ -120,6 +120,15 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
 
       <div className="form-group">
         <label>الصورة</label>
+        {product?.image_url && !image && (
+          <div className="current-image">
+            <img 
+              src={product.image_url.startsWith('http') ? product.image_url : `https://khawam-pro-production.up.railway.app${product.image_url}`}
+              alt="Current product image"
+            />
+            <p>الصورة الحالية</p>
+          </div>
+        )}
         <div className="upload-area">
           <input 
             type="file" 
@@ -131,6 +140,18 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
           <label htmlFor="product-image" className="upload-label">
             {image ? image.name : 'انقر للرفع أو اسحب الملف هنا'}
           </label>
+          {image && (
+            <div className="image-preview">
+              <img src={URL.createObjectURL(image)} alt="Preview" />
+              <button 
+                type="button" 
+                onClick={() => setImage(null)}
+                className="remove-image-btn"
+              >
+                إزالة
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -277,23 +277,41 @@ async def delete_service(service_id: int, db: Session = Depends(get_db)):
 async def get_all_works(db: Session = Depends(get_db)):
     """Get all portfolio works (admin view)"""
     try:
-        works = db.query(PortfolioWork).order_by(PortfolioWork.display_order).all()
+        # استخدام raw SQL لتجنب مشكلة العمود images إذا لم يكن موجوداً
+        from sqlalchemy import text
+        query = text("""
+            SELECT 
+                id, title, title_ar, description, description_ar,
+                image_url, category, category_ar, is_featured, is_visible, display_order
+            FROM portfolio_works 
+            ORDER BY display_order
+        """)
+        result = db.execute(query)
+        rows = result.fetchall()
+        
         works_list = []
-        for w in works:
+        for row in rows:
+            # التأكد من أن image_url يحتوي على المسار الكامل إذا كان نسبياً
+            image_url = row.image_url or ""
+            if image_url and not image_url.startswith('http') and not image_url.startswith('/'):
+                image_url = f"/{image_url}" if image_url else ""
+            
             works_list.append({
-                "id": w.id,
-                "title_ar": w.title_ar,
-                "title": w.title,
-                "description_ar": w.description_ar or "",
-                "image_url": w.image_url or "",
-                "category_ar": w.category_ar or "",
-                "is_visible": w.is_visible,
-                "is_featured": w.is_featured,
-                "display_order": w.display_order
+                "id": row.id,
+                "title_ar": row.title_ar or "",
+                "title": row.title or row.title_ar or "",
+                "description_ar": row.description_ar or "",
+                "image_url": image_url,
+                "category_ar": row.category_ar or "",
+                "is_visible": row.is_visible if hasattr(row, 'is_visible') else True,
+                "is_featured": row.is_featured if hasattr(row, 'is_featured') else False,
+                "display_order": row.display_order if hasattr(row, 'display_order') else 0
             })
         return works_list
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error fetching all works: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 @router.post("/works")

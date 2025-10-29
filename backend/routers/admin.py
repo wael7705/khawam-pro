@@ -321,7 +321,7 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
             "work": {
                 "id": new_work.id,
                 "title_ar": new_work.title_ar,
-                "title_en": new_work.title_en,
+                "title": new_work.title,
                 "image_url": new_work.image_url,
                 "is_featured": new_work.is_featured
             }

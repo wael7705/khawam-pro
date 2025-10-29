@@ -2,41 +2,56 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
 from models import PortfolioWork
+from sqlalchemy import text
 
 router = APIRouter()
 
 @router.get("/")
 async def get_portfolio_works(db: Session = Depends(get_db)):
     try:
-        works = db.query(PortfolioWork).filter(
-            PortfolioWork.is_visible == True
-        ).order_by(PortfolioWork.display_order).all()
+        # استخدام raw SQL لتجنب مشكلة العمود images إذا لم يكن موجوداً
+        query = text("""
+            SELECT 
+                id, title, title_ar, description, description_ar,
+                image_url, category, category_ar, is_featured, is_visible, display_order
+            FROM portfolio_works 
+            WHERE is_visible = true 
+            ORDER BY display_order
+        """)
+        result = db.execute(query)
+        rows = result.fetchall()
+        
         works_list = []
-        for w in works:
-            # معالجة آمنة لحقل images
+        for row in rows:
+            # محاولة الحصول على images إذا كان العمود موجوداً
             images_value = []
             try:
-                if hasattr(w, 'images') and w.images is not None:
-                    images_value = w.images if isinstance(w.images, list) else []
-            except (AttributeError, Exception) as img_err:
-                print(f"Warning: Could not access images for work {w.id}: {img_err}")
-                images_value = []
+                images_query = text("""
+                    SELECT images FROM portfolio_works WHERE id = :work_id
+                """)
+                img_result = db.execute(images_query, {"work_id": row.id})
+                img_row = img_result.fetchone()
+                if img_row and img_row[0] is not None:
+                    images_value = img_row[0] if isinstance(img_row[0], list) else []
+            except Exception:
+                # إذا كان العمود غير موجود، تجاهل الخطأ
+                pass
             
             works_list.append({
-                "id": w.id,
-                "title_ar": w.title_ar or "",
-                "title": w.title or w.title_ar or "",
-                "title_en": w.title or "",
-                "description_ar": w.description_ar or "",
-                "description_en": w.description or "",
-                "description": w.description or "",
-                "image_url": w.image_url or "",
+                "id": row.id,
+                "title_ar": row.title_ar or "",
+                "title": row.title or row.title_ar or "",
+                "title_en": row.title or "",
+                "description_ar": row.description_ar or "",
+                "description_en": row.description or "",
+                "description": row.description or "",
+                "image_url": row.image_url or "",
                 "images": images_value,
-                "category_ar": w.category_ar or "",
-                "category_en": w.category or "",
-                "category": w.category or w.category_ar or "",
-                "is_featured": w.is_featured if hasattr(w, 'is_featured') else False,
-                "is_visible": w.is_visible if hasattr(w, 'is_visible') else True
+                "category_ar": row.category_ar or "",
+                "category_en": row.category or "",
+                "category": row.category or row.category_ar or "",
+                "is_featured": row.is_featured if hasattr(row, 'is_featured') else False,
+                "is_visible": True
             })
         return works_list
     except Exception as e:
@@ -48,34 +63,46 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
 @router.get("/featured")
 async def get_featured_works(db: Session = Depends(get_db)):
     try:
-        works = db.query(PortfolioWork).filter(
-            PortfolioWork.is_visible == True,
-            PortfolioWork.is_featured == True
-        ).order_by(PortfolioWork.display_order).all()
+        # استخدام raw SQL لتجنب مشكلة العمود images
+        query = text("""
+            SELECT 
+                id, title, title_ar, description, description_ar,
+                image_url, category, category_ar, is_featured, is_visible, display_order
+            FROM portfolio_works 
+            WHERE is_visible = true AND is_featured = true 
+            ORDER BY display_order
+        """)
+        result = db.execute(query)
+        rows = result.fetchall()
+        
         works_list = []
-        for w in works:
-            # معالجة آمنة لحقل images
+        for row in rows:
+            # محاولة الحصول على images إذا كان العمود موجوداً
             images_value = []
             try:
-                if hasattr(w, 'images') and w.images is not None:
-                    images_value = w.images if isinstance(w.images, list) else []
-            except (AttributeError, Exception) as img_err:
-                print(f"Warning: Could not access images for work {w.id}: {img_err}")
-                images_value = []
+                images_query = text("""
+                    SELECT images FROM portfolio_works WHERE id = :work_id
+                """)
+                img_result = db.execute(images_query, {"work_id": row.id})
+                img_row = img_result.fetchone()
+                if img_row and img_row[0] is not None:
+                    images_value = img_row[0] if isinstance(img_row[0], list) else []
+            except Exception:
+                pass
             
             works_list.append({
-                "id": w.id,
-                "title_ar": w.title_ar or "",
-                "title": w.title or w.title_ar or "",
-                "title_en": w.title or "",
-                "description_ar": w.description_ar or "",
-                "description_en": w.description or "",
-                "description": w.description or "",
-                "image_url": w.image_url or "",
+                "id": row.id,
+                "title_ar": row.title_ar or "",
+                "title": row.title or row.title_ar or "",
+                "title_en": row.title or "",
+                "description_ar": row.description_ar or "",
+                "description_en": row.description or "",
+                "description": row.description or "",
+                "image_url": row.image_url or "",
                 "images": images_value,
-                "category_ar": w.category_ar or "",
-                "category_en": w.category or "",
-                "category": w.category or w.category_ar or "",
+                "category_ar": row.category_ar or "",
+                "category_en": row.category or "",
+                "category": row.category or row.category_ar or "",
                 "is_featured": True
             })
         return works_list
@@ -89,30 +116,48 @@ async def get_featured_works(db: Session = Depends(get_db)):
 async def get_work_by_id(work_id: int, db: Session = Depends(get_db)):
     """الحصول على تفاصيل عمل محدد"""
     try:
-        work = db.query(PortfolioWork).filter(
-            PortfolioWork.id == work_id,
-            PortfolioWork.is_visible == True
-        ).first()
+        query = text("""
+            SELECT 
+                id, title, title_ar, description, description_ar,
+                image_url, category, category_ar, is_featured, is_visible, created_at
+            FROM portfolio_works 
+            WHERE id = :work_id AND is_visible = true
+        """)
+        result = db.execute(query, {"work_id": work_id})
+        row = result.fetchone()
         
-        if not work:
+        if not row:
             return {"error": "Work not found"}
         
+        # محاولة الحصول على images
+        images_value = []
+        try:
+            images_query = text("""
+                SELECT images FROM portfolio_works WHERE id = :work_id
+            """)
+            img_result = db.execute(images_query, {"work_id": work_id})
+            img_row = img_result.fetchone()
+            if img_row and img_row[0] is not None:
+                images_value = img_row[0] if isinstance(img_row[0], list) else []
+        except Exception:
+            pass
+        
         return {
-            "id": work.id,
-            "title_ar": work.title_ar or "",
-            "title": work.title or work.title_ar or "",
-            "title_en": work.title or "",
-            "description_ar": work.description_ar or "",
-            "description_en": work.description or "",
-            "description": work.description or "",
-            "image_url": work.image_url or "",
-            "images": work.images if hasattr(work, 'images') and work.images else [],
-            "category_ar": work.category_ar or "",
-            "category_en": work.category or "",
-            "category": work.category or work.category_ar or "",
-            "is_featured": work.is_featured if hasattr(work, 'is_featured') else False,
-            "is_visible": work.is_visible if hasattr(work, 'is_visible') else True,
-            "created_at": work.created_at.isoformat() if work.created_at else None
+            "id": row.id,
+            "title_ar": row.title_ar or "",
+            "title": row.title or row.title_ar or "",
+            "title_en": row.title or "",
+            "description_ar": row.description_ar or "",
+            "description_en": row.description or "",
+            "description": row.description or "",
+            "image_url": row.image_url or "",
+            "images": images_value,
+            "category_ar": row.category_ar or "",
+            "category_en": row.category or "",
+            "category": row.category or row.category_ar or "",
+            "is_featured": row.is_featured if hasattr(row, 'is_featured') else False,
+            "is_visible": True,
+            "created_at": row.created_at.isoformat() if row.created_at else None
         }
     except Exception as e:
         print(f"Error fetching work {work_id}: {e}")

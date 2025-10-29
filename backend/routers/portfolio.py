@@ -13,6 +13,15 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
         ).order_by(PortfolioWork.display_order).all()
         works_list = []
         for w in works:
+            # معالجة آمنة لحقل images
+            images_value = []
+            try:
+                if hasattr(w, 'images') and w.images is not None:
+                    images_value = w.images if isinstance(w.images, list) else []
+            except (AttributeError, Exception) as img_err:
+                print(f"Warning: Could not access images for work {w.id}: {img_err}")
+                images_value = []
+            
             works_list.append({
                 "id": w.id,
                 "title_ar": w.title_ar or "",
@@ -22,7 +31,7 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
                 "description_en": w.description or "",
                 "description": w.description or "",
                 "image_url": w.image_url or "",
-                "images": w.images if hasattr(w, 'images') and w.images else [],
+                "images": images_value,
                 "category_ar": w.category_ar or "",
                 "category_en": w.category or "",
                 "category": w.category or w.category_ar or "",
@@ -45,6 +54,15 @@ async def get_featured_works(db: Session = Depends(get_db)):
         ).order_by(PortfolioWork.display_order).all()
         works_list = []
         for w in works:
+            # معالجة آمنة لحقل images
+            images_value = []
+            try:
+                if hasattr(w, 'images') and w.images is not None:
+                    images_value = w.images if isinstance(w.images, list) else []
+            except (AttributeError, Exception) as img_err:
+                print(f"Warning: Could not access images for work {w.id}: {img_err}")
+                images_value = []
+            
             works_list.append({
                 "id": w.id,
                 "title_ar": w.title_ar or "",
@@ -54,7 +72,7 @@ async def get_featured_works(db: Session = Depends(get_db)):
                 "description_en": w.description or "",
                 "description": w.description or "",
                 "image_url": w.image_url or "",
-                "images": w.images if hasattr(w, 'images') and w.images else [],
+                "images": images_value,
                 "category_ar": w.category_ar or "",
                 "category_en": w.category or "",
                 "category": w.category or w.category_ar or "",

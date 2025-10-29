@@ -36,10 +36,12 @@ export default function Products() {
         {loading ? (
           <div className="loading">جاري التحميل...</div>
         ) : (
-          <div className="grid">
-            {products.map((product, index) => (
-              <ProductCard key={product.id} product={product} index={index} />
-            ))}
+          <div className="products-horizontal-container">
+            <div className="products-horizontal">
+              {products.map((product, index) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))}
+            </div>
           </div>
         )}
       </div>

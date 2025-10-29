@@ -26,7 +26,19 @@ export default function ProductCard({ product, index }: ProductCardProps) {
       viewport={{ once: true }}
     >
       <div className="product-image">
-        <div className="placeholder-product-image"></div>
+        {product.image_url ? (
+          <img 
+            src={product.image_url.startsWith('http') ? product.image_url : `https://khawam-pro-production.up.railway.app${product.image_url}`}
+            alt={product.name_ar}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const placeholder = target.nextElementSibling as HTMLElement;
+              if (placeholder) placeholder.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div className={`placeholder-product-image ${product.image_url ? 'hidden' : ''}`}></div>
       </div>
       <div className="product-info">
         <h3>{product.name_ar}</h3>

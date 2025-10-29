@@ -20,3 +20,65 @@
   color: var(--text);
   margin-bottom: 60px;
 }
+
+/* Horizontal Scroll Container - Center Start */
+.products-horizontal-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  margin: 40px 0;
+}
+
+.products-horizontal {
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  padding: 20px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+  scroll-snap-type: x proximity;
+  
+  /* Start from center */
+  justify-content: center;
+  padding-left: 50%;
+  padding-right: 50%;
+}
+
+.products-horizontal > * {
+  flex: 0 0 320px;
+  min-width: 320px;
+  scroll-snap-align: center;
+}
+
+.products-horizontal::-webkit-scrollbar {
+  height: 10px;
+}
+
+.products-horizontal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 5px;
+}
+
+.products-horizontal::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 5px;
+}
+
+.products-horizontal::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .products-horizontal {
+    padding-left: 20px;
+    padding-right: 20px;
+    justify-content: flex-start;
+  }
+  
+  .products-horizontal > * {
+    flex: 0 0 280px;
+    min-width: 280px;
+  }
+}

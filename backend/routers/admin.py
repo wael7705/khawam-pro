@@ -10,6 +10,52 @@ import uuid
 
 router = APIRouter()
 
+# --------------------------------------------
+# Helpers for public image URLs
+# --------------------------------------------
+def _get_public_base_url() -> str:
+    """Return absolute public base URL for this backend (used to build image URLs)."""
+    # Prefer explicit config
+    explicit = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    # Railway provides RAILWAY_PUBLIC_DOMAIN (domain only)
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+    if domain:
+        if domain.startswith("http"):
+            return domain.rstrip("/")
+        return f"https://{domain}"
+    # Fallback to production host if set elsewhere (not ideal but safe)
+    frontend = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    if frontend and frontend.startswith("http"):
+        # If frontend deployed on same domain pathless, reuse its origin
+        from urllib.parse import urlparse
+        p = urlparse(frontend)
+        return f"{p.scheme}://{p.netloc}"
+    # Last resort: known production URL
+    return "https://khawam-pro-production.up.railway.app"
+
+def _normalize_to_absolute(url_or_path: str) -> str:
+    """Normalize any provided value to an absolute URL.
+    - http/https → returned as-is
+    - starts with /uploads/ → prepend base URL
+    - bare filename → make it /uploads/<filename> then prepend base URL
+    - any other relative path → ensure starts with / then prepend base URL
+    """
+    if not url_or_path:
+        return url_or_path
+    value = url_or_path.replace("\\", "/").strip()
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    base = _get_public_base_url()
+    if value.startswith("/uploads/"):
+        return f"{base}{value}"
+    if "/" not in value:
+        return f"{base}/uploads/{value}"
+    if not value.startswith("/"):
+        value = f"/{value}"
+    return f"{base}{value}"
+
 # Pydantic models for request/response
 class ProductCreate(BaseModel):
     name_ar: str = Field(..., min_length=1, max_length=200)
@@ -125,7 +171,7 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
             name_ar=product.name_ar,
             name=final_name,
             price=product.price,
-            image_url=product.image_url,
+            image_url=_normalize_to_absolute(product.image_url) if product.image_url else None,
             category_id=product.category_id or 1,
             is_visible=product.is_visible,
             is_featured=product.is_featured,
@@ -159,6 +205,8 @@ async def update_product(product_id: int, product: ProductUpdate, db: Session = 
             raise HTTPException(status_code=404, detail="Product not found")
         
         update_data = product.dict(exclude_unset=True)
+        if "image_url" in update_data and update_data["image_url"]:
+            update_data["image_url"] = _normalize_to_absolute(update_data["image_url"]) 
         for key, value in update_data.items():
             setattr(existing_product, key, value)
         
@@ -227,6 +275,9 @@ async def create_service(service: ServiceCreate, db: Session = Depends(get_db)):
             is_visible=service.is_visible,
             display_order=service.display_order
         )
+        # services may also have image_url in model, set if provided
+        if hasattr(new_service, "image_url") and service and getattr(service, "image_url", None):
+            new_service.image_url = _normalize_to_absolute(getattr(service, "image_url"))
         db.add(new_service)
         db.commit()
         db.refresh(new_service)
@@ -244,6 +295,8 @@ async def update_service(service_id: int, service: ServiceUpdate, db: Session = 
             raise HTTPException(status_code=404, detail="Service not found")
         
         update_data = service.dict(exclude_unset=True)
+        if "image_url" in update_data and update_data["image_url"]:
+            update_data["image_url"] = _normalize_to_absolute(update_data["image_url"]) 
         for key, value in update_data.items():
             setattr(existing_service, key, value)
         
@@ -330,8 +383,8 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
             title_ar=work.title_ar,
             description=work.description_ar or "",  # description - العمود الفعلي
             description_ar=work.description_ar or "",
-            image_url=work.image_url or "",
-            images=work.images if work.images else [],  # الصور الثانوية
+            image_url=_normalize_to_absolute(work.image_url) if work.image_url else "",
+            images=[_normalize_to_absolute(u) for u in (work.images or [])],  # الصور الثانوية
             category=work.category_ar or "",  # category - العمود الفعلي
             category_ar=work.category_ar or "",
             is_visible=work.is_visible,
@@ -377,9 +430,9 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
             existing_work.description = work.description_ar
             existing_work.description_ar = work.description_ar
         if work.image_url is not None:
-            existing_work.image_url = work.image_url
+            existing_work.image_url = _normalize_to_absolute(work.image_url) if work.image_url else ""
         if work.images is not None:
-            existing_work.images = work.images
+            existing_work.images = [_normalize_to_absolute(u) for u in (work.images or [])]
         if work.category_ar is not None:
             existing_work.category = work.category_ar
             existing_work.category_ar = work.category_ar
@@ -442,10 +495,7 @@ async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Sessio
         for u in payload.images or []:
             if not u:
                 continue
-            v = u.replace('\\\\', '/').replace('\\', '/')
-            if not v.startswith('http') and not v.startswith('/'):
-                v = f"/{v}"
-            normalized.append(v)
+            normalized.append(_normalize_to_absolute(u))
 
         if payload.append:
             work.images = list(dict.fromkeys(current_images + normalized))
@@ -528,11 +578,13 @@ async def upload_image(file: UploadFile = File(...)):
             buffer.write(content)
         
         # Return URL (relative path - will be served via StaticFiles)
-        image_url = f"/uploads/{unique_filename}"
+        relative = f"/uploads/{unique_filename}"
+        absolute = _normalize_to_absolute(relative)
         return {
             "success": True,
-            "url": image_url,
-            "image_url": image_url,
+            "url": absolute,
+            "image_url": absolute,
+            "relative_url": relative,
             "filename": unique_filename
         }
     except HTTPException:
@@ -551,6 +603,7 @@ async def upload_images(files: list[UploadFile] = File(...)):
         os.makedirs(upload_dir, exist_ok=True)
 
         urls: list[str] = []
+        relative_urls: list[str] = []
         for file in files:
             if not file.content_type or not file.content_type.startswith('image/'):
                 continue
@@ -560,12 +613,14 @@ async def upload_images(files: list[UploadFile] = File(...)):
             content = await file.read()
             with open(path, "wb") as buffer:
                 buffer.write(content)
-            urls.append(f"/uploads/{filename}")
+            rel = f"/uploads/{filename}"
+            relative_urls.append(rel)
+            urls.append(_normalize_to_absolute(rel))
 
         if not urls:
             raise HTTPException(status_code=400, detail="No valid image files uploaded")
 
-        return {"success": True, "urls": urls}
+        return {"success": True, "urls": urls, "relative_urls": relative_urls}
     except HTTPException:
         raise
     except Exception as e:

@@ -83,6 +83,10 @@ class WorkUpdate(BaseModel):
     is_featured: Optional[bool] = None
     display_order: Optional[int] = None
 
+class WorkImagesUpdate(BaseModel):
+    images: list[str] = []
+    append: bool = True
+
 # ============================================
 # Products Management Endpoints
 # ============================================
@@ -424,6 +428,39 @@ async def delete_work(work_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/works/{work_id}/images")
+async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Session = Depends(get_db)):
+    """Replace or append secondary images for a work."""
+    try:
+        work = db.query(PortfolioWork).filter(PortfolioWork.id == work_id).first()
+        if not work:
+            raise HTTPException(status_code=404, detail="Work not found")
+
+        current_images = work.images or []
+        # Normalize slashes and ensure leading slash for local uploads
+        normalized = []
+        for u in payload.images or []:
+            if not u:
+                continue
+            v = u.replace('\\\\', '/').replace('\\', '/')
+            if not v.startswith('http') and not v.startswith('/'):
+                v = f"/{v}"
+            normalized.append(v)
+
+        if payload.append:
+            work.images = list(dict.fromkeys(current_images + normalized))
+        else:
+            work.images = normalized
+
+        db.commit()
+        db.refresh(work)
+        return {"success": True, "images": work.images or []}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ============================================
 # Orders Management Endpoints
 # ============================================
@@ -502,3 +539,34 @@ async def upload_image(file: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ في رفع الصورة: {str(e)}")
+
+@router.post("/upload/multiple")
+async def upload_images(files: list[UploadFile] = File(...)):
+    """Upload multiple images and return their URLs."""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files uploaded")
+
+        upload_dir = "uploads/"
+        os.makedirs(upload_dir, exist_ok=True)
+
+        urls: list[str] = []
+        for file in files:
+            if not file.content_type or not file.content_type.startswith('image/'):
+                continue
+            ext = os.path.splitext(file.filename)[1] or '.jpg'
+            filename = f"{uuid.uuid4()}{ext}"
+            path = os.path.join(upload_dir, filename)
+            content = await file.read()
+            with open(path, "wb") as buffer:
+                buffer.write(content)
+            urls.append(f"/uploads/{filename}")
+
+        if not urls:
+            raise HTTPException(status_code=400, detail="No valid image files uploaded")
+
+        return {"success": True, "urls": urls}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ في رفع الصور: {str(e)}")

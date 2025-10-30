@@ -722,3 +722,27 @@ async def normalize_image_urls(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Normalization failed: {str(e)}")
+
+@router.post("/maintenance/ensure-portfolio-images-column")
+async def ensure_portfolio_images_column(db: Session = Depends(get_db)):
+    """Ensure portfolio_works has an images TEXT[] column to store multiple image URLs."""
+    try:
+        from sqlalchemy import text
+        db.execute(text(
+            """
+            DO $$
+            BEGIN
+              IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name='portfolio_works' AND column_name='images'
+              ) THEN
+                ALTER TABLE portfolio_works ADD COLUMN images TEXT[] DEFAULT ARRAY[]::TEXT[];
+              END IF;
+            END $$;
+            """
+        ))
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

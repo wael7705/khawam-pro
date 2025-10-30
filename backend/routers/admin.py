@@ -644,62 +644,75 @@ async def upload_images(files: list[UploadFile] = File(...)):
 
 @router.post("/maintenance/normalize-images")
 async def normalize_image_urls(db: Session = Depends(get_db)):
-    """Normalize image URLs in DB to absolute public URLs for products, services, and portfolio works."""
+    """Normalize image URLs in DB to absolute public URLs for products, services, and portfolio works.
+    Safe against missing optional columns like images in portfolio_works.
+    """
     try:
+        from sqlalchemy import text
         updated_counts = {"products": 0, "services": 0, "portfolio_works": 0}
 
+        # Helper to check column existence
+        def column_exists(table: str, column: str) -> bool:
+            q = text(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = :t AND column_name = :c
+                """
+            )
+            res = db.execute(q, {"t": table, "c": column}).fetchone()
+            return bool(res)
+
+        has_products_images = column_exists("products", "images")
+        has_pw_images = column_exists("portfolio_works", "images")
+
         # Products
-        products = db.query(Product).all()
-        for p in products:
-            before = p.image_url or ""
-            after = _normalize_to_absolute(before) if before else before
+        rows = db.execute(text("SELECT id, image_url{} FROM products".format(
+            ", images" if has_products_images else ""
+        ))).fetchall()
+        for r in rows:
+            pid = r[0]
+            img_before = r[1] if len(r) > 1 else None
+            images_before = r[2] if (has_products_images and len(r) > 2) else None
             changed = False
-            if before and after and before != after:
-                p.image_url = after
+            img_after = _normalize_to_absolute(img_before) if img_before else img_before
+            if img_before and img_after and img_after != img_before:
+                db.execute(text("UPDATE products SET image_url=:u WHERE id=:id"), {"u": img_after, "id": pid})
                 changed = True
-            # Also normalize images array if present
-            if hasattr(p, "images") and isinstance(p.images, list) and p.images:
-                normalized = []
-                arr_changed = False
-                for u in p.images:
-                    nu = _normalize_to_absolute(u) if u else u
-                    normalized.append(nu)
-                    if u != nu:
-                        arr_changed = True
-                if arr_changed:
-                    p.images = normalized
+            if has_products_images and isinstance(images_before, list) and images_before:
+                normalized = [_normalize_to_absolute(u) if u else u for u in images_before]
+                if normalized != images_before:
+                    db.execute(text("UPDATE products SET images=:arr WHERE id=:id"), {"arr": normalized, "id": pid})
                     changed = True
             if changed:
                 updated_counts["products"] += 1
 
         # Services
-        services = db.query(Service).all()
-        for s in services:
-            before = s.image_url or ""
-            after = _normalize_to_absolute(before) if before else before
-            if before and after and before != after:
-                s.image_url = after
-                updated_counts["services"] += 1
+        rows = db.execute(text("SELECT id, image_url FROM services")).fetchall()
+        for r in rows:
+            sid, img_before = r[0], r[1]
+            if img_before:
+                img_after = _normalize_to_absolute(img_before)
+                if img_after != img_before:
+                    db.execute(text("UPDATE services SET image_url=:u WHERE id=:id"), {"u": img_after, "id": sid})
+                    updated_counts["services"] += 1
 
         # Portfolio works
-        works = db.query(PortfolioWork).all()
-        for w in works:
-            before = w.image_url or ""
-            after = _normalize_to_absolute(before) if before else before
+        rows = db.execute(text("SELECT id, image_url{} FROM portfolio_works".format(
+            ", images" if has_pw_images else ""
+        ))).fetchall()
+        for r in rows:
+            wid = r[0]
+            img_before = r[1] if len(r) > 1 else None
+            images_before = r[2] if (has_pw_images and len(r) > 2) else None
             changed = False
-            if before and after and before != after:
-                w.image_url = after
+            img_after = _normalize_to_absolute(img_before) if img_before else img_before
+            if img_before and img_after and img_after != img_before:
+                db.execute(text("UPDATE portfolio_works SET image_url=:u WHERE id=:id"), {"u": img_after, "id": wid})
                 changed = True
-            if hasattr(w, "images") and isinstance(w.images, list) and w.images:
-                normalized = []
-                arr_changed = False
-                for u in w.images:
-                    nu = _normalize_to_absolute(u) if u else u
-                    normalized.append(nu)
-                    if u != nu:
-                        arr_changed = True
-                if arr_changed:
-                    w.images = normalized
+            if has_pw_images and isinstance(images_before, list) and images_before:
+                normalized = [_normalize_to_absolute(u) if u else u for u in images_before]
+                if normalized != images_before:
+                    db.execute(text("UPDATE portfolio_works SET images=:arr WHERE id=:id"), {"arr": normalized, "id": wid})
                     changed = True
             if changed:
                 updated_counts["portfolio_works"] += 1

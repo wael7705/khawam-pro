@@ -24,9 +24,15 @@ async def get_products(
         for p in products:
             # اختر صورة مناسبة: image_url أو أول صورة من images
             img = p.image_url or (p.images[0] if isinstance(p.images, list) and p.images else "")
-            # إذا كانت قيمة نسبية ولا تبدأ بـ '/' أضف '/'
-            if img and not str(img).startswith('http') and not str(img).startswith('/'):
-                img = f"/{img}"
+            # تطبيع الرابط:
+            # - إذا http: اتركه كما هو
+            # - إذا اسم ملف فقط: حوله إلى /uploads/<filename>
+            # - إذا مسار نسبي بدون '/': أضف '/'
+            if img and not str(img).startswith('http'):
+                if '/' not in str(img):
+                    img = f"/uploads/{img}"
+                elif not str(img).startswith('/'):
+                    img = f"/{img}"
             products_list.append({
                 "id": p.id,
                 "name_ar": p.name_ar,

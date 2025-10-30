@@ -39,8 +39,11 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
             
             # التأكد من أن image_url يحتوي على المسار الكامل
             image_url = row.image_url or ""
-            if image_url and not image_url.startswith('http') and not image_url.startswith('/'):
-                image_url = f"/{image_url}"
+            # Normalize Windows backslashes and ensure leading slash for relative paths
+            if image_url:
+                image_url = image_url.replace('\\', '/')
+                if not image_url.startswith('http') and not image_url.startswith('/'):
+                    image_url = f"/{image_url}"
             
             works_list.append({
                 "id": row.id,
@@ -97,8 +100,10 @@ async def get_featured_works(db: Session = Depends(get_db)):
             
             # التأكد من أن image_url يحتوي على المسار الكامل
             image_url = row.image_url or ""
-            if image_url and not image_url.startswith('http') and not image_url.startswith('/'):
-                image_url = f"/{image_url}"
+            if image_url:
+                image_url = image_url.replace('\\', '/')
+                if not image_url.startswith('http') and not image_url.startswith('/'):
+                    image_url = f"/{image_url}"
             
             works_list.append({
                 "id": row.id,
@@ -154,8 +159,10 @@ async def get_work_by_id(work_id: int, db: Session = Depends(get_db)):
         
         # التأكد من أن image_url يحتوي على المسار الكامل
         image_url = row.image_url or ""
-        if image_url and not image_url.startswith('http') and not image_url.startswith('/'):
-            image_url = f"/{image_url}"
+        if image_url:
+            image_url = image_url.replace('\\', '/')
+            if not image_url.startswith('http') and not image_url.startswith('/'):
+                image_url = f"/{image_url}"
         
         return {
             "id": row.id,

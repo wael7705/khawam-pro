@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, validator
 from utils import handle_error, success_response, validate_price, validate_string
 import os
 import uuid
+import requests
 
 router = APIRouter()
 
@@ -637,6 +638,50 @@ async def upload_images(files: list[UploadFile] = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ في رفع الصور: {str(e)}")
+
+@router.post("/upload/by-url")
+async def upload_image_by_url(url: str = Form(...)):
+    """Download an image from a URL and store it under /uploads, returning its public URL."""
+    try:
+        if not url or not url.strip():
+            raise HTTPException(status_code=400, detail="URL is required")
+        url = url.strip()
+        # Fetch bytes
+        resp = requests.get(url, timeout=20)
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {resp.status_code}")
+        content = resp.content
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty content fetched")
+        # Guess extension
+        ext = '.jpg'
+        ct = resp.headers.get('Content-Type', '')
+        if 'png' in ct:
+            ext = '.png'
+        elif 'jpeg' in ct or 'jpg' in ct:
+            ext = '.jpg'
+        elif 'webp' in ct:
+            ext = '.webp'
+        # Save
+        upload_dir = "uploads/"
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = f"{uuid.uuid4()}{ext}"
+        path = os.path.join(upload_dir, filename)
+        with open(path, "wb") as f:
+            f.write(content)
+        relative = f"/uploads/{filename}"
+        absolute = _normalize_to_absolute(relative)
+        return {
+            "success": True,
+            "url": absolute,
+            "image_url": absolute,
+            "relative_url": relative,
+            "filename": filename
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب الصورة: {str(e)}")
 
 # ============================================
 # Maintenance: Normalize and persist image URLs

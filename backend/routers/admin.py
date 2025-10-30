@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Product, Service, PortfolioWork, Order
+from models import Product, Service, PortfolioWork, Order, OrderItem
 from typing import Optional
 from pydantic import BaseModel, Field, validator
 from utils import handle_error, success_response, validate_price, validate_string
@@ -348,11 +348,10 @@ async def get_all_works(db: Session = Depends(get_db)):
         
         works_list = []
         for row in rows:
-            # التأكد من أن image_url يحتوي على المسار الكامل إذا كان نسبياً
-            image_url = row.image_url or ""
-            if image_url and not image_url.startswith('http') and not image_url.startswith('/'):
-                image_url = f"/{image_url}" if image_url else ""
-            
+            # تطبيع رابط الصورة ليكون مطلقاً وصالحاً للعرض العام
+            image_url_raw = row.image_url or ""
+            image_url = _normalize_to_absolute(image_url_raw) if image_url_raw else ""
+
             works_list.append({
                 "id": row.id,
                 "title_ar": row.title_ar or "",
@@ -522,12 +521,25 @@ async def get_all_orders(db: Session = Depends(get_db)):
         orders = db.query(Order).order_by(Order.created_at.desc()).all()
         orders_list = []
         for o in orders:
+            # Try to find first design file from order items as the image
+            first_item = db.query(OrderItem).filter(OrderItem.order_id == o.id).order_by(OrderItem.id.asc()).first()
+            raw_image: str | None = None
+            if first_item and first_item.design_files:
+                # pick the first non-empty entry
+                for u in first_item.design_files:
+                    if u and str(u).strip():
+                        raw_image = str(u).strip()
+                        break
+            image_url = _normalize_to_absolute(raw_image) if raw_image else None
+
             orders_list.append({
                 "id": o.id,
                 "order_number": o.order_number,
                 "status": o.status,
-                "total": float(o.total) if o.total else 0,
-                "created_at": o.created_at.isoformat() if o.created_at else None
+                "final_amount": float(o.final_amount) if o.final_amount is not None else 0,
+                "total_amount": float(o.total_amount) if o.total_amount is not None else 0,
+                "created_at": o.created_at.isoformat() if o.created_at else None,
+                "image_url": image_url
             })
         return orders_list
     except Exception as e:
@@ -625,3 +637,75 @@ async def upload_images(files: list[UploadFile] = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ في رفع الصور: {str(e)}")
+
+# ============================================
+# Maintenance: Normalize and persist image URLs
+# ============================================
+
+@router.post("/maintenance/normalize-images")
+async def normalize_image_urls(db: Session = Depends(get_db)):
+    """Normalize image URLs in DB to absolute public URLs for products, services, and portfolio works."""
+    try:
+        updated_counts = {"products": 0, "services": 0, "portfolio_works": 0}
+
+        # Products
+        products = db.query(Product).all()
+        for p in products:
+            before = p.image_url or ""
+            after = _normalize_to_absolute(before) if before else before
+            changed = False
+            if before and after and before != after:
+                p.image_url = after
+                changed = True
+            # Also normalize images array if present
+            if hasattr(p, "images") and isinstance(p.images, list) and p.images:
+                normalized = []
+                arr_changed = False
+                for u in p.images:
+                    nu = _normalize_to_absolute(u) if u else u
+                    normalized.append(nu)
+                    if u != nu:
+                        arr_changed = True
+                if arr_changed:
+                    p.images = normalized
+                    changed = True
+            if changed:
+                updated_counts["products"] += 1
+
+        # Services
+        services = db.query(Service).all()
+        for s in services:
+            before = s.image_url or ""
+            after = _normalize_to_absolute(before) if before else before
+            if before and after and before != after:
+                s.image_url = after
+                updated_counts["services"] += 1
+
+        # Portfolio works
+        works = db.query(PortfolioWork).all()
+        for w in works:
+            before = w.image_url or ""
+            after = _normalize_to_absolute(before) if before else before
+            changed = False
+            if before and after and before != after:
+                w.image_url = after
+                changed = True
+            if hasattr(w, "images") and isinstance(w.images, list) and w.images:
+                normalized = []
+                arr_changed = False
+                for u in w.images:
+                    nu = _normalize_to_absolute(u) if u else u
+                    normalized.append(nu)
+                    if u != nu:
+                        arr_changed = True
+                if arr_changed:
+                    w.images = normalized
+                    changed = True
+            if changed:
+                updated_counts["portfolio_works"] += 1
+
+        db.commit()
+        return {"success": True, "updated": updated_counts, "base_url": _get_public_base_url()}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Normalization failed: {str(e)}")

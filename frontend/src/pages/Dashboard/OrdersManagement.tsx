@@ -1,46 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Search, Filter, MoreVertical } from 'lucide-react'
 import './OrdersManagement.css'
+import { adminAPI } from '../../lib/api'
 
 export default function OrdersManagement() {
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      orderNumber: 'ORD-2025-001',
-      customerName: 'أحمد محمد',
-      whatsapp: '+963912345678',
-      serviceName: 'طباعة البوسترات',
-      quantity: 10,
-      total: 140000,
-      status: 'pending',
-      date: '2025-10-27',
-      time: '11:02 ص'
-    },
-    {
-      id: 2,
-      orderNumber: 'ORD-2025-002',
-      customerName: 'سارة علي',
-      whatsapp: '+963987654321',
-      serviceName: 'تصميم جرافيكي',
-      quantity: 5,
-      total: 70000,
-      status: 'in_progress',
-      date: '2025-10-26',
-      time: '08:08 م'
-    },
-    {
-      id: 3,
-      orderNumber: 'ORD-2025-003',
-      customerName: 'خالد حسن',
-      whatsapp: '+963955555555',
-      serviceName: 'طباعة الفليكس',
-      quantity: 20,
-      total: 200000,
-      status: 'delivered',
-      date: '2025-10-25',
-      time: '03:15 م'
-    },
-  ])
+  const [orders, setOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await adminAPI.orders.getAll()
+        const data = Array.isArray(res.data) ? res.data : []
+        setOrders(data)
+      } catch (e) {
+        setOrders([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
 
   return (
     <div className="orders-management">
@@ -69,11 +49,8 @@ export default function OrdersManagement() {
         <table className="orders-table">
           <thead>
             <tr>
+              <th>الصورة</th>
               <th>رقم الطلب</th>
-              <th>العميل</th>
-              <th>رقم الواتساب</th>
-              <th>الخدمة</th>
-              <th>الكمية</th>
               <th>الإجمالي</th>
               <th>الحالة</th>
               <th>التاريخ</th>
@@ -81,22 +58,28 @@ export default function OrdersManagement() {
             </tr>
           </thead>
           <tbody>
-            {orders.map(order => (
+            {loading ? (
+              <tr><td colSpan={6}>جاري التحميل...</td></tr>
+            ) : orders.map((order: any) => (
               <tr key={order.id}>
-                <td>{order.orderNumber}</td>
-                <td>{order.customerName}</td>
-                <td>{order.whatsapp}</td>
-                <td>{order.serviceName}</td>
-                <td>{order.quantity}</td>
-                <td>{order.total.toLocaleString()} ل.س</td>
                 <td>
-                  <span className={`status-badge ${order.status}`}>
-                    {order.status === 'pending' && 'معلق'}
-                    {order.status === 'in_progress' && 'قيد التنفيذ'}
-                    {order.status === 'delivered' && 'تم التوصيل'}
-                  </span>
+                  {order.image_url ? (
+                    <img
+                      className="order-image-thumb"
+                      src={order.image_url}
+                      alt={order.order_number || 'order image'}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <div className="order-image-placeholder">لا توجد صورة</div>
+                  )}
                 </td>
-                <td>{order.date}</td>
+                <td>{order.order_number}</td>
+                <td>{(order.final_amount ?? order.total_amount ?? 0).toLocaleString()} ل.س</td>
+                <td>
+                  <span className={`status-badge ${order.status}`}>{order.status}</span>
+                </td>
+                <td>{order.created_at ? new Date(order.created_at).toLocaleString('ar-SY') : '-'}</td>
                 <td>
                   <button className="icon-btn">
                     <MoreVertical size={18} />

@@ -92,3 +92,21 @@ class Order(Base):
     delivery_address = Column(Text)
     notes = Column(Text)
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    product_name = Column(String(100))
+    quantity = Column(Integer)
+    unit_price = Column(DECIMAL(10, 2))
+    total_price = Column(DECIMAL(12, 2))
+    size_id = Column(Integer)
+    material_id = Column(Integer)
+    specifications = Column(JSON)
+    design_files = Column(ARRAY(Text))
+    production_notes = Column(Text)
+    status = Column(String(20), default="pending")
+    created_at = Column(TIMESTAMP, server_default=func.now())

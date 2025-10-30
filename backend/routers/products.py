@@ -22,12 +22,17 @@ async def get_products(
         # تحويل إلى list للتحقق
         products_list = []
         for p in products:
+            # اختر صورة مناسبة: image_url أو أول صورة من images
+            img = p.image_url or (p.images[0] if isinstance(p.images, list) and p.images else "")
+            # إذا كانت قيمة نسبية ولا تبدأ بـ '/' أضف '/'
+            if img and not str(img).startswith('http') and not str(img).startswith('/'):
+                img = f"/{img}"
             products_list.append({
                 "id": p.id,
                 "name_ar": p.name_ar,
                 "name": p.name,
                 "price": float(p.price) if p.price else 0,
-                "image_url": p.image_url or ""
+                "image_url": img or ""
             })
         return products_list
     except Exception as e:

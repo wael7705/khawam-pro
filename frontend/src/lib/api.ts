@@ -91,9 +91,9 @@ export const adminAPI = {
   // Orders
   orders: {
     getAll: () => api.get('/admin/orders/all'),
-    updateStatus: (id: number, status: string) => api.put(`/admin/orders/${id}/status`, null, {
-      params: { status }
-    }),
+    getById: (id: number) => api.get(`/admin/orders/${id}`),
+    updateStatus: (id: number, status: string) => api.put(`/admin/orders/${id}/status?status=${status}`),
+    updateStaffNotes: (id: number, notes: string) => api.put(`/admin/orders/${id}/staff-notes`, { notes }),
   },
   
   // Upload

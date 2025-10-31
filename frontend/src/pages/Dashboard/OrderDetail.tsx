@@ -1,0 +1,357 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowRight, MessageSquare, X, Save } from 'lucide-react'
+import { adminAPI } from '../../lib/api'
+import { showSuccess, showError } from '../../utils/toast'
+import './OrderDetail.css'
+
+interface OrderItem {
+  id: number
+  product_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  specifications?: any
+  design_files?: string[]
+  status: string
+}
+
+interface Order {
+  id: number
+  order_number: string
+  customer_name: string
+  customer_phone: string
+  customer_whatsapp: string
+  shop_name?: string
+  status: string
+  delivery_type: string
+  total_amount: number
+  final_amount: number
+  payment_status: string
+  delivery_address?: string
+  notes?: string
+  staff_notes?: string
+  created_at: string
+  items: OrderItem[]
+  image_url?: string
+}
+
+export default function OrderDetail() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const [order, setOrder] = useState<Order | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [staffNotes, setStaffNotes] = useState('')
+  const [isSavingNotes, setIsSavingNotes] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+
+  useEffect(() => {
+    if (id) {
+      loadOrder(parseInt(id))
+    }
+  }, [id])
+
+  const loadOrder = async (orderId: number) => {
+    try {
+      setLoading(true)
+      const response = await adminAPI.orders.getById(orderId)
+      if (response.data.success && response.data.order) {
+        setOrder(response.data.order)
+        setStaffNotes(response.data.order.staff_notes || '')
+      } else {
+        showError('الطلب غير موجود')
+        navigate('/dashboard/orders')
+      }
+    } catch (error: any) {
+      console.error('Error loading order:', error)
+      showError('حدث خطأ في جلب تفاصيل الطلب')
+      navigate('/dashboard/orders')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!order) return
+    
+    setIsUpdatingStatus(true)
+    try {
+      await adminAPI.orders.updateStatus(order.id, newStatus)
+      setOrder({ ...order, status: newStatus })
+      showSuccess(`تم تحديث حالة الطلب إلى: ${getStatusLabel(newStatus)}`)
+    } catch (error: any) {
+      showError('فشل تحديث حالة الطلب')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleSaveNotes = async () => {
+    if (!order) return
+    
+    setIsSavingNotes(true)
+    try {
+      await adminAPI.orders.updateStaffNotes(order.id, staffNotes)
+      setOrder({ ...order, staff_notes: staffNotes })
+      showSuccess('تم حفظ الملاحظات بنجاح')
+    } catch (error: any) {
+      showError('فشل حفظ الملاحظات')
+    } finally {
+      setIsSavingNotes(false)
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: 'في الانتظار',
+      accepted: 'تم القبول',
+      preparing: 'قيد التحضير',
+      shipping: 'قيد التوصيل',
+      awaiting_pickup: 'في انتظار الاستلام',
+      completed: 'مكتمل',
+      cancelled: 'ملغى',
+      rejected: 'مرفوض'
+    }
+    return labels[status] || status
+  }
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: '#F59E0B',
+      accepted: '#3B82F6',
+      preparing: '#8B5CF6',
+      shipping: '#10B981',
+      awaiting_pickup: '#06B6D4',
+      completed: '#10B981',
+      cancelled: '#EF4444',
+      rejected: '#EF4444'
+    }
+    return colors[status] || '#6B7280'
+  }
+
+  const openWhatsApp = (phone: string) => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '')
+    window.open(`https://wa.me/${cleanPhone}`, '_blank')
+  }
+
+  if (loading) {
+    return (
+      <div className="order-detail-page">
+        <div className="container">
+          <div className="loading">جاري التحميل...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!order) {
+    return (
+      <div className="order-detail-page">
+        <div className="container">
+          <div className="error-message">الطلب غير موجود</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="order-detail-page">
+      <div className="container">
+        <div className="order-detail-header">
+        <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
+          <ArrowRight size={20} />
+          العودة للطلبات
+        </button>
+        <h1>تفاصيل الطلب: {order.order_number}</h1>
+      </div>
+
+      <div className="order-detail-content">
+        {/* Customer Info Card */}
+        <div className="detail-card customer-card">
+          <h2>معلومات العميل</h2>
+          <div className="customer-info-grid">
+            <div className="info-item">
+              <label>اسم العميل:</label>
+              <span>{order.customer_name || '-'}</span>
+            </div>
+            <div className="info-item">
+              <label>رقم الهاتف:</label>
+              <span>{order.customer_phone || '-'}</span>
+            </div>
+            <div className="info-item">
+              <label>واتساب:</label>
+              <button 
+                className="whatsapp-btn"
+                onClick={() => openWhatsApp(order.customer_whatsapp || order.customer_phone)}
+              >
+                <MessageSquare size={16} />
+                {order.customer_whatsapp || order.customer_phone}
+              </button>
+            </div>
+            {order.shop_name && (
+              <div className="info-item">
+                <label>اسم المتجر:</label>
+                <span>{order.shop_name}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Order Status Card */}
+        <div className="detail-card status-card">
+          <h2>حالة الطلب</h2>
+          <div className="status-controls">
+            <div className="current-status">
+              <span className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
+                {getStatusLabel(order.status)}
+              </span>
+            </div>
+            <div className="status-buttons">
+              {['accepted', 'preparing', 'shipping', 'awaiting_pickup', 'completed', 'cancelled', 'rejected'].map(status => (
+                <button
+                  key={status}
+                  className={`status-btn ${order.status === status ? 'active' : ''}`}
+                  onClick={() => handleStatusChange(status)}
+                  disabled={isUpdatingStatus}
+                  style={{ '--status-color': getStatusColor(status) } as React.CSSProperties}
+                >
+                  {getStatusLabel(status)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Order Items */}
+        <div className="detail-card items-card">
+          <h2>عناصر الطلب</h2>
+          <div className="items-list">
+            {order.items.map((item) => (
+              <div key={item.id} className="order-item-card">
+                <div className="item-header">
+                  <h3>{item.product_name}</h3>
+                  <span className="item-quantity">الكمية: {item.quantity}</span>
+                </div>
+                <div className="item-details">
+                  <div className="item-price">
+                    <span>السعر للوحدة: {item.unit_price.toLocaleString()} ل.س</span>
+                    <span className="total">الإجمالي: {item.total_price.toLocaleString()} ل.س</span>
+                  </div>
+                  {item.specifications && (
+                    <div className="item-specs">
+                      {item.specifications.dimensions && (
+                        <div className="spec-group">
+                          <label>الأبعاد:</label>
+                          <span>
+                            {item.specifications.dimensions.length || '-'} × 
+                            {item.specifications.dimensions.width || '-'} × 
+                            {item.specifications.dimensions.height || '-'} 
+                            {item.specifications.dimensions.unit || 'سم'}
+                          </span>
+                        </div>
+                      )}
+                      {item.specifications.colors && item.specifications.colors.length > 0 && (
+                        <div className="spec-group">
+                          <label>الألوان:</label>
+                          <div className="colors-list">
+                            {item.specifications.colors.map((color: string, idx: number) => (
+                              <span key={idx} className="color-dot" style={{ backgroundColor: color }} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {item.specifications.work_type && (
+                        <div className="spec-group">
+                          <label>نوع العمل:</label>
+                          <span>{item.specifications.work_type}</span>
+                        </div>
+                      )}
+                      {item.specifications.notes && (
+                        <div className="spec-group">
+                          <label>ملاحظات:</label>
+                          <span>{item.specifications.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {item.design_files && item.design_files.length > 0 && (
+                    <div className="design-files">
+                      <label>ملفات التصميم:</label>
+                      <div className="files-grid">
+                        {item.design_files.map((file, idx) => (
+                          <img key={idx} src={file} alt={`Design ${idx + 1}`} className="design-preview" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Order Summary */}
+        <div className="detail-card summary-card">
+          <h2>ملخص الطلب</h2>
+          <div className="summary-grid">
+            <div className="summary-item">
+              <label>تاريخ الطلب:</label>
+              <span>{new Date(order.created_at).toLocaleDateString('ar-SY', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</span>
+            </div>
+            <div className="summary-item">
+              <label>نوع التوصيل:</label>
+              <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+            </div>
+            {order.delivery_address && (
+              <div className="summary-item">
+                <label>عنوان التوصيل:</label>
+                <span>{order.delivery_address}</span>
+              </div>
+            )}
+            <div className="summary-item">
+              <label>حالة الدفع:</label>
+              <span>{order.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}</span>
+            </div>
+            <div className="summary-item total">
+              <label>الإجمالي:</label>
+              <span className="amount">{order.final_amount.toLocaleString()} ل.س</span>
+            </div>
+          </div>
+          {order.notes && (
+            <div className="customer-notes">
+              <label>ملاحظات العميل:</label>
+              <p>{order.notes}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Staff Notes */}
+        <div className="detail-card notes-card">
+          <h2>ملاحظات الموظف</h2>
+          <textarea
+            value={staffNotes}
+            onChange={(e) => setStaffNotes(e.target.value)}
+            placeholder="أضف ملاحظات حول هذا الطلب..."
+            className="notes-textarea"
+            rows={4}
+          />
+          <button
+            className="save-notes-btn"
+            onClick={handleSaveNotes}
+            disabled={isSavingNotes}
+          >
+            <Save size={16} />
+            {isSavingNotes ? 'جاري الحفظ...' : 'حفظ الملاحظات'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+

@@ -85,12 +85,18 @@ class Order(Base):
     id = Column(Integer, primary_key=True, index=True)
     order_number = Column(String(20), unique=True)
     customer_id = Column(Integer, ForeignKey("users.id"))
-    status = Column(String(20), default="pending")
+    customer_name = Column(String(100))  # اسم العميل
+    customer_phone = Column(String(20))  # رقم العميل
+    customer_whatsapp = Column(String(20))  # رقم واتساب
+    shop_name = Column(String(200))  # اسم المتجر
+    status = Column(String(20), default="pending")  # pending, accepted, preparing, shipping, awaiting_pickup, completed, cancelled, rejected
     total_amount = Column(DECIMAL(12, 2), nullable=False)
     final_amount = Column(DECIMAL(12, 2), nullable=False)
     payment_status = Column(String(20), default="pending")
+    delivery_type = Column(String(20), default="self")  # self or delivery
     delivery_address = Column(Text)
-    notes = Column(Text)
+    notes = Column(Text)  # ملاحظات العميل
+    staff_notes = Column(Text)  # ملاحظات الموظف
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 class OrderItem(Base):

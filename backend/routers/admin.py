@@ -596,35 +596,158 @@ async def get_all_orders(db: Session = Depends(get_db)):
 
             orders_list.append({
                 "id": o.id,
-                "order_number": o.order_number,
-                "status": o.status,
+                "order_number": getattr(o, 'order_number', None),
+                "customer_name": getattr(o, 'customer_name', None) or "",
+                "customer_phone": getattr(o, 'customer_phone', None) or "",
+                "customer_whatsapp": getattr(o, 'customer_whatsapp', None) or getattr(o, 'customer_phone', None) or "",
+                "shop_name": getattr(o, 'shop_name', None) or "",
+                "status": getattr(o, 'status', 'pending'),
+                "delivery_type": getattr(o, 'delivery_type', 'self'),
                 "final_amount": float(o.final_amount) if o.final_amount is not None else 0,
                 "total_amount": float(o.total_amount) if o.total_amount is not None else 0,
+                "payment_status": getattr(o, 'payment_status', 'pending'),
+                "delivery_address": getattr(o, 'delivery_address', None),
+                "notes": getattr(o, 'notes', None),
+                "staff_notes": getattr(o, 'staff_notes', None),
                 "created_at": o.created_at.isoformat() if o.created_at else None,
                 "image_url": image_url
             })
         return orders_list
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error fetching orders: {e}")
+        import traceback
+        traceback.print_exc()
         return []
+
+@router.get("/orders/{order_id}")
+async def get_order_details(order_id: int, db: Session = Depends(get_db)):
+    """Get order details with items"""
+    try:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+        
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "order_number": getattr(order, 'order_number', None),
+                "customer_name": getattr(order, 'customer_name', None) or "",
+                "customer_phone": getattr(order, 'customer_phone', None) or "",
+                "customer_whatsapp": getattr(order, 'customer_whatsapp', None) or getattr(order, 'customer_phone', None) or "",
+                "shop_name": getattr(order, 'shop_name', None) or "",
+                "status": getattr(order, 'status', 'pending'),
+                "delivery_type": getattr(order, 'delivery_type', 'self'),
+                "total_amount": float(order.total_amount) if order.total_amount is not None else 0,
+                "final_amount": float(order.final_amount) if order.final_amount is not None else 0,
+                "payment_status": getattr(order, 'payment_status', 'pending'),
+                "delivery_address": getattr(order, 'delivery_address', None),
+                "notes": getattr(order, 'notes', None),
+                "staff_notes": getattr(order, 'staff_notes', None),
+                "created_at": order.created_at.isoformat() if order.created_at else None,
+                "items": [
+                    {
+                        "id": item.id,
+                        "product_name": item.product_name,
+                        "quantity": item.quantity,
+                        "unit_price": float(item.unit_price) if item.unit_price else 0,
+                        "total_price": float(item.total_price) if item.total_price else 0,
+                        "specifications": item.specifications,
+                        "design_files": item.design_files or [],
+                        "status": item.status
+                    }
+                    for item in items
+                ]
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching order details: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب تفاصيل الطلب: {str(e)}")
 
 @router.put("/orders/{order_id}/status")
 async def update_order_status(order_id: int, status: str, db: Session = Depends(get_db)):
     """Update order status"""
     try:
+        # Validate status
+        valid_statuses = ['pending', 'accepted', 'preparing', 'shipping', 'awaiting_pickup', 'completed', 'cancelled', 'rejected']
+        if status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"حالة غير صحيحة. الحالات المتاحة: {', '.join(valid_statuses)}")
+        
         order = db.query(Order).filter(Order.id == order_id).first()
         if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
         
         order.status = status
         db.commit()
         db.refresh(order)
-        return {"success": True, "order": order}
+        
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "order_number": getattr(order, 'order_number', None),
+                "status": order.status
+            },
+            "message": f"تم تحديث حالة الطلب إلى: {status}"
+        }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error updating order status: {e}")
+        raise HTTPException(status_code=500, detail=f"خطأ في تحديث حالة الطلب: {str(e)}")
+
+@router.put("/orders/{order_id}/staff-notes")
+async def update_staff_notes(order_id: int, notes_data: dict, db: Session = Depends(get_db)):
+    """Update staff notes for an order"""
+    try:
+        notes = notes_data.get('notes', '') if isinstance(notes_data, dict) else str(notes_data or '')
+        
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        # Use setattr for safety if column doesn't exist
+        if hasattr(order, 'staff_notes'):
+            order.staff_notes = notes
+        else:
+            # If column doesn't exist, we'll need to add it via SQL
+            from sqlalchemy import text
+            try:
+                db.execute(text("UPDATE orders SET staff_notes = :notes WHERE id = :id"), 
+                          {"notes": notes, "id": order_id})
+            except Exception as sql_err:
+                # Column might not exist, try to add it first
+                try:
+                    db.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS staff_notes TEXT"))
+                    db.execute(text("UPDATE orders SET staff_notes = :notes WHERE id = :id"), 
+                              {"notes": notes, "id": order_id})
+                except:
+                    pass
+        
+        db.commit()
+        db.refresh(order)
+        
+        return {
+            "success": True,
+            "order_id": order.id,
+            "staff_notes": notes,
+            "message": "تم حفظ ملاحظات الموظف بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating staff notes: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حفظ الملاحظات: {str(e)}")
 
 # ============================================
 # Image Upload Endpoint

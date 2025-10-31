@@ -55,11 +55,19 @@ def test_create_order():
         if response.status_code == 200:
             data = response.json()
             print(f"✅ نجح إنشاء الطلب!")
-            print(f"Order ID: {data.get('order', {}).get('id')}")
-            print(f"Order Number: {data.get('order', {}).get('order_number')}")
-            print(f"Status: {data.get('order', {}).get('status')}")
-            print(f"Total: {data.get('order', {}).get('total_amount')} ل.س")
-            return data.get('order', {}).get('id')
+            print(f"Response Data: {json.dumps(data, indent=2, ensure_ascii=False)}")
+            # Try different response formats
+            order_data = data.get('order') or data
+            order_id = order_data.get('id') if isinstance(order_data, dict) else None
+            order_number = order_data.get('order_number') if isinstance(order_data, dict) else None
+            status = order_data.get('status') if isinstance(order_data, dict) else None
+            total = order_data.get('total_amount') or order_data.get('final_amount') if isinstance(order_data, dict) else None
+            
+            print(f"Order ID: {order_id}")
+            print(f"Order Number: {order_number}")
+            print(f"Status: {status}")
+            print(f"Total: {total} ل.س")
+            return order_id
         else:
             print(f"❌ فشل إنشاء الطلب")
             print(f"Response: {response.text}")

@@ -57,10 +57,15 @@ async def create_order(
         new_order = Order(
             order_number=order_number,
             customer_id=None,  # TODO: Link to User if authenticated
+            customer_name=order_data.customer_name,
+            customer_phone=order_data.customer_phone,
+            customer_whatsapp=order_data.customer_whatsapp or order_data.customer_phone,
+            shop_name=order_data.shop_name,
             status="pending",
             total_amount=order_data.total_amount,
             final_amount=order_data.final_amount,
             payment_status="pending",
+            delivery_type=order_data.delivery_type,
             delivery_address=order_data.delivery_address if order_data.delivery_type == "delivery" else None,
             notes=order_data.notes
         )

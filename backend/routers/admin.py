@@ -582,9 +582,65 @@ async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Sessio
 async def get_all_orders(db: Session = Depends(get_db)):
     """Get all orders"""
     try:
-        # Query orders directly
+        # First try using raw SQL to avoid issues with missing columns
+        from sqlalchemy import text
+        try:
+            # Try to get all orders using raw SQL
+            result = db.execute(text("""
+                SELECT id, order_number, status, total_amount, final_amount, 
+                       payment_status, delivery_address, notes, created_at,
+                       COALESCE(customer_name, '') as customer_name,
+                       COALESCE(customer_phone, '') as customer_phone,
+                       COALESCE(customer_whatsapp, customer_phone, '') as customer_whatsapp,
+                       COALESCE(shop_name, '') as shop_name,
+                       COALESCE(delivery_type, 'self') as delivery_type,
+                       staff_notes
+                FROM orders 
+                ORDER BY created_at DESC
+            """))
+            rows = result.fetchall()
+            print(f"Found {len(rows)} orders using raw SQL")
+            
+            orders_list = []
+            for row in rows:
+                order_id = row[0]
+                # Get image from first order item
+                first_item = db.query(OrderItem).filter(OrderItem.order_id == order_id).order_by(OrderItem.id.asc()).first()
+                raw_image = None
+                if first_item and first_item.design_files:
+                    for u in first_item.design_files:
+                        if u and str(u).strip():
+                            raw_image = str(u).strip()
+                            break
+                
+                orders_list.append({
+                    "id": row[0],
+                    "order_number": row[1],
+                    "status": row[2] or 'pending',
+                    "total_amount": float(row[3]) if row[3] is not None else 0,
+                    "final_amount": float(row[4]) if row[4] is not None else 0,
+                    "payment_status": row[5] or 'pending',
+                    "delivery_address": row[6],
+                    "notes": row[7],
+                    "created_at": row[8].isoformat() if row[8] else None,
+                    "customer_name": row[9] or "",
+                    "customer_phone": row[10] or "",
+                    "customer_whatsapp": row[11] or row[10] or "",
+                    "shop_name": row[12] or "",
+                    "delivery_type": row[13] or "self",
+                    "staff_notes": row[14],
+                    "image_url": raw_image
+                })
+            print(f"Returning {len(orders_list)} orders from raw SQL")
+            return orders_list
+        except Exception as sql_err:
+            print(f"Raw SQL failed, trying ORM: {sql_err}")
+            # Fallback to ORM
+            pass
+        
+        # Query orders directly using ORM
         orders = db.query(Order).order_by(Order.created_at.desc()).all()
-        print(f"Found {len(orders)} orders in database")
+        print(f"Found {len(orders)} orders in database using ORM")
         orders_list = []
         for o in orders:
             # Try to find first design file from order items as the image

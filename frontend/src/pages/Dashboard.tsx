@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, Package, Palette, Briefcase, Edit, Eye, EyeOff } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, Eye, EyeOff } from 'lucide-react'
 import DashboardHome from './Dashboard/DashboardHome'
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
@@ -19,7 +19,7 @@ export default function Dashboard() {
 
   const tabs = [
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard' },
-    { id: 'orders', name: 'الطلبات', icon: ShoppingCart, path: '/dashboard/orders' },
+    { id: 'orders', name: 'الطلبات', icon: ShoppingCartIcon, path: '/dashboard/orders' },
     { id: 'products', name: 'المنتجات', icon: Package, path: '/dashboard/products' },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services' },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works' },

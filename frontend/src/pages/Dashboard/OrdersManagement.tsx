@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Filter, MessageSquare, Eye, Calendar } from 'lucide-react'
+import { Search, Filter, MessageSquare, Eye, Calendar, ShoppingCart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'

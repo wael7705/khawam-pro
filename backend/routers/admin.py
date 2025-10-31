@@ -582,7 +582,9 @@ async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Sessio
 async def get_all_orders(db: Session = Depends(get_db)):
     """Get all orders"""
     try:
+        # Query orders directly
         orders = db.query(Order).order_by(Order.created_at.desc()).all()
+        print(f"Found {len(orders)} orders in database")
         orders_list = []
         for o in orders:
             # Try to find first design file from order items as the image

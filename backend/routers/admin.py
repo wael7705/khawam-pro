@@ -594,21 +594,54 @@ async def get_all_orders(db: Session = Depends(get_db)):
             # نُرجع القيمة من قاعدة البيانات كما هي
             image_url = raw_image if raw_image else None
 
+            # Try to get customer info - use try/except for safety
+            customer_name = ""
+            customer_phone = ""
+            customer_whatsapp = ""
+            shop_name = ""
+            delivery_type = "self"
+            staff_notes = None
+            
+            try:
+                customer_name = o.customer_name or ""
+            except:
+                pass
+            try:
+                customer_phone = o.customer_phone or ""
+            except:
+                pass
+            try:
+                customer_whatsapp = o.customer_whatsapp or o.customer_phone or ""
+            except:
+                customer_whatsapp = customer_phone
+            try:
+                shop_name = o.shop_name or ""
+            except:
+                pass
+            try:
+                delivery_type = o.delivery_type or "self"
+            except:
+                pass
+            try:
+                staff_notes = o.staff_notes
+            except:
+                pass
+
             orders_list.append({
                 "id": o.id,
                 "order_number": getattr(o, 'order_number', None),
-                "customer_name": getattr(o, 'customer_name', None) or "",
-                "customer_phone": getattr(o, 'customer_phone', None) or "",
-                "customer_whatsapp": getattr(o, 'customer_whatsapp', None) or getattr(o, 'customer_phone', None) or "",
-                "shop_name": getattr(o, 'shop_name', None) or "",
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "customer_whatsapp": customer_whatsapp,
+                "shop_name": shop_name,
                 "status": getattr(o, 'status', 'pending'),
-                "delivery_type": getattr(o, 'delivery_type', 'self'),
+                "delivery_type": delivery_type,
                 "final_amount": float(o.final_amount) if o.final_amount is not None else 0,
                 "total_amount": float(o.total_amount) if o.total_amount is not None else 0,
                 "payment_status": getattr(o, 'payment_status', 'pending'),
                 "delivery_address": getattr(o, 'delivery_address', None),
                 "notes": getattr(o, 'notes', None),
-                "staff_notes": getattr(o, 'staff_notes', None),
+                "staff_notes": staff_notes,
                 "created_at": o.created_at.isoformat() if o.created_at else None,
                 "image_url": image_url
             })
@@ -629,23 +662,56 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         
         items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
         
+        # Safely get customer info
+        customer_name = ""
+        customer_phone = ""
+        customer_whatsapp = ""
+        shop_name = ""
+        delivery_type = "self"
+        staff_notes = None
+        
+        try:
+            customer_name = order.customer_name or ""
+        except:
+            pass
+        try:
+            customer_phone = order.customer_phone or ""
+        except:
+            pass
+        try:
+            customer_whatsapp = order.customer_whatsapp or order.customer_phone or ""
+        except:
+            customer_whatsapp = customer_phone
+        try:
+            shop_name = order.shop_name or ""
+        except:
+            pass
+        try:
+            delivery_type = order.delivery_type or "self"
+        except:
+            pass
+        try:
+            staff_notes = order.staff_notes
+        except:
+            pass
+        
         return {
             "success": True,
             "order": {
                 "id": order.id,
                 "order_number": getattr(order, 'order_number', None),
-                "customer_name": getattr(order, 'customer_name', None) or "",
-                "customer_phone": getattr(order, 'customer_phone', None) or "",
-                "customer_whatsapp": getattr(order, 'customer_whatsapp', None) or getattr(order, 'customer_phone', None) or "",
-                "shop_name": getattr(order, 'shop_name', None) or "",
+                "customer_name": customer_name,
+                "customer_phone": customer_phone,
+                "customer_whatsapp": customer_whatsapp,
+                "shop_name": shop_name,
                 "status": getattr(order, 'status', 'pending'),
-                "delivery_type": getattr(order, 'delivery_type', 'self'),
+                "delivery_type": delivery_type,
                 "total_amount": float(order.total_amount) if order.total_amount is not None else 0,
                 "final_amount": float(order.final_amount) if order.final_amount is not None else 0,
                 "payment_status": getattr(order, 'payment_status', 'pending'),
                 "delivery_address": getattr(order, 'delivery_address', None),
                 "notes": getattr(order, 'notes', None),
-                "staff_notes": getattr(order, 'staff_notes', None),
+                "staff_notes": staff_notes,
                 "created_at": order.created_at.isoformat() if order.created_at else None,
                 "items": [
                     {
@@ -671,9 +737,14 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"خطأ في جلب تفاصيل الطلب: {str(e)}")
 
 @router.put("/orders/{order_id}/status")
-async def update_order_status(order_id: int, status: str, db: Session = Depends(get_db)):
+async def update_order_status(order_id: int, status: str = None, db: Session = Depends(get_db)):
     """Update order status"""
     try:
+        from fastapi import Query
+        # Get status from query parameter
+        if status is None:
+            status = Query(..., description="Order status")
+        
         # Validate status
         valid_statuses = ['pending', 'accepted', 'preparing', 'shipping', 'awaiting_pickup', 'completed', 'cancelled', 'rejected']
         if status not in valid_statuses:
@@ -704,10 +775,10 @@ async def update_order_status(order_id: int, status: str, db: Session = Depends(
         raise HTTPException(status_code=500, detail=f"خطأ في تحديث حالة الطلب: {str(e)}")
 
 @router.put("/orders/{order_id}/staff-notes")
-async def update_staff_notes(order_id: int, notes_data: dict, db: Session = Depends(get_db)):
+async def update_staff_notes(order_id: int, notes_data: StaffNotesUpdate, db: Session = Depends(get_db)):
     """Update staff notes for an order"""
     try:
-        notes = notes_data.get('notes', '') if isinstance(notes_data, dict) else str(notes_data or '')
+        notes = notes_data.notes
         
         order = db.query(Order).filter(Order.id == order_id).first()
         if not order:

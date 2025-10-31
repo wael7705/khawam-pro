@@ -194,7 +194,7 @@ export default function OrdersManagement() {
                     <div className="shop-name">
                       <span className="label">المتجر:</span>
                       <span className="value">{order.shop_name}</span>
-                    </div>
+        </div>
                   )}
 
                   <div className="customer-contact">
@@ -210,10 +210,10 @@ export default function OrdersManagement() {
                         title="فتح واتساب"
                       >
                         <MessageSquare size={16} />
-                      </button>
+        </button>
                     )}
                   </div>
-                </div>
+      </div>
 
                 <div className="order-meta">
                   <div className="meta-item">
@@ -223,7 +223,7 @@ export default function OrdersManagement() {
                   <div className="meta-item delivery-type">
                     <span className="delivery-badge">
                       {order.delivery_type === 'delivery' ? '🚚 توصيل' : '🏪 استلام ذاتي'}
-                    </span>
+                  </span>
                   </div>
                 </div>
 
@@ -240,8 +240,8 @@ export default function OrdersManagement() {
                 >
                   <Eye size={16} />
                   عرض التفاصيل
-                </button>
-              </div>
+                  </button>
+      </div>
             </div>
           ))}
         </div>

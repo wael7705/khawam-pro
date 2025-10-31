@@ -820,6 +820,56 @@ async def update_staff_notes(order_id: int, notes_data: StaffNotesUpdate, db: Se
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في حفظ الملاحظات: {str(e)}")
 
+@router.post("/maintenance/add-order-columns")
+async def add_order_columns(db: Session = Depends(get_db)):
+    """Add new columns to orders table if they don't exist"""
+    try:
+        from sqlalchemy import text
+        
+        columns_to_add = [
+            ("customer_name", "VARCHAR(100)"),
+            ("customer_phone", "VARCHAR(20)"),
+            ("customer_whatsapp", "VARCHAR(20)"),
+            ("shop_name", "VARCHAR(200)"),
+            ("delivery_type", "VARCHAR(20) DEFAULT 'self'"),
+            ("staff_notes", "TEXT"),
+        ]
+        
+        added_columns = []
+        for column_name, column_type in columns_to_add:
+            try:
+                # Check if column exists using raw SQL
+                check_query = text(f"""
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name='orders' AND column_name='{column_name}'
+                """)
+                result = db.execute(check_query).fetchone()
+                
+                if not result:
+                    # Column doesn't exist, add it
+                    alter_query = text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}")
+                    db.execute(alter_query)
+                    added_columns.append(column_name)
+                    print(f"✅ Added column: {column_name}")
+                else:
+                    print(f"ℹ️ Column {column_name} already exists")
+            except Exception as e:
+                print(f"⚠️ Error adding column {column_name}: {e}")
+                continue
+        
+        db.commit()
+        return {
+            "success": True,
+            "added_columns": added_columns,
+            "message": f"تم إضافة {len(added_columns)} عمود جديد"
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"Error adding columns: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في إضافة الأعمدة: {str(e)}")
+
 # ============================================
 # Image Upload Endpoint
 # ============================================

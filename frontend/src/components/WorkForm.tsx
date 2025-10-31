@@ -32,9 +32,7 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
     is_featured: work?.is_featured ?? false,
   })
   const [loading, setLoading] = useState(false)
-  const [mainImage, setMainImage] = useState<File | null>(null)  // الصورة الأساسية
-  const [additionalImages, setAdditionalImages] = useState<File[]>([])  // الصور الثانوية
-  const [existingAdditionalImages, setExistingAdditionalImages] = useState<string[]>(work?.images || [])  // الصور الثانوية الموجودة
+  const [mainImage, setMainImage] = useState<File | null>(null)  // الصورة الأساسية فقط
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,9 +40,8 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
     
     try {
       let imageUrl = work?.image_url
-      let additionalImageUrls: string[] = [...existingAdditionalImages]
       
-      // رفع الصورة الأساسية إذا كانت موجودة
+      // رفع الصورة الأساسية فقط إذا كانت موجودة
       if (mainImage) {
         try {
           const uploadResponse = await adminAPI.upload(mainImage)
@@ -56,31 +53,13 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
         }
       }
       
-      // رفع الصور الثانوية الجديدة
-      if (additionalImages.length > 0) {
-        const uploadPromises = additionalImages.map(async (img) => {
-          try {
-            const uploadResponse = await adminAPI.upload(img)
-            return uploadResponse.url || uploadResponse.image_url
-          } catch (error) {
-            console.error('خطأ في رفع صورة ثانوية:', error)
-            return null
-          }
-        })
-        
-        const uploadedUrls = await Promise.all(uploadPromises)
-        const newUrls = uploadedUrls.filter(url => url !== null) as string[]
-        additionalImageUrls = [...additionalImageUrls, ...newUrls]
-        console.log('✅ تم رفع الصور الثانوية:', newUrls)
-      }
-      
-      // إعداد البيانات للإرسال
+      // إعداد البيانات للإرسال (الصورة الرئيسية فقط)
       const submitData = {
         title_ar: formData.title_ar.trim(),
         title: formData.title_en.trim() || formData.title_ar.trim(),
         description_ar: formData.description_ar.trim(),
         image_url: imageUrl || null,
-        images: additionalImageUrls.length > 0 ? additionalImageUrls : null,
+        images: null,  // إزالة الصور الثانوية لتجنب التضارب
         category_ar: formData.category_ar.trim(),
         is_visible: formData.is_visible,
         is_featured: formData.is_featured,
@@ -205,67 +184,6 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
         </div>
       </div>
 
-      <div className="form-group">
-        <label>الصور الثانوية (يمكن إضافة عدة صور)</label>
-        <div className="upload-area">
-          <input 
-            type="file" 
-            accept="image/*" 
-            multiple
-            className="hidden" 
-            id="work-additional-images"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || [])
-              setAdditionalImages([...additionalImages, ...files])
-            }}
-          />
-          <label htmlFor="work-additional-images" className="upload-label">
-            إضافة صور ثانوية
-          </label>
-        </div>
-        {(additionalImages.length > 0 || existingAdditionalImages.length > 0) && (
-          <div className="additional-images-preview" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '15px' }}>
-            {existingAdditionalImages.map((imgUrl, idx) => (
-              <div key={`existing-${idx}`} style={{ position: 'relative' }}>
-                <img 
-                  src={
-                    imgUrl.startsWith('data:')
-                      ? imgUrl
-                      : imgUrl.startsWith('http')
-                      ? imgUrl
-                      : `https://khawam-pro-production.up.railway.app${imgUrl.startsWith('/') ? imgUrl : '/' + imgUrl}`
-                  }
-                  alt={`Existing ${idx + 1}`}
-                  style={{ width: '100%', height: '100px', objectFit: 'contain', borderRadius: '8px', background: '#f0f0f0', padding: '5px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setExistingAdditionalImages(existingAdditionalImages.filter((_, i) => i !== idx))}
-                  style={{ position: 'absolute', top: '5px', right: '5px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '18px', lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            {additionalImages.map((img, idx) => (
-              <div key={`new-${idx}`} style={{ position: 'relative' }}>
-                <img 
-                  src={URL.createObjectURL(img)} 
-                  alt={`Additional ${idx + 1}`}
-                  style={{ width: '100%', height: '100px', objectFit: 'contain', borderRadius: '8px', background: '#f0f0f0', padding: '5px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setAdditionalImages(additionalImages.filter((_, i) => i !== idx))}
-                  style={{ position: 'absolute', top: '5px', right: '5px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '18px', lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       <div className="form-group checkbox-group">
         <label>

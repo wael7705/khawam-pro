@@ -23,35 +23,9 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
         
         works_list = []
         for row in rows:
-            # محاولة الحصول على images إذا كان العمود موجوداً
-            images_value = []
-            try:
-                images_query = text("""
-                    SELECT images FROM portfolio_works WHERE id = :work_id
-                """)
-                img_result = db.execute(images_query, {"work_id": row.id})
-                img_row = img_result.fetchone()
-                if img_row and img_row[0] is not None:
-                    images_value = img_row[0] if isinstance(img_row[0], list) else []
-            except Exception:
-                # إذا كان العمود غير موجود، تجاهل الخطأ
-                pass
-            
-            # التأكد من أن image_url يحتوي على المسار الكامل
+            # استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
+            # الصور تُخزن في قاعدة البيانات مباشرة (base64 أو رابط)
             image_url = row.image_url or ""
-            # Normalize to a publicly served path
-            if image_url:
-                image_url = image_url.replace('\\', '/')
-                if image_url.startswith('http'):
-                    pass
-                else:
-                    # If it's just a bare filename (no slash), serve it from /uploads/
-                    if '/' not in image_url:
-                        image_url = f"/uploads/{image_url}"
-                    else:
-                        # Ensure it starts with slash
-                        if not image_url.startswith('/'):
-                            image_url = f"/{image_url}"
             
             works_list.append({
                 "id": row.id,
@@ -61,8 +35,8 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
                 "description_ar": row.description_ar or "",
                 "description_en": row.description or "",
                 "description": row.description or "",
-                "image_url": image_url,
-                "images": images_value,
+                "image_url": image_url,  # الصورة الرئيسية فقط
+                "images": [],  # إزالة الصور الثانوية لتجنب التضارب
                 "category_ar": row.category_ar or "",
                 "category_en": row.category or "",
                 "category": row.category or row.category_ar or "",
@@ -93,31 +67,8 @@ async def get_featured_works(db: Session = Depends(get_db)):
         
         works_list = []
         for row in rows:
-            # محاولة الحصول على images إذا كان العمود موجوداً
-            images_value = []
-            try:
-                images_query = text("""
-                    SELECT images FROM portfolio_works WHERE id = :work_id
-                """)
-                img_result = db.execute(images_query, {"work_id": row.id})
-                img_row = img_result.fetchone()
-                if img_row and img_row[0] is not None:
-                    images_value = img_row[0] if isinstance(img_row[0], list) else []
-            except Exception:
-                pass
-            
-            # التأكد من أن image_url يحتوي على المسار الكامل
+            # استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
             image_url = row.image_url or ""
-            if image_url:
-                image_url = image_url.replace('\\', '/')
-                if image_url.startswith('http'):
-                    pass
-                else:
-                    if '/' not in image_url:
-                        image_url = f"/uploads/{image_url}"
-                    else:
-                        if not image_url.startswith('/'):
-                            image_url = f"/{image_url}"
             
             works_list.append({
                 "id": row.id,
@@ -127,8 +78,8 @@ async def get_featured_works(db: Session = Depends(get_db)):
                 "description_ar": row.description_ar or "",
                 "description_en": row.description or "",
                 "description": row.description or "",
-                "image_url": image_url,
-                "images": images_value,
+                "image_url": image_url,  # الصورة الرئيسية فقط
+                "images": [],  # إزالة الصور الثانوية لتجنب التضارب
                 "category_ar": row.category_ar or "",
                 "category_en": row.category or "",
                 "category": row.category or row.category_ar or "",
@@ -158,31 +109,8 @@ async def get_work_by_id(work_id: int, db: Session = Depends(get_db)):
         if not row:
             return {"error": "Work not found"}
         
-        # محاولة الحصول على images
-        images_value = []
-        try:
-            images_query = text("""
-                SELECT images FROM portfolio_works WHERE id = :work_id
-            """)
-            img_result = db.execute(images_query, {"work_id": work_id})
-            img_row = img_result.fetchone()
-            if img_row and img_row[0] is not None:
-                images_value = img_row[0] if isinstance(img_row[0], list) else []
-        except Exception:
-            pass
-        
-        # التأكد من أن image_url يحتوي على المسار الكامل
+        # استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
         image_url = row.image_url or ""
-        if image_url:
-            image_url = image_url.replace('\\', '/')
-            if image_url.startswith('http'):
-                pass
-            else:
-                if '/' not in image_url:
-                    image_url = f"/uploads/{image_url}"
-                else:
-                    if not image_url.startswith('/'):
-                        image_url = f"/{image_url}"
         
         return {
             "id": row.id,
@@ -192,8 +120,8 @@ async def get_work_by_id(work_id: int, db: Session = Depends(get_db)):
             "description_ar": row.description_ar or "",
             "description_en": row.description or "",
             "description": row.description or "",
-            "image_url": image_url,
-            "images": images_value,
+            "image_url": image_url,  # الصورة الرئيسية فقط
+            "images": [],  # إزالة الصور الثانوية لتجنب التضارب
             "category_ar": row.category_ar or "",
             "category_en": row.category or "",
             "category": row.category or row.category_ar or "",

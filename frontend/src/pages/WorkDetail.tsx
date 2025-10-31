@@ -45,7 +45,8 @@ export default function WorkDetail() {
     }
   }
 
-  const allImages = work ? [work.image_url, ...(work.images || [])].filter(Boolean) : []
+  // استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
+  const allImages = work?.image_url ? [work.image_url] : []
 
   if (loading) {
     return (

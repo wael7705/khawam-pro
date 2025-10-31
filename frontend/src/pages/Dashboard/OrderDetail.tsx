@@ -158,14 +158,14 @@ export default function OrderDetail() {
     <div className="order-detail-page">
       <div className="container">
         <div className="order-detail-header">
-        <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
-          <ArrowRight size={20} />
-          العودة للطلبات
-        </button>
-        <h1>تفاصيل الطلب: {order.order_number}</h1>
-      </div>
+          <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
+            <ArrowRight size={20} />
+            العودة للطلبات
+          </button>
+          <h1>تفاصيل الطلب: {order.order_number}</h1>
+        </div>
 
-      <div className="order-detail-content">
+        <div className="order-detail-content">
         {/* Customer Info Card */}
         <div className="detail-card customer-card">
           <h2>معلومات العميل</h2>

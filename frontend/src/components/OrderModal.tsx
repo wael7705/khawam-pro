@@ -46,26 +46,40 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
     let price = 0
     // احسب السعر حسب الأبعاد
     if (length && width) {
-      const l = parseFloat(length) || 0
-      const w = parseFloat(width) || 0
-      const h = parseFloat(height) || 0
+      const l = parseFloat(String(length)) || 0
+      const w = parseFloat(String(width)) || 0
+      const h = parseFloat(String(height)) || 0
       
       // حساب المساحة (للبوستر: الطول × العرض، للأشياء ثلاثية: السطح)
-      if (h > 0) {
+      if (h > 0 && l > 0 && w > 0) {
         // جسم ثلاثي الأبعاد
         const area = (l * w * 2) + (l * h * 2) + (w * h * 2)
         price = area * 100 // 100 ل.س لكل وحدة مساحة
-      } else {
+      } else if (l > 0 && w > 0) {
         // بوستر ثنائي الأبعاد
         const area = l * w
         price = area * 50 // 50 ل.س لكل سم²
+      } else {
+        price = 2000 // سعر افتراضي
       }
     } else {
       // سعر افتراضي إذا لم تكن هناك أبعاد
       price = 2000
     }
     
-    const total = price * quantity
+    // التأكد من أن price و quantity أرقام صحيحة
+    const safeQuantity = Number(quantity) || 1
+    const safePrice = Number(price) || 2000
+    
+    const total = safePrice * safeQuantity
+    
+    // التأكد من عدم وجود NaN
+    if (isNaN(total) || total < 0) {
+      const fallbackTotal = 2000 * safeQuantity
+      setTotalPrice(fallbackTotal)
+      return fallbackTotal
+    }
+    
     setTotalPrice(total)
     return total
   }
@@ -115,8 +129,17 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         }
       }
 
-      // Prepare order data
-      const unitPrice = totalPrice / quantity || 0
+      // Prepare order data - التأكد من عدم وجود NaN
+      const safeQuantity = Number(quantity) || 1
+      const safeTotalPrice = Number(totalPrice) || calculatePrice() || 2000
+      const unitPrice = safeTotalPrice / safeQuantity
+      
+      // التأكد من أن unitPrice ليس NaN
+      if (isNaN(unitPrice) || unitPrice <= 0) {
+        showError('خطأ في حساب السعر. يرجى التحقق من الأبعاد والكمية')
+        setIsSubmitting(false)
+        return
+      }
       const orderData = {
         customer_name: customerName,
         customer_phone: customerWhatsApp,
@@ -126,9 +149,9 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         items: [
           {
             service_name: serviceName,
-            quantity: quantity,
+            quantity: safeQuantity,
             unit_price: unitPrice,
-            total_price: totalPrice,
+            total_price: safeTotalPrice,
             specifications: {
               work_type: workType,
               notes: notes
@@ -143,8 +166,8 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             design_files: imageUrl ? [imageUrl] : []
           }
         ],
-        total_amount: totalPrice,
-        final_amount: totalPrice,
+        total_amount: safeTotalPrice,
+        final_amount: safeTotalPrice,
         delivery_type: deliveryType,
         delivery_address: deliveryType === 'delivery' ? shopName : null,
         notes: notes || workType || null
@@ -435,15 +458,23 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
               <div className="invoice-details">
                 <div className="invoice-row">
                   <span>السعر لكل وحدة:</span>
-                  <span>{calculatePrice() / quantity} ل.س</span>
+                  <span>{(() => {
+                    const safeQty = Number(quantity) || 1
+                    const safeTotal = Number(totalPrice) || 0
+                    const unit = safeTotal / safeQty
+                    return isNaN(unit) || unit <= 0 ? '0' : unit.toFixed(2)
+                  })()} ل.س</span>
                 </div>
                 <div className="invoice-row">
                   <span>الكمية:</span>
-                  <span>{quantity}</span>
+                  <span>{quantity || 1}</span>
                 </div>
                 <div className="invoice-row total">
                   <span>الإجمالي:</span>
-                  <span>{totalPrice} ل.س</span>
+                  <span>{(() => {
+                    const safeTotal = Number(totalPrice) || 0
+                    return isNaN(safeTotal) || safeTotal < 0 ? '0' : safeTotal.toFixed(2)
+                  })()} ل.س</span>
                 </div>
               </div>
             </div>

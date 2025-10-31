@@ -22,13 +22,12 @@ async def get_products(
         # تحويل إلى list للتحقق
         products_list = []
         for p in products:
-            # الصور تُخزن في قاعدة البيانات مباشرة (رابط http أو base64 data URL)
-            # نُرجع image_url من قاعدة البيانات كما هو
+            # الصور تُخزن في قاعدة البيانات مباشرة (base64 data URL أو رابط http مطلق)
             img = p.image_url or (p.images[0] if isinstance(p.images, list) and p.images else "")
             
-            # إذا كانت الصورة رابط http/https أو base64 data URL، نُرجعها مباشرة
-            # إذا كانت اسم ملف فقط (مثل: c21c3de1-...jpg)، نُرجعها كما هي (يفترض أن الصورة base64 في DB)
-            # لا حاجة لفحص وجود ملف - كل شيء في قاعدة البيانات
+            # إذا كانت مسار نسبي (مثل /images/... أو /uploads/... بدون http)، نُرجع "" لتجنب 404
+            if img and not img.startswith('data:') and not img.startswith('http'):
+                img = ""
             
             products_list.append({
                 "id": p.id,

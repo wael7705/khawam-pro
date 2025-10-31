@@ -24,8 +24,10 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
         works_list = []
         for row in rows:
             # استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
-            # الصور تُخزن في قاعدة البيانات مباشرة (base64 أو رابط)
             image_url = row.image_url or ""
+            # إذا كانت مسار نسبي (مثل /images/... أو /uploads/... بدون http)، نُرجع "" لتجنب 404
+            if image_url and not image_url.startswith('data:') and not image_url.startswith('http'):
+                image_url = ""
             
             works_list.append({
                 "id": row.id,
@@ -35,7 +37,7 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
                 "description_ar": row.description_ar or "",
                 "description_en": row.description or "",
                 "description": row.description or "",
-                "image_url": image_url,  # الصورة الرئيسية فقط
+                "image_url": image_url,  # base64 أو http فقط
                 "images": [],  # إزالة الصور الثانوية لتجنب التضارب
                 "category_ar": row.category_ar or "",
                 "category_en": row.category or "",
@@ -69,6 +71,9 @@ async def get_featured_works(db: Session = Depends(get_db)):
         for row in rows:
             # استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
             image_url = row.image_url or ""
+            # إذا كانت مسار نسبي (مثل /images/... أو /uploads/... بدون http)، نُرجع "" لتجنب 404
+            if image_url and not image_url.startswith('data:') and not image_url.startswith('http'):
+                image_url = ""
             
             works_list.append({
                 "id": row.id,
@@ -78,7 +83,7 @@ async def get_featured_works(db: Session = Depends(get_db)):
                 "description_ar": row.description_ar or "",
                 "description_en": row.description or "",
                 "description": row.description or "",
-                "image_url": image_url,  # الصورة الرئيسية فقط
+                "image_url": image_url,  # base64 أو http فقط
                 "images": [],  # إزالة الصور الثانوية لتجنب التضارب
                 "category_ar": row.category_ar or "",
                 "category_en": row.category or "",
@@ -111,6 +116,9 @@ async def get_work_by_id(work_id: int, db: Session = Depends(get_db)):
         
         # استخدام الصورة الرئيسية فقط (image_url) لتجنب التضارب
         image_url = row.image_url or ""
+        # إذا كانت مسار نسبي (مثل /images/... أو /uploads/... بدون http)، نُرجع "" لتجنب 404
+        if image_url and not image_url.startswith('data:') and not image_url.startswith('http'):
+            image_url = ""
         
         return {
             "id": row.id,
@@ -120,7 +128,7 @@ async def get_work_by_id(work_id: int, db: Session = Depends(get_db)):
             "description_ar": row.description_ar or "",
             "description_en": row.description or "",
             "description": row.description or "",
-            "image_url": image_url,  # الصورة الرئيسية فقط
+            "image_url": image_url,  # base64 أو http فقط
             "images": [],  # إزالة الصور الثانوية لتجنب التضارب
             "category_ar": row.category_ar or "",
             "category_en": row.category or "",

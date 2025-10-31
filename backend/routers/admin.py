@@ -348,8 +348,11 @@ async def get_all_works(db: Session = Depends(get_db)):
         works_list = []
         for row in rows:
             # إرجاع image_url من قاعدة البيانات كما هو (base64 أو رابط مطلق)
-            # لا تطبيع - الصور تُخزن في قاعدة البيانات مباشرة
+            # إذا كانت مسار نسبي (مثل /images/... أو /uploads/... بدون http)، نُرجع "" لتجنب 404
             image_url = row.image_url or ""
+            if image_url and not image_url.startswith('data:') and not image_url.startswith('http'):
+                # مسار نسبي غير موجود على الخادم - تجاهله
+                image_url = ""
 
             works_list.append({
                 "id": row.id,

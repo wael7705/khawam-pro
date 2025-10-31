@@ -76,7 +76,16 @@ export default function ProductsManagement() {
           <div key={product.id} className="product-card">
             <div className="product-image">
               {product.image_url ? (
-                <img src={product.image_url} alt={product.name} />
+                <img 
+                  src={
+                    product.image_url.startsWith('data:')
+                      ? product.image_url
+                      : product.image_url.startsWith('http')
+                      ? product.image_url
+                      : `https://khawam-pro-production.up.railway.app${product.image_url.startsWith('/') ? product.image_url : '/' + product.image_url}`
+                  }
+                  alt={product.name} 
+                />
               ) : (
                 <div className="placeholder-image">بدون صورة</div>
               )}

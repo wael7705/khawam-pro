@@ -413,48 +413,85 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
 async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_db)):
     """Update a portfolio work"""
     try:
-        existing_work = db.query(PortfolioWork).filter(PortfolioWork.id == work_id).first()
-        if not existing_work:
+        from sqlalchemy import text
+        
+        # التحقق من وجود العمل أولاً باستخدام raw SQL
+        check_work = text("SELECT id FROM portfolio_works WHERE id = :id")
+        work_exists = db.execute(check_work, {"id": work_id}).fetchone()
+        if not work_exists:
             raise HTTPException(status_code=404, detail="Work not found")
         
-        # تحديث الحقول يدوياً لضمان التوافق مع قاعدة البيانات
+        # التحقق من وجود عمود images
+        check_col = text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='portfolio_works' AND column_name='images'
+        """)
+        has_images_col = db.execute(check_col).fetchone()
+        
+        # بناء استعلام UPDATE ديناميكي
+        updates = []
+        params = {"id": work_id}
+        
         if work.title_ar is not None:
-            existing_work.title_ar = work.title_ar
+            updates.append("title_ar = :title_ar")
+            params["title_ar"] = work.title_ar
         if work.title is not None:
-            existing_work.title = work.title
+            updates.append("title = :title")
+            params["title"] = work.title
         elif work.title_ar is not None:
-            # إذا تم تحديث title_ar بدون title، استخدم title_ar كـ title
-            existing_work.title = work.title_ar
+            updates.append("title = :title")
+            params["title"] = work.title_ar
         
         if work.description_ar is not None:
-            existing_work.description = work.description_ar
-            existing_work.description_ar = work.description_ar
+            updates.append("description = :desc, description_ar = :desc_ar")
+            params["desc"] = work.description_ar
+            params["desc_ar"] = work.description_ar
+        
         if work.image_url is not None:
-            existing_work.image_url = _normalize_to_absolute(work.image_url) if work.image_url else ""
-        if work.images is not None:
-            existing_work.images = [_normalize_to_absolute(u) for u in (work.images or [])]
+            updates.append("image_url = :img_url")
+            params["img_url"] = _normalize_to_absolute(work.image_url) if work.image_url else ""
+        
+        if work.images is not None and has_images_col:
+            normalized = [_normalize_to_absolute(u) for u in (work.images or [])]
+            updates.append("images = :imgs")
+            params["imgs"] = normalized
+        
         if work.category_ar is not None:
-            existing_work.category = work.category_ar
-            existing_work.category_ar = work.category_ar
+            updates.append("category = :cat, category_ar = :cat_ar")
+            params["cat"] = work.category_ar
+            params["cat_ar"] = work.category_ar
         
-        # الحقول الأخرى
         if hasattr(work, 'is_visible') and work.is_visible is not None:
-            existing_work.is_visible = work.is_visible
-        if hasattr(work, 'is_featured') and work.is_featured is not None:
-            existing_work.is_featured = work.is_featured
-        if hasattr(work, 'display_order') and work.display_order is not None:
-            existing_work.display_order = work.display_order
+            updates.append("is_visible = :visible")
+            params["visible"] = work.is_visible
         
-        db.commit()
-        db.refresh(existing_work)
+        if hasattr(work, 'is_featured') and work.is_featured is not None:
+            updates.append("is_featured = :featured")
+            params["featured"] = work.is_featured
+        
+        if hasattr(work, 'display_order') and work.display_order is not None:
+            updates.append("display_order = :order")
+            params["order"] = work.display_order
+        
+        if updates:
+            update_query = text(f"UPDATE portfolio_works SET {', '.join(updates)} WHERE id = :id")
+            db.execute(update_query, params)
+            db.commit()
+        
+        # استرجاع العمل المحدث
+        result = db.execute(text("""
+            SELECT id, title_ar, title, image_url, is_featured
+            FROM portfolio_works WHERE id = :id
+        """), {"id": work_id}).fetchone()
+        
         return {
             "success": True,
             "work": {
-                "id": existing_work.id,
-                "title_ar": existing_work.title_ar,
-                "title": existing_work.title,
-                "image_url": existing_work.image_url,
-                "is_featured": existing_work.is_featured
+                "id": result[0],
+                "title_ar": result[1] or "",
+                "title": result[2] or "",
+                "image_url": result[3] or "",
+                "is_featured": result[4] if len(result) > 4 else False
             }
         }
     except HTTPException:
@@ -485,11 +522,29 @@ async def delete_work(work_id: int, db: Session = Depends(get_db)):
 async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Session = Depends(get_db)):
     """Replace or append secondary images for a work."""
     try:
+        from sqlalchemy import text
+        # التحقق من وجود العمود أولاً
+        check_col = text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='portfolio_works' AND column_name='images'
+        """)
+        has_images_col = db.execute(check_col).fetchone()
+        
+        if not has_images_col:
+            # إنشاء العمود إذا لم يكن موجوداً
+            db.execute(text("""
+                ALTER TABLE portfolio_works ADD COLUMN images TEXT[] DEFAULT ARRAY[]::TEXT[]
+            """))
+            db.commit()
+        
         work = db.query(PortfolioWork).filter(PortfolioWork.id == work_id).first()
         if not work:
             raise HTTPException(status_code=404, detail="Work not found")
 
-        current_images = work.images or []
+        # استرجاع الصور الحالية بطريقة آمنة
+        current_images = []
+        if hasattr(work, 'images') and work.images is not None:
+            current_images = work.images if isinstance(work.images, list) else []
         # Normalize slashes and ensure leading slash for local uploads
         normalized = []
         for u in payload.images or []:

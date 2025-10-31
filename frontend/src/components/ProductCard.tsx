@@ -29,8 +29,13 @@ export default function ProductCard({ product, index }: ProductCardProps) {
         {product.image_url && product.image_url.trim() ? (
           <img 
             src={
-              product.image_url.startsWith('http') 
+              // دعم base64 data URLs (تُخزن في قاعدة البيانات مباشرة)
+              product.image_url.startsWith('data:') 
+                ? product.image_url
+                // دعم الروابط الخارجية
+                : product.image_url.startsWith('http') 
                 ? product.image_url 
+                // دعم المسارات النسبية (legacy support)
                 : product.image_url.startsWith('/')
                 ? `https://khawam-pro-production.up.railway.app${product.image_url}`
                 : `https://khawam-pro-production.up.railway.app/${product.image_url}`

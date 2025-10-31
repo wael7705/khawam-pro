@@ -225,7 +225,13 @@ function FeaturedWorksSection() {
                       <div className="work-image-mini">
                         {work.image_url ? (
                           <img 
-                            src={work.image_url.startsWith('http') ? work.image_url : `https://khawam-pro-production.up.railway.app${work.image_url}`}
+                            src={
+                              work.image_url.startsWith('data:')
+                                ? work.image_url
+                                : work.image_url.startsWith('http')
+                                ? work.image_url
+                                : `https://khawam-pro-production.up.railway.app${work.image_url.startsWith('/') ? work.image_url : '/' + work.image_url}`
+                            }
                             alt={work.title_ar || work.title}
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;

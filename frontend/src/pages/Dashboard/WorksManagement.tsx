@@ -78,7 +78,16 @@ export default function WorksManagement() {
             <div className="work-image">
               {work.image_url ? (
                 <img 
-                  src={work.image_url.startsWith('http') ? work.image_url : `https://khawam-pro-production.up.railway.app${work.image_url}`}
+                  src={
+                    // دعم base64 data URLs
+                    work.image_url.startsWith('data:')
+                      ? work.image_url
+                      // دعم الروابط الخارجية
+                      : work.image_url.startsWith('http')
+                      ? work.image_url
+                      // دعم المسارات النسبية
+                      : `https://khawam-pro-production.up.railway.app${work.image_url.startsWith('/') ? work.image_url : '/' + work.image_url}`
+                  }
                   alt={work.title_ar}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;

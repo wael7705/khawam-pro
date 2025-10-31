@@ -86,9 +86,11 @@ export default function WorkDetail() {
               {allImages.length > 0 && (
                 <img 
                   src={
-                    allImages[selectedImageIndex]?.startsWith('http') 
+                    allImages[selectedImageIndex]?.startsWith('data:')
                       ? allImages[selectedImageIndex]
-                      : `https://khawam-pro-production.up.railway.app${allImages[selectedImageIndex]}`
+                      : allImages[selectedImageIndex]?.startsWith('http')
+                      ? allImages[selectedImageIndex]
+                      : `https://khawam-pro-production.up.railway.app${allImages[selectedImageIndex]?.startsWith('/') ? allImages[selectedImageIndex] : '/' + allImages[selectedImageIndex]}`
                   }
                   alt={work.title_ar}
                   className="main-image"
@@ -105,7 +107,13 @@ export default function WorkDetail() {
                     onClick={() => setSelectedImageIndex(idx)}
                   >
                     <img 
-                      src={img.startsWith('http') ? img : `https://khawam-pro-production.up.railway.app${img}`}
+                      src={
+                        img.startsWith('data:')
+                          ? img
+                          : img.startsWith('http')
+                          ? img
+                          : `https://khawam-pro-production.up.railway.app${img.startsWith('/') ? img : '/' + img}`
+                      }
                       alt={`${work.title_ar} - ${idx + 1}`}
                     />
                   </div>

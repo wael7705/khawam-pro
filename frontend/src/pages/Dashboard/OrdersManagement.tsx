@@ -7,19 +7,25 @@ export default function OrdersManagement() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await adminAPI.orders.getAll()
-        const data = Array.isArray(res.data) ? res.data : []
-        setOrders(data)
-      } catch (e) {
-        setOrders([])
-      } finally {
-        setLoading(false)
-      }
+  const loadOrders = async () => {
+    try {
+      setLoading(true)
+      const res = await adminAPI.orders.getAll()
+      const data = Array.isArray(res.data) ? res.data : []
+      setOrders(data)
+    } catch (e) {
+      console.error('Error loading orders:', e)
+      setOrders([])
+    } finally {
+      setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadOrders()
+    // Refresh every 30 seconds
+    const interval = setInterval(loadOrders, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   return (

@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 import { X } from 'lucide-react'
+import { ordersAPI } from '../lib/api'
+import { showSuccess, showError } from '../utils/toast'
 import './OrderModal.css'
 
 interface OrderModalProps {
@@ -24,6 +26,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const [shopName, setShopName] = useState('')
   const [deliveryType, setDeliveryType] = useState('self')
   const [totalPrice, setTotalPrice] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -66,10 +69,98 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
     setStep(step - 1)
   }
 
-  const handleSubmit = () => {
-    // هنا إرسال الطلب
-    alert('تم إرسال الطلب بنجاح!')
-    onClose()
+  const handleSubmit = async () => {
+    // Validation
+    if (!customerName.trim()) {
+      showError('يرجى إدخال اسم العميل')
+      return
+    }
+    if (!customerWhatsApp.trim()) {
+      showError('يرجى إدخال رقم واتساب')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      // Upload image if exists
+      let imageUrl = null
+      if (image) {
+        try {
+          const formData = new FormData()
+          formData.append('file', image)
+          // For now, we'll skip image upload and add it to design_files later
+          // const uploadResponse = await adminAPI.upload(image)
+          // imageUrl = uploadResponse.url
+        } catch (uploadError) {
+          console.warn('Image upload failed, continuing without image:', uploadError)
+        }
+      }
+
+      // Prepare order data
+      const unitPrice = totalPrice / quantity || 0
+      const orderData = {
+        customer_name: customerName,
+        customer_phone: customerWhatsApp,
+        customer_whatsapp: customerWhatsApp,
+        shop_name: shopName || null,
+        service_name: serviceName,
+        items: [
+          {
+            service_name: serviceName,
+            quantity: quantity,
+            unit_price: unitPrice,
+            total_price: totalPrice,
+            specifications: {
+              work_type: workType,
+              notes: notes
+            },
+            dimensions: {
+              length: length || null,
+              width: width || null,
+              height: height || null,
+              unit: unit
+            },
+            colors: selectedColors,
+            design_files: imageUrl ? [imageUrl] : []
+          }
+        ],
+        total_amount: totalPrice,
+        final_amount: totalPrice,
+        delivery_type: deliveryType,
+        delivery_address: deliveryType === 'delivery' ? shopName : null,
+        notes: notes || workType || null
+      }
+
+      const response = await ordersAPI.create(orderData)
+      
+      if (response.data.success) {
+        showSuccess(`تم إرسال الطلب بنجاح! رقم الطلب: ${response.data.order.order_number}`)
+        // Reset form
+        setStep(1)
+        setQuantity(1)
+        setImage(null)
+        setLength('')
+        setWidth('')
+        setHeight('')
+        setSelectedColors([])
+        setWorkType('')
+        setNotes('')
+        setCustomerName('')
+        setCustomerWhatsApp('')
+        setShopName('')
+        setDeliveryType('self')
+        setTotalPrice(0)
+        onClose()
+      } else {
+        showError('فشل إرسال الطلب. يرجى المحاولة مرة أخرى')
+      }
+    } catch (error: any) {
+      console.error('Error creating order:', error)
+      const errorMessage = error.response?.data?.detail || error.message || 'حدث خطأ في إرسال الطلب'
+      showError(`خطأ: ${errorMessage}`)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (!isOpen) return null
@@ -352,8 +443,12 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
               التالي
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={handleSubmit}>
-              تأكيد الطلب
+            <button 
+              className="btn btn-primary" 
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'جاري الإرسال...' : 'تأكيد الطلب'}
             </button>
           )}
         </div>

@@ -31,7 +31,21 @@ export default function OrdersManagement() {
     try {
       setLoading(true)
       const res = await adminAPI.orders.getAll()
-      const data = Array.isArray(res.data) ? res.data : []
+      console.log('Orders API response:', res)
+      
+      // Handle different response structures
+      let data = []
+      if (Array.isArray(res.data)) {
+        data = res.data
+      } else if (res.data && Array.isArray(res.data.data)) {
+        data = res.data.data
+      } else if (res.data && Array.isArray(res.data.orders)) {
+        data = res.data.orders
+      } else if (res.data && res.data.orders && Array.isArray(res.data.orders)) {
+        data = res.data.orders
+      }
+      
+      console.log('Parsed orders:', data)
       setOrders(data)
     } catch (e) {
       console.error('Error loading orders:', e)

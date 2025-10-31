@@ -12,11 +12,7 @@ import './Dashboard.css'
 export default function Dashboard() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('home')
-
-  // Check if we're on order detail page
-  const isOrderDetail = location.pathname.includes('/dashboard/orders/')
-
+  
   const tabs = [
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'orders', name: 'الطلبات', icon: ShoppingCartIcon, path: '/dashboard/orders' },
@@ -25,8 +21,20 @@ export default function Dashboard() {
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works' },
   ]
 
+  // Determine active tab based on current pathname
+  const getActiveTab = () => {
+    const path = location.pathname
+    if (path === '/dashboard' || path === '/dashboard/') return 'home'
+    if (path.startsWith('/dashboard/orders')) return 'orders'
+    if (path.startsWith('/dashboard/products')) return 'products'
+    if (path.startsWith('/dashboard/services')) return 'services'
+    if (path.startsWith('/dashboard/works')) return 'works'
+    return 'home'
+  }
+
+  const activeTab = getActiveTab()
+
   const handleTabClick = (tab: typeof tabs[0]) => {
-    setActiveTab(tab.id)
     navigate(tab.path)
   }
 

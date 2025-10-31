@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { ordersAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
@@ -45,18 +45,37 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const calculatePrice = () => {
     let price = 0
     // احسب السعر حسب الأبعاد
-    if (length && width && height) {
-      const l = parseFloat(length)
-      const w = parseFloat(width)
+    if (length && width) {
+      const l = parseFloat(length) || 0
+      const w = parseFloat(width) || 0
       const h = parseFloat(height) || 0
       
-      const area = l * w * 2 + l * h * 2 + w * h * 2
-      price = area * 100 // مثال
+      // حساب المساحة (للبوستر: الطول × العرض، للأشياء ثلاثية: السطح)
+      if (h > 0) {
+        // جسم ثلاثي الأبعاد
+        const area = (l * w * 2) + (l * h * 2) + (w * h * 2)
+        price = area * 100 // 100 ل.س لكل وحدة مساحة
+      } else {
+        // بوستر ثنائي الأبعاد
+        const area = l * w
+        price = area * 50 // 50 ل.س لكل سم²
+      }
+    } else {
+      // سعر افتراضي إذا لم تكن هناك أبعاد
+      price = 2000
     }
     
-    setTotalPrice(price * quantity)
-    return price * quantity
+    const total = price * quantity
+    setTotalPrice(total)
+    return total
   }
+
+  // تحديث السعر عند تغيير الأبعاد أو الكمية
+  useEffect(() => {
+    if (step >= 2) {
+      calculatePrice()
+    }
+  }, [length, width, height, quantity, step])
 
   const handleNext = () => {
     if (step === 5) {

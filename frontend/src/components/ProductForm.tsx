@@ -132,7 +132,13 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
         {product?.image_url && !image && (
           <div className="current-image">
             <img 
-              src={product.image_url.startsWith('http') ? product.image_url : `https://khawam-pro-production.up.railway.app${product.image_url}`}
+              src={
+                product.image_url.startsWith('data:')
+                  ? product.image_url
+                  : product.image_url.startsWith('http')
+                  ? product.image_url
+                  : `https://khawam-pro-production.up.railway.app${product.image_url.startsWith('/') ? product.image_url : '/' + product.image_url}`
+              }
               alt="Current product image"
             />
             <p>الصورة الحالية</p>

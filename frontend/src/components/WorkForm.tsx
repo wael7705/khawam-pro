@@ -187,7 +187,17 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
           {(mainImage || work?.image_url) && (
             <div className="image-preview">
               <img 
-                src={mainImage ? URL.createObjectURL(mainImage) : (work?.image_url?.startsWith('http') ? work.image_url : work?.image_url ? `https://khawam-pro-production.up.railway.app${work.image_url}` : '')} 
+                src={
+                  mainImage 
+                    ? URL.createObjectURL(mainImage)
+                    : work?.image_url?.startsWith('data:')
+                    ? work.image_url
+                    : work?.image_url?.startsWith('http')
+                    ? work.image_url
+                    : work?.image_url
+                    ? `https://khawam-pro-production.up.railway.app${work.image_url.startsWith('/') ? work.image_url : '/' + work.image_url}`
+                    : ''
+                } 
                 alt="Preview" 
               />
             </div>
@@ -218,7 +228,13 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
             {existingAdditionalImages.map((imgUrl, idx) => (
               <div key={`existing-${idx}`} style={{ position: 'relative' }}>
                 <img 
-                  src={imgUrl.startsWith('http') ? imgUrl : `https://khawam-pro-production.up.railway.app${imgUrl}`}
+                  src={
+                    imgUrl.startsWith('data:')
+                      ? imgUrl
+                      : imgUrl.startsWith('http')
+                      ? imgUrl
+                      : `https://khawam-pro-production.up.railway.app${imgUrl.startsWith('/') ? imgUrl : '/' + imgUrl}`
+                  }
                   alt={`Existing ${idx + 1}`}
                   style={{ width: '100%', height: '100px', objectFit: 'contain', borderRadius: '8px', background: '#f0f0f0', padding: '5px' }}
                 />

@@ -11,6 +11,10 @@ import requests
 
 router = APIRouter()
 
+# Pydantic models
+class StaffNotesUpdate(BaseModel):
+    notes: str
+
 # --------------------------------------------
 # Helpers for public image URLs
 # --------------------------------------------

@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Product
-import os
 router = APIRouter()
 
 @router.get("/")
@@ -23,39 +22,14 @@ async def get_products(
         # تحويل إلى list للتحقق
         products_list = []
         for p in products:
-            # اختر صورة مناسبة: image_url أو أول صورة من images
+            # الصور تُخزن في قاعدة البيانات مباشرة (رابط http أو base64 data URL)
+            # نُرجع image_url من قاعدة البيانات كما هو
             img = p.image_url or (p.images[0] if isinstance(p.images, list) and p.images else "")
-            # تطبيع الرابط إلى رابط مطلق:
-            # - إذا http/https: اتركه كما هو
-            # - إذا اسم ملف فقط أو مسار نسبي: حوّله إلى رابط مطلق
-            if img and not str(img).startswith('http'):
-                # إذا اسم ملف فقط بدون مسار
-                if '/' not in str(img):
-                    img = f"/uploads/{img}"
-                elif not str(img).startswith('/'):
-                    img = f"/{img}"
-                # الآن img إما مسار نسبي يبدأ بـ / أو رابط http
-                # إذا كان مسار نسبي، حوّله إلى رابط مطلق
-                if img.startswith('/') and not img.startswith('http'):
-                    # تحقق من وجود الملف فعلياً على الخادم
-                    # إذا كان المسار /uploads/filename، افحص uploads/filename
-                    local_path = None
-                    if img.startswith('/uploads/'):
-                        local_path = img[1:]  # إزالة / الأولى
-                    elif img.startswith('/'):
-                        local_path = img[1:]
-                    
-                    if local_path and os.path.exists(local_path):
-                        # الملف موجود، حوّله إلى رابط مطلق
-                        from routers.admin import _get_public_base_url
-                        base = _get_public_base_url()
-                        img = f"{base}{img}"
-                    else:
-                        # الملف غير موجود، لا نرجّع رابطاً له
-                        img = ""
-                elif img.startswith('http'):
-                    # رابط خارجي، اتركه كما هو
-                    pass
+            
+            # إذا كانت الصورة رابط http/https أو base64 data URL، نُرجعها مباشرة
+            # إذا كانت اسم ملف فقط (مثل: c21c3de1-...jpg)، نُرجعها كما هي (يفترض أن الصورة base64 في DB)
+            # لا حاجة لفحص وجود ملف - كل شيء في قاعدة البيانات
+            
             products_list.append({
                 "id": p.id,
                 "name_ar": p.name_ar,

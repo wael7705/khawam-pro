@@ -449,12 +449,15 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
         
         if work.image_url is not None:
             updates.append("image_url = :img_url")
-            params["img_url"] = _normalize_to_absolute(work.image_url) if work.image_url else ""
+            # image_url تُخزن في قاعدة البيانات مباشرة (رابط http أو base64 data URL)
+            # نُحفظ القيمة كما هي بدون تطبيع
+            params["img_url"] = work.image_url if work.image_url else ""
         
         if work.images is not None and has_images_col:
-            normalized = [_normalize_to_absolute(u) for u in (work.images or [])]
+            # images تُخزن في قاعدة البيانات مباشرة (base64 data URLs أو روابط)
+            # نُحفظ القيم كما هي بدون تطبيع
             updates.append("images = :imgs")
-            params["imgs"] = normalized
+            params["imgs"] = work.images or []
         
         if work.category_ar is not None:
             updates.append("category = :cat, category_ar = :cat_ar")
@@ -586,7 +589,9 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     if u and str(u).strip():
                         raw_image = str(u).strip()
                         break
-            image_url = _normalize_to_absolute(raw_image) if raw_image else None
+            # design_files تُخزن في قاعدة البيانات مباشرة (رابط أو base64)
+            # نُرجع القيمة من قاعدة البيانات كما هي
+            image_url = raw_image if raw_image else None
 
             orders_list.append({
                 "id": o.id,
@@ -626,34 +631,27 @@ async def update_order_status(order_id: int, status: str, db: Session = Depends(
 
 @router.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    """Upload an image"""
+    """Upload an image and return it as base64 data URL for storage in database"""
     try:
+        import base64
         # Validate file type
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
-        upload_dir = "uploads/"
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Generate unique filename
-        file_ext = os.path.splitext(file.filename)[1] or '.jpg'
-        unique_filename = f"{uuid.uuid4()}{file_ext}"
-        file_path = os.path.join(upload_dir, unique_filename)
-        
-        # Save file
+        # Read file content
         content = await file.read()
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
         
-        # Return URL (relative path - will be served via StaticFiles)
-        relative = f"/uploads/{unique_filename}"
-        absolute = _normalize_to_absolute(relative)
+        # Convert to base64 data URL (stored directly in database)
+        img_data = base64.b64encode(content).decode('utf-8')
+        mime_type = file.content_type or 'image/jpeg'
+        data_url = f"data:{mime_type};base64,{img_data}"
+        
         return {
             "success": True,
-            "url": absolute,
-            "image_url": absolute,
-            "relative_url": relative,
-            "filename": unique_filename
+            "url": data_url,
+            "image_url": data_url,
+            "mime_type": mime_type,
+            "size": len(content)
         }
     except HTTPException:
         raise

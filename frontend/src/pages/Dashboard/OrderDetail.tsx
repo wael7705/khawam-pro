@@ -350,7 +350,9 @@ export default function OrderDetail() {
             {isSavingNotes ? 'جاري الحفظ...' : 'حفظ الملاحظات'}
           </button>
         </div>
+        </div>
       </div>
+    </div>
     </div>
   )
 }

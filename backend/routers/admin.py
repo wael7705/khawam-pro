@@ -651,11 +651,13 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 "created_at": o.created_at.isoformat() if o.created_at else None,
                 "image_url": image_url
             })
+        print(f"Returning {len(orders_list)} orders")
         return orders_list
     except Exception as e:
         print(f"Error fetching orders: {e}")
         import traceback
         traceback.print_exc()
+        # Return empty list on error instead of crashing
         return []
 
 @router.get("/orders/{order_id}")

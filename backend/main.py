@@ -72,6 +72,11 @@ async def root():
         return FileResponse(index_path)
     return {"message": "Khawam API is running"}
 
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "ok", "message": "API is running"}
+
 if __name__ == "__main__":
     import uvicorn
     import os

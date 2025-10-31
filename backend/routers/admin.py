@@ -172,7 +172,7 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
             name_ar=product.name_ar,
             name=final_name,
             price=product.price,
-            image_url=_normalize_to_absolute(product.image_url) if product.image_url else None,
+            image_url=product.image_url if product.image_url else None,  # حفظ كما هو (base64 أو رابط)
             category_id=product.category_id or 1,
             is_visible=product.is_visible,
             is_featured=product.is_featured,
@@ -206,8 +206,7 @@ async def update_product(product_id: int, product: ProductUpdate, db: Session = 
             raise HTTPException(status_code=404, detail="Product not found")
         
         update_data = product.dict(exclude_unset=True)
-        if "image_url" in update_data and update_data["image_url"]:
-            update_data["image_url"] = _normalize_to_absolute(update_data["image_url"]) 
+        # image_url تُحفظ كما هي (base64 أو رابط مطلق) بدون تطبيع 
         for key, value in update_data.items():
             setattr(existing_product, key, value)
         
@@ -278,7 +277,7 @@ async def create_service(service: ServiceCreate, db: Session = Depends(get_db)):
         )
         # services may also have image_url in model, set if provided
         if hasattr(new_service, "image_url") and service and getattr(service, "image_url", None):
-            new_service.image_url = _normalize_to_absolute(getattr(service, "image_url"))
+            new_service.image_url = getattr(service, "image_url")  # حفظ كما هو
         db.add(new_service)
         db.commit()
         db.refresh(new_service)
@@ -296,8 +295,7 @@ async def update_service(service_id: int, service: ServiceUpdate, db: Session = 
             raise HTTPException(status_code=404, detail="Service not found")
         
         update_data = service.dict(exclude_unset=True)
-        if "image_url" in update_data and update_data["image_url"]:
-            update_data["image_url"] = _normalize_to_absolute(update_data["image_url"]) 
+        # image_url تُحفظ كما هي (base64 أو رابط مطلق) بدون تطبيع 
         for key, value in update_data.items():
             setattr(existing_service, key, value)
         
@@ -349,16 +347,16 @@ async def get_all_works(db: Session = Depends(get_db)):
         
         works_list = []
         for row in rows:
-            # تطبيع رابط الصورة ليكون مطلقاً وصالحاً للعرض العام
-            image_url_raw = row.image_url or ""
-            image_url = _normalize_to_absolute(image_url_raw) if image_url_raw else ""
+            # إرجاع image_url من قاعدة البيانات كما هو (base64 أو رابط مطلق)
+            # لا تطبيع - الصور تُخزن في قاعدة البيانات مباشرة
+            image_url = row.image_url or ""
 
             works_list.append({
                 "id": row.id,
                 "title_ar": row.title_ar or "",
                 "title": row.title or row.title_ar or "",
                 "description_ar": row.description_ar or "",
-                "image_url": image_url,
+                "image_url": image_url,  # كما هو من قاعدة البيانات
                 "category_ar": row.category_ar or "",
                 "is_visible": row.is_visible if hasattr(row, 'is_visible') else True,
                 "is_featured": row.is_featured if hasattr(row, 'is_featured') else False,
@@ -383,8 +381,8 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
             title_ar=work.title_ar,
             description=work.description_ar or "",  # description - العمود الفعلي
             description_ar=work.description_ar or "",
-            image_url=_normalize_to_absolute(work.image_url) if work.image_url else "",
-            images=[_normalize_to_absolute(u) for u in (work.images or [])],  # الصور الثانوية
+            image_url=work.image_url if work.image_url else "",  # حفظ كما هو (base64 أو رابط مطلق)
+            images=[],  # إزالة الصور الثانوية
             category=work.category_ar or "",  # category - العمود الفعلي
             category_ar=work.category_ar or "",
             is_visible=work.is_visible,
@@ -449,8 +447,8 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
         
         if work.image_url is not None:
             updates.append("image_url = :img_url")
-            # image_url تُخزن في قاعدة البيانات مباشرة (رابط http أو base64 data URL)
-            # نُحفظ القيمة كما هي بدون تطبيع
+            # image_url تُخزن في قاعدة البيانات مباشرة (base64 data URL أو رابط http)
+            # نُحفظ القيمة كما هي بدون تطبيع أو تحويل
             params["img_url"] = work.image_url if work.image_url else ""
         
         if work.images is not None and has_images_col:

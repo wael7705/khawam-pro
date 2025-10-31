@@ -353,7 +353,6 @@ export default function OrderDetail() {
         </div>
       </div>
     </div>
-    </div>
   )
 }
 

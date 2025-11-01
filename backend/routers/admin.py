@@ -689,12 +689,21 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 if len(row) > 7 and row[7]:
                     notes_str = str(row[7] or "")
                     
-                # For old orders: if notes mention "وائل", set default customer data
-                if not customer_name and notes_str and "تجريبي" in notes_str:
-                    # Old test orders - set default data
-                    customer_name = "وائل"  # Default name for test orders
+                # For old orders without customer data: set default customer data
+                # This handles orders created before customer columns were added
+                if not customer_name and not customer_phone:
+                    # Check if this is an old order (created before we added customer columns)
+                    # All old orders will have empty customer_name and customer_phone
+                    # Set default customer data for display
+                    customer_name = "وائل"  # Default name for old test orders
                     customer_phone = "09991234567"  # Default phone
                     customer_whatsapp = customer_phone
+                    
+                    # Try to extract from notes if available
+                    if notes_str:
+                        if "وائل" in notes_str:
+                            customer_name = "وائل"
+                        # Could add more extraction logic here
                 
                 orders_list.append({
                     "id": row[0],

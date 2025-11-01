@@ -167,19 +167,9 @@ export default function OrdersManagement() {
           <p>{searchQuery || statusFilter !== 'all' ? 'لا توجد طلبات تطابق البحث' : 'لم يتم إنشاء أي طلبات بعد'}</p>
         </div>
       ) : (
-        <div className="orders-grid">
+        <div className="orders-list">
           {filteredOrders.map((order) => (
-            <div key={order.id} className="order-card">
-              <div className="order-card-header">
-                <div className="order-number">#{order.order_number}</div>
-                <span 
-                  className="order-status-badge" 
-                  style={{ backgroundColor: getStatusColor(order.status) }}
-                >
-                  {getStatusLabel(order.status)}
-                </span>
-              </div>
-
+            <div key={order.id} className="order-card-horizontal">
               {order.image_url && (
                 <div className="order-image-container">
                   <img 
@@ -192,70 +182,83 @@ export default function OrdersManagement() {
                     }
                     alt={order.order_number}
                     className="order-card-image"
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 </div>
               )}
 
-              <div className="order-card-body">
-                <div className="customer-info">
-                  <div className="customer-name">
-                    <span className="label">العميل:</span>
-                    <span className="value">{order.customer_name || '-'}</span>
-                  </div>
-                  
-                  {order.shop_name && (
-                    <div className="shop-name">
-                      <span className="label">المتجر:</span>
-                      <span className="value">{order.shop_name}</span>
-        </div>
-                  )}
-
-                  <div className="customer-contact">
-                    <span className="label">الهاتف:</span>
-                    <span className="value">{order.customer_phone || '-'}</span>
-                    {(order.customer_whatsapp || order.customer_phone) && (
-                      <button
-                        className="whatsapp-link-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openWhatsApp(order.customer_whatsapp || order.customer_phone)
-                        }}
-                        title="فتح واتساب"
-                      >
-                        <MessageSquare size={16} />
-        </button>
-                    )}
-                  </div>
-      </div>
-
-                <div className="order-meta">
-                  <div className="meta-item">
-                    <Calendar size={16} />
-                    <span>{formatDate(order.created_at)}</span>
-                  </div>
-                  <div className="meta-item delivery-type">
-                    <span className="delivery-badge">
-                      {order.delivery_type === 'delivery' ? '🚚 توصيل' : '🏪 استلام ذاتي'}
+              <div className="order-card-content">
+                <div className="order-card-header">
+                  <div className="order-number">#{order.order_number}</div>
+                  <span 
+                    className="order-status-badge" 
+                    style={{ backgroundColor: getStatusColor(order.status) }}
+                  >
+                    {getStatusLabel(order.status)}
                   </span>
+                </div>
+
+                <div className="order-card-body">
+                  <div className="customer-info">
+                    <div className="customer-name">
+                      <span className="label">العميل:</span>
+                      <span className="value">{order.customer_name || '-'}</span>
+                    </div>
+                    
+                    {order.shop_name && (
+                      <div className="shop-name">
+                        <span className="label">المتجر:</span>
+                        <span className="value">{order.shop_name}</span>
+                      </div>
+                    )}
+
+                    <div className="customer-contact">
+                      <span className="label">الهاتف:</span>
+                      <span className="value">{order.customer_phone || '-'}</span>
+                      {(order.customer_whatsapp || order.customer_phone) && (
+                        <button
+                          className="whatsapp-link-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openWhatsApp(order.customer_whatsapp || order.customer_phone)
+                          }}
+                          title="فتح واتساب"
+                        >
+                          <MessageSquare size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="order-meta">
+                    <div className="meta-item">
+                      <Calendar size={16} />
+                      <span>{formatDate(order.created_at)}</span>
+                    </div>
+                    <div className="meta-item delivery-type">
+                      <span className="delivery-badge">
+                        {order.delivery_type === 'delivery' ? '🚚 توصيل' : '🏪 استلام ذاتي'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="order-total">
-                  <span className="total-label">الإجمالي:</span>
-                  <span className="total-amount">{order.final_amount.toLocaleString()} ل.س</span>
+                <div className="order-card-footer">
+                  <div className="order-total">
+                    <span className="total-label">الإجمالي:</span>
+                    <span className="total-amount">{order.final_amount.toLocaleString()} ل.س</span>
+                  </div>
+                  <button
+                    className="view-details-btn"
+                    onClick={() => navigate(`/dashboard/orders/${order.id}`)}
+                  >
+                    <Eye size={16} />
+                    عرض التفاصيل
+                  </button>
                 </div>
               </div>
-
-              <div className="order-card-actions">
-                <button
-                  className="view-details-btn"
-                  onClick={() => navigate(`/dashboard/orders/${order.id}`)}
-                >
-                  <Eye size={16} />
-                  عرض التفاصيل
-                  </button>
-      </div>
             </div>
           ))}
         </div>

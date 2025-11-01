@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, Eye, EyeOff } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, ChevronLeft, ChevronRight } from 'lucide-react'
 import DashboardHome from './Dashboard/DashboardHome'
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
@@ -12,6 +12,7 @@ import './Dashboard.css'
 export default function Dashboard() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   
   const tabs = [
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard' },
@@ -38,15 +39,27 @@ export default function Dashboard() {
     navigate(tab.path)
   }
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed)
+  }
+
   return (
     <div className="admin-dashboard">
       <div className="dashboard-container">
         {/* Sidebar */}
-        <aside className="dashboard-sidebar">
+        <aside className={`dashboard-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           <div className="sidebar-header">
-            <h2>خوام</h2>
-            <p>نظام الإدارة</p>
+            {!sidebarCollapsed && (
+              <>
+                <h2>خوام</h2>
+                <p>نظام الإدارة</p>
+              </>
+            )}
           </div>
+          
+          <button className="sidebar-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? 'توسيع الشريط الجانبي' : 'طي الشريط الجانبي'}>
+            {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+          </button>
           
           <nav className="sidebar-nav">
             {tabs.map(tab => {
@@ -56,20 +69,23 @@ export default function Dashboard() {
                   key={tab.id}
                   className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
                   onClick={() => handleTabClick(tab)}
+                  title={sidebarCollapsed ? tab.name : ''}
                 >
                   <Icon size={20} />
-                  <span>{tab.name}</span>
+                  {!sidebarCollapsed && <span>{tab.name}</span>}
                 </button>
               )
             })}
           </nav>
 
-          <div className="sidebar-footer">
-            <button className="language-btn">
-              <span>EN</span>
-              <Edit size={16} />
-            </button>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="sidebar-footer">
+              <button className="language-btn">
+                <span>EN</span>
+                <Edit size={16} />
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Main Content */}

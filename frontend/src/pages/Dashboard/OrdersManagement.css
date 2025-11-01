@@ -114,26 +114,27 @@
   opacity: 0.8;
 }
 
-.orders-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 24px;
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.order-card {
+.order-card-horizontal {
   background: white;
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  flex-direction: row;
+  gap: 20px;
+  align-items: stretch;
 }
 
-.order-card:hover {
-  transform: translateY(-8px);
+.order-card-horizontal:hover {
+  transform: translateX(-4px);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
 }
 
@@ -163,7 +164,8 @@
 }
 
 .order-image-container {
-  width: 100%;
+  width: 200px;
+  min-width: 200px;
   height: 180px;
   border-radius: 12px;
   overflow: hidden;
@@ -179,10 +181,19 @@
   object-fit: cover;
 }
 
+.order-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
 .order-card-body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1;
 }
 
 .customer-info {
@@ -263,11 +274,20 @@
   font-weight: 600;
 }
 
-.order-total {
+.order-card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.order-total {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
   color: white;
@@ -280,15 +300,13 @@
 }
 
 .total-amount {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
 }
 
 .order-card-actions {
   display: flex;
   gap: 12px;
-  padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
 }
 
 .view-details-btn {
@@ -314,8 +332,18 @@
 }
 
 @media (max-width: 768px) {
-  .orders-grid {
-    grid-template-columns: 1fr;
+  .order-card-horizontal {
+    flex-direction: column;
+  }
+
+  .order-image-container {
+    width: 100%;
+    height: 200px;
+  }
+
+  .order-card-footer {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .orders-filters {
@@ -327,3 +355,4 @@
     width: 100%;
   }
 }
+

@@ -343,7 +343,7 @@ async def get_all_works(
     try:
         # استخدام raw SQL مع LIMIT لتحسين الأداء
         from sqlalchemy import text
-            query = text("""
+        query = text("""
             SELECT 
                 id, title, title_ar, 
                 CASE 

@@ -653,6 +653,16 @@ async def get_all_orders(db: Session = Depends(get_db)):
             else:
                 select_parts.append("NULL as staff_notes")
             
+            if "cancellation_reason" in available_cols:
+                select_parts.append("cancellation_reason")
+            else:
+                select_parts.append("NULL as cancellation_reason")
+            
+            if "rejection_reason" in available_cols:
+                select_parts.append("rejection_reason")
+            else:
+                select_parts.append("NULL as rejection_reason")
+            
             query = f"""
                 SELECT {', '.join(select_parts)}
                 FROM orders 
@@ -710,6 +720,13 @@ async def get_all_orders(db: Session = Depends(get_db)):
                             customer_name = "وائل"
                         # Could add more extraction logic here
                 
+                cancellation_reason = None
+                rejection_reason = None
+                if len(row) > 15:
+                    cancellation_reason = (row[15] or "").strip() if row[15] else None
+                if len(row) > 16:
+                    rejection_reason = (row[16] or "").strip() if row[16] else None
+                
                 orders_list.append({
                     "id": row[0],
                     "order_number": row[1] or f"ORD-{row[0]}",
@@ -726,6 +743,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     "shop_name": (row[12] or "").strip() if len(row) > 12 else "",
                     "delivery_type": (row[13] or "self") if len(row) > 13 else "self",
                     "staff_notes": row[14] if len(row) > 14 else None,
+                    "cancellation_reason": cancellation_reason,
+                    "rejection_reason": rejection_reason,
                     "image_url": raw_image
                 })
             print(f"Returning {len(orders_list)} orders from raw SQL")
@@ -800,6 +819,21 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     if "وائل" in notes_str:
                         customer_name = "وائل"
 
+            cancellation_reason = None
+            rejection_reason = None
+            try:
+                cancellation_reason = getattr(o, 'cancellation_reason', None)
+                if cancellation_reason:
+                    cancellation_reason = str(cancellation_reason).strip()
+            except:
+                pass
+            try:
+                rejection_reason = getattr(o, 'rejection_reason', None)
+                if rejection_reason:
+                    rejection_reason = str(rejection_reason).strip()
+            except:
+                pass
+            
             orders_list.append({
                 "id": o.id,
                 "order_number": getattr(o, 'order_number', None),
@@ -815,6 +849,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 "delivery_address": getattr(o, 'delivery_address', None),
                 "notes": getattr(o, 'notes', None),
                 "staff_notes": staff_notes,
+                "cancellation_reason": cancellation_reason,
+                "rejection_reason": rejection_reason,
                 "created_at": o.created_at.isoformat() if o.created_at else None,
                 "image_url": image_url
             })

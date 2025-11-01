@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, MessageSquare, Eye, Calendar, ShoppingCart, ChevronDown, X, AlertCircle } from 'lucide-react'
+import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
@@ -18,6 +18,8 @@ interface Order {
   final_amount: number
   created_at: string
   image_url?: string
+  cancellation_reason?: string
+  rejection_reason?: string
 }
 
 const statusTabs = [
@@ -29,16 +31,6 @@ const statusTabs = [
   { id: 'rejected', label: 'مرفوض', count: 0 },
 ]
 
-const statusOptions = [
-  { value: 'pending', label: 'في الانتظار' },
-  { value: 'accepted', label: 'تم القبول' },
-  { value: 'preparing', label: 'قيد التحضير' },
-  { value: 'shipping', label: 'قيد التوصيل' },
-  { value: 'awaiting_pickup', label: 'في انتظار الاستلام' },
-  { value: 'completed', label: 'مكتمل' },
-  { value: 'cancelled', label: 'ملغى' },
-  { value: 'rejected', label: 'مرفوض' },
-]
 
 export default function OrdersManagement() {
   const navigate = useNavigate()
@@ -46,7 +38,6 @@ export default function OrdersManagement() {
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<string>('pending')
-  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
   const [cancelModalOpen, setCancelModalOpen] = useState<number | null>(null)
   const [rejectModalOpen, setRejectModalOpen] = useState<number | null>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -157,12 +148,44 @@ export default function OrdersManagement() {
     return matchesSearch && matchesTab
   })
 
-  const handleStatusChange = async (orderId: number, newStatus: string) => {
+  const handleAcceptOrder = async (orderId: number) => {
     try {
       setUpdatingOrderId(orderId)
+      await adminAPI.orders.updateStatus(orderId, 'preparing')
+      
+      const order = orders.find(o => o.id === orderId)
+      const orderNumber = order?.order_number || `#${orderId}`
+      
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: 'preparing' }
+            : order
+        )
+      )
+      
+      showSuccess(`تم قبول الطلب ونقله إلى قيد التحضير - ${orderNumber}`)
+    } catch (e) {
+      console.error('Error accepting order:', e)
+      showError('حدث خطأ في قبول الطلب')
+    } finally {
+      setUpdatingOrderId(null)
+    }
+  }
+
+  const handleFinishPreparing = async (orderId: number) => {
+    try {
+      setUpdatingOrderId(orderId)
+      const order = orders.find(o => o.id === orderId)
+      if (!order) return
+      
+      // Move to awaiting_pickup if self delivery, shipping if delivery
+      const newStatus = order.delivery_type === 'self' ? 'awaiting_pickup' : 'shipping'
       await adminAPI.orders.updateStatus(orderId, newStatus)
       
-      // Update order status locally without full reload
+      const orderNumber = order?.order_number || `#${orderId}`
+      const statusLabel = newStatus === 'awaiting_pickup' ? 'في انتظار الاستلام' : 'قيد التوصيل'
+      
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
@@ -171,16 +194,35 @@ export default function OrdersManagement() {
         )
       )
       
-      // Find order number for notification
+      showSuccess(`تم الانتهاء من التحضير ونقل الطلب إلى ${statusLabel} - ${orderNumber}`)
+    } catch (e) {
+      console.error('Error finishing preparation:', e)
+      showError('حدث خطأ في إنهاء التحضير')
+    } finally {
+      setUpdatingOrderId(null)
+    }
+  }
+
+  const handleCompleteOrder = async (orderId: number) => {
+    try {
+      setUpdatingOrderId(orderId)
+      await adminAPI.orders.updateStatus(orderId, 'completed')
+      
       const order = orders.find(o => o.id === orderId)
       const orderNumber = order?.order_number || `#${orderId}`
-      const statusLabel = getStatusLabel(newStatus)
       
-      showSuccess(`تم تحديث حالة الطلب إلى "${statusLabel}" - ${orderNumber}`)
-      setDropdownOpen(null)
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: 'completed' }
+            : order
+        )
+      )
+      
+      showSuccess(`تم استلام الطلب بنجاح - ${orderNumber}`)
     } catch (e) {
-      console.error('Error updating status:', e)
-      showError('حدث خطأ في تحديث حالة الطلب')
+      console.error('Error completing order:', e)
+      showError('حدث خطأ في استلام الطلب')
     } finally {
       setUpdatingOrderId(null)
     }
@@ -327,48 +369,91 @@ export default function OrdersManagement() {
                 <div className="order-card-header">
                   <div className="order-number">#{order.order_number}</div>
                   <div className="order-status-controls">
-                    <div className="status-dropdown-container">
-                      <button
-                        className={`status-dropdown-btn ${updatingOrderId === order.id ? 'updating' : ''}`}
-                        onClick={() => setDropdownOpen(dropdownOpen === order.id ? null : order.id)}
-                        style={{ backgroundColor: getStatusColor(order.status) }}
-                        disabled={updatingOrderId === order.id}
-                      >
-                        <span>{getStatusLabel(order.status)}</span>
-                        <ChevronDown size={16} />
-                      </button>
-                      {dropdownOpen === order.id && (
-                        <div className="status-dropdown">
-                          {statusOptions.map(option => (
-                            <button
-                              key={option.value}
-                              className={`status-option ${order.status === option.value ? 'active' : ''}`}
-                              onClick={() => handleStatusChange(order.id, option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                    {/* Status Display - No dropdown */}
+                    <div 
+                      className={`status-badge ${updatingOrderId === order.id ? 'updating' : ''}`}
+                      style={{ backgroundColor: getStatusColor(order.status) }}
+                    >
+                      <span>{getStatusLabel(order.status)}</span>
                     </div>
-                    {/* Reject button - only show for pending orders */}
+                    
+                    {/* Action Buttons based on status */}
                     {order.status === 'pending' && (
-                      <button
-                        className="reject-order-btn"
-                        onClick={() => setRejectModalOpen(order.id)}
-                        title="رفض الطلب"
-                        disabled={updatingOrderId === order.id}
-                      >
-                        <AlertCircle size={16} />
-                      </button>
+                      <>
+                        <button
+                          className="action-btn accept-btn"
+                          onClick={() => handleAcceptOrder(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="قبول الطلب"
+                        >
+                          <CheckCircle size={18} />
+                          <span>قبول الطلب</span>
+                        </button>
+                        <button
+                          className="action-btn reject-btn"
+                          onClick={() => setRejectModalOpen(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="رفض الطلب"
+                        >
+                          <AlertCircle size={18} />
+                          <span>رفض</span>
+                        </button>
+                      </>
                     )}
-                    {/* Cancel button - show for all statuses except pending and cancelled */}
-                    {order.status !== 'pending' && order.status !== 'cancelled' && (
+                    
+                    {order.status === 'preparing' && (
+                      <>
+                        <button
+                          className="action-btn finish-prep-btn"
+                          onClick={() => handleFinishPreparing(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="انتهاء التحضير"
+                        >
+                          <Package size={18} />
+                          <span>انتهاء التحضير</span>
+                        </button>
+                        <button
+                          className="action-btn cancel-btn-small"
+                          onClick={() => setCancelModalOpen(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="إلغاء الطلب"
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    )}
+                    
+                    {(order.status === 'shipping' || order.status === 'awaiting_pickup') && (
+                      <>
+                        <button
+                          className="action-btn complete-btn"
+                          onClick={() => handleCompleteOrder(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="تم الاستلام"
+                        >
+                          <Truck size={18} />
+                          <span>تم الاستلام</span>
+                        </button>
+                        <button
+                          className="action-btn cancel-btn-small"
+                          onClick={() => setCancelModalOpen(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="إلغاء الطلب"
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* Cancel button for other statuses */}
+                    {order.status !== 'pending' && order.status !== 'preparing' && 
+                     order.status !== 'shipping' && order.status !== 'awaiting_pickup' && 
+                     order.status !== 'cancelled' && order.status !== 'completed' && (
                       <button
-                        className="cancel-order-btn"
+                        className="action-btn cancel-btn-small"
                         onClick={() => setCancelModalOpen(order.id)}
-                        title="إلغاء الطلب"
                         disabled={updatingOrderId === order.id}
+                        title="إلغاء الطلب"
                       >
                         <X size={16} />
                       </button>

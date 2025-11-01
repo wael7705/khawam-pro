@@ -220,7 +220,6 @@ def create_test_orders():
                     raise
         
         try:
-            
             if response.status_code == 200 or response.status_code == 201:
                 order_result = response.json()
                 order_id = None

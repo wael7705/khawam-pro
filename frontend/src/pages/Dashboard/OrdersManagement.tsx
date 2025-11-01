@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Filter, MessageSquare, Eye, Calendar, ShoppingCart } from 'lucide-react'
+import { Search, MessageSquare, Eye, Calendar, ShoppingCart, ChevronDown, X, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
@@ -20,12 +20,34 @@ interface Order {
   image_url?: string
 }
 
+const statusTabs = [
+  { id: 'pending', label: 'في الانتظار', count: 0 },
+  { id: 'preparing', label: 'قيد التحضير', count: 0 },
+  { id: 'shipping', label: 'قيد التوصيل', count: 0 },
+  { id: 'completed', label: 'مكتمل', count: 0 },
+  { id: 'cancelled', label: 'ملغى', count: 0 },
+]
+
+const statusOptions = [
+  { value: 'pending', label: 'في الانتظار' },
+  { value: 'accepted', label: 'تم القبول' },
+  { value: 'preparing', label: 'قيد التحضير' },
+  { value: 'shipping', label: 'قيد التوصيل' },
+  { value: 'awaiting_pickup', label: 'في انتظار الاستلام' },
+  { value: 'completed', label: 'مكتمل' },
+  { value: 'cancelled', label: 'ملغى' },
+  { value: 'rejected', label: 'مرفوض' },
+]
+
 export default function OrdersManagement() {
   const navigate = useNavigate()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState<string>('pending')
+  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
+  const [cancelModalOpen, setCancelModalOpen] = useState<number | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
 
   const loadOrders = async () => {
     try {
@@ -108,17 +130,58 @@ export default function OrdersManagement() {
     })
   }
 
-  // Filter orders
+  // Get orders count by status
+  const getOrdersCountByStatus = (status: string) => {
+    return orders.filter(order => {
+      const matchesSearch = searchQuery === '' || 
+        order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer_phone.includes(searchQuery)
+      return matchesSearch && order.status === status
+    }).length
+  }
+
+  // Filter orders by active tab and search
   const filteredOrders = orders.filter(order => {
     const matchesSearch = searchQuery === '' || 
       order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer_phone.includes(searchQuery)
     
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+    const matchesTab = order.status === activeTab
     
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesTab
   })
+
+  const handleStatusChange = async (orderId: number, newStatus: string) => {
+    try {
+      await adminAPI.orders.updateStatus(orderId, newStatus)
+      showSuccess('تم تحديث حالة الطلب بنجاح')
+      setDropdownOpen(null)
+      await loadOrders()
+    } catch (e) {
+      console.error('Error updating status:', e)
+      showError('حدث خطأ في تحديث حالة الطلب')
+    }
+  }
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (!cancelReason.trim()) {
+      showError('يرجى إدخال سبب الإلغاء')
+      return
+    }
+    
+    try {
+      await adminAPI.orders.updateStatus(orderId, 'cancelled', cancelReason)
+      showSuccess('تم إلغاء الطلب بنجاح')
+      setCancelModalOpen(null)
+      setCancelReason('')
+      await loadOrders()
+    } catch (e) {
+      console.error('Error cancelling order:', e)
+      showError('حدث خطأ في إلغاء الطلب')
+    }
+  }
 
   return (
     <div className="orders-management">
@@ -139,21 +202,23 @@ export default function OrdersManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <select 
-          className="status-filter-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">جميع الحالات</option>
-          <option value="pending">في الانتظار</option>
-          <option value="accepted">تم القبول</option>
-          <option value="preparing">قيد التحضير</option>
-          <option value="shipping">قيد التوصيل</option>
-          <option value="awaiting_pickup">في انتظار الاستلام</option>
-          <option value="completed">مكتمل</option>
-          <option value="cancelled">ملغى</option>
-          <option value="rejected">مرفوض</option>
-        </select>
+      </div>
+
+      {/* Status Tabs */}
+      <div className="status-tabs">
+        {statusTabs.map(tab => {
+          const count = getOrdersCountByStatus(tab.id)
+          return (
+            <button
+              key={tab.id}
+              className={`status-tab ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="tab-label">{tab.label}</span>
+              <span className="tab-count">{count}</span>
+            </button>
+          )
+        })}
       </div>
 
       {loading ? (
@@ -164,7 +229,7 @@ export default function OrdersManagement() {
         <div className="empty-state">
           <ShoppingCart size={64} />
           <h3>لا توجد طلبات</h3>
-          <p>{searchQuery || statusFilter !== 'all' ? 'لا توجد طلبات تطابق البحث' : 'لم يتم إنشاء أي طلبات بعد'}</p>
+          <p>{searchQuery ? 'لا توجد طلبات تطابق البحث' : `لا توجد طلبات بحالة "${statusTabs.find(t => t.id === activeTab)?.label}"`}</p>
         </div>
       ) : (
         <div className="orders-list">
@@ -192,12 +257,40 @@ export default function OrdersManagement() {
               <div className="order-card-content">
                 <div className="order-card-header">
                   <div className="order-number">#{order.order_number}</div>
-                  <span 
-                    className="order-status-badge" 
-                    style={{ backgroundColor: getStatusColor(order.status) }}
-                  >
-                    {getStatusLabel(order.status)}
-                  </span>
+                  <div className="order-status-controls">
+                    <div className="status-dropdown-container">
+                      <button
+                        className="status-dropdown-btn"
+                        onClick={() => setDropdownOpen(dropdownOpen === order.id ? null : order.id)}
+                        style={{ backgroundColor: getStatusColor(order.status) }}
+                      >
+                        <span>{getStatusLabel(order.status)}</span>
+                        <ChevronDown size={16} />
+                      </button>
+                      {dropdownOpen === order.id && (
+                        <div className="status-dropdown">
+                          {statusOptions.map(option => (
+                            <button
+                              key={option.value}
+                              className={`status-option ${order.status === option.value ? 'active' : ''}`}
+                              onClick={() => handleStatusChange(order.id, option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {order.status !== 'cancelled' && (
+                      <button
+                        className="cancel-order-btn"
+                        onClick={() => setCancelModalOpen(order.id)}
+                        title="إلغاء الطلب"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="order-card-body">
@@ -261,6 +354,45 @@ export default function OrdersManagement() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Cancel Modal */}
+      {cancelModalOpen && (
+        <div className="modal-overlay" onClick={() => { setCancelModalOpen(null); setCancelReason('') }}>
+          <div className="cancel-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <AlertCircle size={24} />
+              <h3>إلغاء الطلب</h3>
+              <button className="modal-close" onClick={() => { setCancelModalOpen(null); setCancelReason('') }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>يرجى إدخال سبب إلغاء الطلب:</p>
+              <textarea
+                className="cancel-reason-input"
+                placeholder="مثال: طلب العميل إلغاء الطلب..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="modal-footer">
+              <button
+                className="cancel-btn-secondary"
+                onClick={() => { setCancelModalOpen(null); setCancelReason('') }}
+              >
+                إلغاء
+              </button>
+              <button
+                className="cancel-btn-primary"
+                onClick={() => handleCancelOrder(cancelModalOpen)}
+              >
+                تأكيد الإلغاء
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

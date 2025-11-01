@@ -15,6 +15,10 @@ router = APIRouter()
 class StaffNotesUpdate(BaseModel):
     notes: str
 
+class OrderStatusUpdate(BaseModel):
+    status: str
+    cancellation_reason: Optional[str] = None
+
 # --------------------------------------------
 # Helpers for public image URLs
 # --------------------------------------------
@@ -907,13 +911,13 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"خطأ في جلب تفاصيل الطلب: {str(e)}")
 
 @router.put("/orders/{order_id}/status")
-async def update_order_status(order_id: int, status: str = None, db: Session = Depends(get_db)):
-    """Update order status"""
+async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db: Session = Depends(get_db)):
+    """Update order status with optional cancellation reason"""
     try:
-        from fastapi import Query
-        # Get status from query parameter
-        if status is None:
-            status = Query(..., description="Order status")
+        from sqlalchemy import text
+        
+        status = status_data.status
+        cancellation_reason = status_data.cancellation_reason
         
         # Validate status
         valid_statuses = ['pending', 'accepted', 'preparing', 'shipping', 'awaiting_pickup', 'completed', 'cancelled', 'rejected']
@@ -924,7 +928,33 @@ async def update_order_status(order_id: int, status: str = None, db: Session = D
         if not order:
             raise HTTPException(status_code=404, detail="الطلب غير موجود")
         
+        # Update status
         order.status = status
+        
+        # If cancelling, save cancellation reason
+        if status == 'cancelled' and cancellation_reason:
+            # Check if cancellation_reason column exists
+            try:
+                check_col = text("""
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='orders' AND column_name='cancellation_reason'
+                """)
+                has_col = db.execute(check_col).fetchone()
+                
+                if not has_col:
+                    # Add column if it doesn't exist
+                    db.execute(text("ALTER TABLE orders ADD COLUMN cancellation_reason TEXT"))
+                    db.commit()
+                
+                # Update cancellation reason
+                db.execute(
+                    text("UPDATE orders SET cancellation_reason = :reason WHERE id = :id"),
+                    {"reason": cancellation_reason, "id": order_id}
+                )
+            except Exception as col_err:
+                # If column operation fails, log but don't break the status update
+                print(f"Warning: Could not update cancellation_reason: {col_err}")
+        
         db.commit()
         db.refresh(order)
         

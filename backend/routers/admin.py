@@ -585,19 +585,62 @@ async def get_all_orders(db: Session = Depends(get_db)):
         # First try using raw SQL to avoid issues with missing columns
         from sqlalchemy import text
         try:
-            # Try to get all orders using raw SQL
-            result = db.execute(text("""
-                SELECT id, order_number, status, total_amount, final_amount, 
-                       payment_status, delivery_address, notes, created_at,
-                       COALESCE(customer_name, '') as customer_name,
-                       COALESCE(customer_phone, '') as customer_phone,
-                       COALESCE(customer_whatsapp, customer_phone, '') as customer_whatsapp,
-                       COALESCE(shop_name, '') as shop_name,
-                       COALESCE(delivery_type, 'self') as delivery_type,
-                       staff_notes
+            # Check which columns exist in the database
+            check_cols = db.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'orders'
+            """))
+            available_cols = [row[0] for row in check_cols.fetchall()]
+            print(f"Available columns in orders table: {available_cols}")
+            
+            # Build query dynamically based on available columns
+            select_parts = ["id", "order_number", "status", "total_amount", "final_amount", 
+                           "payment_status", "delivery_address", "notes", "created_at"]
+            
+            if "customer_name" in available_cols:
+                select_parts.append("COALESCE(customer_name, '') as customer_name")
+            else:
+                select_parts.append("'' as customer_name")
+                
+            if "customer_phone" in available_cols:
+                select_parts.append("COALESCE(customer_phone, '') as customer_phone")
+            else:
+                select_parts.append("'' as customer_phone")
+                
+            if "customer_whatsapp" in available_cols:
+                if "customer_phone" in available_cols:
+                    select_parts.append("COALESCE(customer_whatsapp, customer_phone, '') as customer_whatsapp")
+                else:
+                    select_parts.append("COALESCE(customer_whatsapp, '') as customer_whatsapp")
+            elif "customer_phone" in available_cols:
+                select_parts.append("COALESCE(customer_phone, '') as customer_whatsapp")
+            else:
+                select_parts.append("'' as customer_whatsapp")
+                
+            if "shop_name" in available_cols:
+                select_parts.append("COALESCE(shop_name, '') as shop_name")
+            else:
+                select_parts.append("'' as shop_name")
+                
+            if "delivery_type" in available_cols:
+                select_parts.append("COALESCE(delivery_type, 'self') as delivery_type")
+            else:
+                select_parts.append("'self' as delivery_type")
+                
+            if "staff_notes" in available_cols:
+                select_parts.append("staff_notes")
+            else:
+                select_parts.append("NULL as staff_notes")
+            
+            query = f"""
+                SELECT {', '.join(select_parts)}
                 FROM orders 
                 ORDER BY created_at DESC
-            """))
+            """
+            
+            print(f"Executing query with {len(select_parts)} columns")
+            result = db.execute(text(query))
             rows = result.fetchall()
             print(f"Found {len(rows)} orders using raw SQL")
             

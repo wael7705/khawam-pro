@@ -343,10 +343,14 @@ async def get_all_works(
     try:
         # استخدام raw SQL مع LIMIT لتحسين الأداء
         from sqlalchemy import text
-        query = text("""
+            query = text("""
             SELECT 
                 id, title, title_ar, 
-                CASE WHEN LENGTH(description_ar) > 100 THEN LEFT(description_ar, 100) || '...' ELSE description_ar END as description_ar,
+                CASE 
+                    WHEN description_ar IS NULL THEN ''
+                    WHEN LENGTH(description_ar) > 100 THEN SUBSTRING(description_ar, 1, 100) || '...' 
+                    ELSE description_ar 
+                END as description_ar,
                 image_url, category, category_ar, is_featured, is_visible, display_order
             FROM portfolio_works 
             ORDER BY display_order, id DESC

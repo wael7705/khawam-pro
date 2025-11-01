@@ -504,6 +504,21 @@ export default function OrdersManagement() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Show cancellation or rejection reason */}
+                  {order.status === 'cancelled' && order.cancellation_reason && (
+                    <div className="reason-display cancellation-reason">
+                      <strong>سبب الإلغاء:</strong>
+                      <span>{order.cancellation_reason}</span>
+                    </div>
+                  )}
+                  
+                  {order.status === 'rejected' && order.rejection_reason && (
+                    <div className="reason-display rejection-reason">
+                      <strong>سبب الرفض:</strong>
+                      <span>{order.rejection_reason}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="order-card-footer">

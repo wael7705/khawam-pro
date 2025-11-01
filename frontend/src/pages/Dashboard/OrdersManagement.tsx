@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
+import OrderMap from '../../components/OrderMap'
 
 interface Order {
   id: number
@@ -563,7 +564,7 @@ export default function OrdersManagement() {
                       <div className="shop-name">
                         <span className="label">المتجر:</span>
                         <span className="value">{order.shop_name}</span>
-                      </div>
+        </div>
                     )}
 
                     <div className="customer-contact">
@@ -579,10 +580,10 @@ export default function OrdersManagement() {
                           title="فتح واتساب"
                         >
                           <MessageSquare size={16} />
-                        </button>
+        </button>
                       )}
                     </div>
-                  </div>
+      </div>
 
                   <div className="order-meta">
                     <div className="meta-item">
@@ -592,7 +593,7 @@ export default function OrdersManagement() {
                     <div className="meta-item delivery-type">
                       <span className="delivery-badge">
                         {order.delivery_type === 'delivery' ? '🚚 توصيل' : '🏪 استلام ذاتي'}
-                      </span>
+                  </span>
                     </div>
                   </div>
 
@@ -710,6 +711,82 @@ export default function OrdersManagement() {
           </div>
         </div>
       )}
+
+      {/* Map Modal */}
+      {mapOpen && (() => {
+        const order = orders.find(o => o.id === mapOpen)
+        if (!order || !order.delivery_address) {
+          return (
+            <div className="modal-overlay" onClick={() => setMapOpen(null)}>
+              <div className="map-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <MapPin size={24} />
+                  <h3>موقع العميل - {order?.order_number}</h3>
+                  <button className="modal-close" onClick={() => setMapOpen(null)}>
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="map-modal-body">
+                  <p>لا يوجد عنوان توصيل لهذا الطلب</p>
+                </div>
+              </div>
+            </div>
+          )
+        }
+        
+        const address = order.delivery_address
+        const encodedAddress = encodeURIComponent(address)
+        
+        return (
+          <div className="modal-overlay" onClick={() => setMapOpen(null)}>
+            <div className="map-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <MapPin size={24} />
+                <h3>موقع العميل - {order.order_number}</h3>
+                <button className="modal-close" onClick={() => setMapOpen(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="map-modal-body">
+                <div className="address-info">
+                  <strong>العنوان:</strong>
+                  <p>{address}</p>
+                  <strong>العميل:</strong>
+                  <p>{order.customer_name} - {order.customer_phone}</p>
+                </div>
+                
+                <OrderMap
+                  address={address}
+                  customerName={order.customer_name}
+                  orderNumber={order.order_number}
+                  onClose={() => setMapOpen(null)}
+                />
+                
+                <div className="map-actions">
+                  <a
+                    href={`https://www.google.com/maps?q=${encodedAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="map-link-btn"
+                  >
+                    <MapPin size={18} />
+                    فتح في Google Maps
+                  </a>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="map-link-btn"
+                  >
+                    <MapPin size={18} />
+                    فتح تطبيق الخرائط
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

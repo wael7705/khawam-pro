@@ -377,7 +377,7 @@ async def get_all_works(
             if skip_images and image_url and image_url.startswith('data:'):
                 if len(image_url) > 100000:  # Skip if larger than 100KB
                     image_url = ""  # Will load lazily later
-
+            
             works_list.append({
                 "id": row.id,
                 "title_ar": row.title_ar or "",
@@ -504,7 +504,7 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
         if updates:
             update_query = text(f"UPDATE portfolio_works SET {', '.join(updates)} WHERE id = :id")
             db.execute(update_query, params)
-            db.commit()
+        db.commit()
         
         # استرجاع العمل المحدث
         result = db.execute(text("""

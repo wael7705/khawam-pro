@@ -50,8 +50,10 @@ async def create_order(
 ):
     """Create a new order"""
     try:
-        # Generate unique order number
-        order_number = f"ORD-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        # Generate unique order number: ORDYYMMDD-xxx
+        date_str = datetime.now().strftime('%y%m%d')
+        random_suffix = uuid.uuid4().hex[:3].upper()
+        order_number = f"ORD{date_str}-{random_suffix}"
         
         # Create order
         new_order = Order(

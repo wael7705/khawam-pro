@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck } from 'lucide-react'
+import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
@@ -20,11 +20,13 @@ interface Order {
   image_url?: string
   cancellation_reason?: string
   rejection_reason?: string
+  delivery_address?: string
 }
 
 const statusTabs = [
   { id: 'pending', label: 'في الانتظار', count: 0 },
   { id: 'preparing', label: 'قيد التحضير', count: 0 },
+  { id: 'awaiting_pickup', label: 'استلام ذاتي', count: 0 },
   { id: 'shipping', label: 'قيد التوصيل', count: 0 },
   { id: 'completed', label: 'مكتمل', count: 0 },
   { id: 'cancelled', label: 'ملغى', count: 0 },
@@ -43,10 +45,13 @@ export default function OrdersManagement() {
   const [cancelReason, setCancelReason] = useState('')
   const [rejectReason, setRejectReason] = useState('')
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
+  const [mapOpen, setMapOpen] = useState<number | null>(null)
 
-  const loadOrders = async () => {
+  const loadOrders = async (showLoading = false) => {
     try {
-      setLoading(true)
+      if (showLoading) {
+        setLoading(true)
+      }
       const res = await adminAPI.orders.getAll()
       console.log('Orders API response:', res)
       console.log('Response structure:', {
@@ -98,14 +103,16 @@ export default function OrdersManagement() {
       showError('حدث خطأ في جلب الطلبات')
       setOrders([])
     } finally {
-      setLoading(false)
+      if (showLoading) {
+        setLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    loadOrders()
-    // Refresh every 30 seconds
-    const interval = setInterval(loadOrders, 30000)
+    loadOrders(true) // Show loading only on initial load
+    // Refresh every 30 seconds in background
+    const interval = setInterval(() => loadOrders(false), 30000)
     return () => clearInterval(interval)
   }, [])
 
@@ -185,6 +192,7 @@ export default function OrdersManagement() {
       const order = orders.find(o => o.id === orderId)
       const orderNumber = order?.order_number || `#${orderId}`
       
+      // Update in background without showing loading
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
@@ -210,11 +218,8 @@ export default function OrdersManagement() {
       
       // Move to awaiting_pickup if self delivery, shipping if delivery
       const newStatus = order.delivery_type === 'self' ? 'awaiting_pickup' : 'shipping'
-      await adminAPI.orders.updateStatus(orderId, newStatus)
       
-      const orderNumber = order?.order_number || `#${orderId}`
-      const statusLabel = newStatus === 'awaiting_pickup' ? 'في انتظار الاستلام' : 'قيد التوصيل'
-      
+      // Update in background first for smooth UX
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
@@ -223,10 +228,25 @@ export default function OrdersManagement() {
         )
       )
       
+      // Then update in backend
+      await adminAPI.orders.updateStatus(orderId, newStatus)
+      
+      const orderNumber = order?.order_number || `#${orderId}`
+      const statusLabel = newStatus === 'awaiting_pickup' ? 'استلام ذاتي' : 'قيد التوصيل'
+      
       showSuccess(`تم الانتهاء من التحضير ونقل الطلب إلى ${statusLabel} - ${orderNumber}`)
     } catch (e) {
       console.error('Error finishing preparation:', e)
       showError('حدث خطأ في إنهاء التحضير')
+      // Revert on error
+      const order = orders.find(o => o.id === orderId)
+      if (order) {
+        setOrders(prevOrders => 
+          prevOrders.map(o => 
+            o.id === orderId ? { ...o, status: order.status } : o
+          )
+        )
+      }
     } finally {
       setUpdatingOrderId(null)
     }
@@ -235,11 +255,9 @@ export default function OrdersManagement() {
   const handleCompleteOrder = async (orderId: number) => {
     try {
       setUpdatingOrderId(orderId)
-      await adminAPI.orders.updateStatus(orderId, 'completed')
-      
       const order = orders.find(o => o.id === orderId)
-      const orderNumber = order?.order_number || `#${orderId}`
       
+      // Update in background first
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
@@ -248,10 +266,23 @@ export default function OrdersManagement() {
         )
       )
       
+      // Then update in backend
+      await adminAPI.orders.updateStatus(orderId, 'completed')
+      
+      const orderNumber = order?.order_number || `#${orderId}`
       showSuccess(`تم استلام الطلب بنجاح - ${orderNumber}`)
     } catch (e) {
       console.error('Error completing order:', e)
       showError('حدث خطأ في استلام الطلب')
+      // Revert on error
+      const order = orders.find(o => o.id === orderId)
+      if (order) {
+        setOrders(prevOrders => 
+          prevOrders.map(o => 
+            o.id === orderId ? { ...o, status: order.status } : o
+          )
+        )
+      }
     } finally {
       setUpdatingOrderId(null)
     }
@@ -452,8 +483,39 @@ export default function OrdersManagement() {
                       </>
                     )}
                     
-                    {(order.status === 'shipping' || order.status === 'awaiting_pickup') && (
+                    {order.status === 'awaiting_pickup' && (
                       <>
+                        <button
+                          className="action-btn complete-btn"
+                          onClick={() => handleCompleteOrder(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="تم الاستلام"
+                        >
+                          <Truck size={18} />
+                          <span>تم الاستلام</span>
+                        </button>
+                        <button
+                          className="action-btn cancel-btn-small"
+                          onClick={() => setCancelModalOpen(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="إلغاء الطلب"
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    )}
+                    
+                    {order.status === 'shipping' && (
+                      <>
+                        <button
+                          className="action-btn map-btn"
+                          onClick={() => setMapOpen(order.id)}
+                          disabled={updatingOrderId === order.id}
+                          title="عرض على الخريطة"
+                        >
+                          <MapPin size={18} />
+                          <span>عرض الخريطة</span>
+                        </button>
                         <button
                           className="action-btn complete-btn"
                           onClick={() => handleCompleteOrder(order.id)}

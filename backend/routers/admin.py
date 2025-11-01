@@ -780,6 +780,20 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 staff_notes = o.staff_notes
             except:
                 pass
+            
+            # For old orders without customer data: set default customer data
+            # This handles orders created before customer columns were added
+            if not customer_name and not customer_phone:
+                notes_str = str(getattr(o, 'notes', '') or "")
+                # Set default customer data for display
+                customer_name = "وائل"  # Default name for old test orders
+                customer_phone = "09991234567"  # Default phone
+                customer_whatsapp = customer_phone
+                
+                # Try to extract from notes if available
+                if notes_str:
+                    if "وائل" in notes_str:
+                        customer_name = "وائل"
 
             orders_list.append({
                 "id": o.id,

@@ -891,41 +891,70 @@ async def add_order_columns(db: Session = Depends(get_db)):
         from sqlalchemy import text
         
         columns_to_add = [
-            ("customer_name", "VARCHAR(100)"),
-            ("customer_phone", "VARCHAR(20)"),
-            ("customer_whatsapp", "VARCHAR(20)"),
-            ("shop_name", "VARCHAR(200)"),
-            ("delivery_type", "VARCHAR(20) DEFAULT 'self'"),
-            ("staff_notes", "TEXT"),
+            ("customer_name", "VARCHAR(100)", "''"),
+            ("customer_phone", "VARCHAR(20)", "''"),
+            ("customer_whatsapp", "VARCHAR(20)", "customer_phone"),
+            ("shop_name", "VARCHAR(200)", "''"),
+            ("delivery_type", "VARCHAR(20)", "'self'"),
+            ("staff_notes", "TEXT", "NULL"),
         ]
         
         added_columns = []
-        for column_name, column_type in columns_to_add:
+        existing_columns = []
+        
+        # First, get list of existing columns
+        check_columns_query = text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'orders'
+        """)
+        existing = db.execute(check_columns_query).fetchall()
+        existing_column_names = [row[0] for row in existing]
+        print(f"Existing columns: {existing_column_names}")
+        
+        for column_name, column_type, default_value in columns_to_add:
             try:
-                # Check if column exists using raw SQL
-                check_query = text(f"""
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name='orders' AND column_name='{column_name}'
-                """)
-                result = db.execute(check_query).fetchone()
-                
-                if not result:
-                    # Column doesn't exist, add it
-                    alter_query = text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}")
-                    db.execute(alter_query)
-                    added_columns.append(column_name)
-                    print(f"✅ Added column: {column_name}")
-                else:
+                if column_name in existing_column_names:
                     print(f"ℹ️ Column {column_name} already exists")
+                    existing_columns.append(column_name)
+                    continue
+                
+                # Column doesn't exist, add it
+                if default_value == "NULL":
+                    alter_query = text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}")
+                elif default_value.startswith("'") or default_value == "''":
+                    # String default
+                    alter_query = text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type} DEFAULT {default_value}")
+                else:
+                    # Reference to another column (like customer_whatsapp = customer_phone)
+                    alter_query = text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}")
+                
+                print(f"Executing: {alter_query}")
+                db.execute(alter_query)
+                
+                # If column references another column, update existing rows
+                if default_value and not default_value.startswith("'") and default_value != "NULL" and default_value in existing_column_names:
+                    update_query = text(f"UPDATE orders SET {column_name} = {default_value} WHERE {column_name} IS NULL")
+                    db.execute(update_query)
+                
+                added_columns.append(column_name)
+                print(f"✅ Added column: {column_name}")
+                
             except Exception as e:
                 print(f"⚠️ Error adding column {column_name}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         db.commit()
+        print(f"✅ Migration completed. Added: {added_columns}, Existing: {existing_columns}")
+        
         return {
             "success": True,
             "added_columns": added_columns,
-            "message": f"تم إضافة {len(added_columns)} عمود جديد"
+            "existing_columns": existing_columns,
+            "total_orders": db.execute(text("SELECT COUNT(*) FROM orders")).scalar(),
+            "message": f"تم إضافة {len(added_columns)} عمود جديد. يوجد {len(existing_columns)} عمود موجود مسبقاً."
         }
     except Exception as e:
         db.rollback()

@@ -78,6 +78,8 @@ export default function WorksManagement() {
             <div className="work-image">
               {work.image_url ? (
                 <img 
+                  loading="lazy"
+                  decoding="async"
                   src={
                     // دعم base64 data URLs
                     work.image_url.startsWith('data:')

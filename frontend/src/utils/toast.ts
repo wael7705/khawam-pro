@@ -1,6 +1,6 @@
 import { ToastType } from '../components/Toast'
 
-interface Toast {
+export interface Toast {
   id: string
   message: string
   type: ToastType

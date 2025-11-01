@@ -258,13 +258,13 @@
   font-weight: 600;
 }
 
-.cancel-order-btn {
+.cancel-order-btn,
+.reject-order-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: #EF4444;
   color: white;
   border: none;
   border-radius: 8px;
@@ -272,10 +272,61 @@
   transition: all 0.2s;
 }
 
-.cancel-order-btn:hover {
+.cancel-order-btn {
+  background: #EF4444;
+}
+
+.cancel-order-btn:hover:not(:disabled) {
   background: #DC2626;
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.reject-order-btn {
+  background: #F59E0B;
+}
+
+.reject-order-btn:hover:not(:disabled) {
+  background: #D97706;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.cancel-order-btn:disabled,
+.reject-order-btn:disabled,
+.status-dropdown-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status-dropdown-btn.updating {
+  position: relative;
+  opacity: 0.7;
+}
+
+.status-dropdown-btn.updating::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.order-card-horizontal {
+  transition: all 0.3s ease;
+}
+
+.order-card-horizontal.updating {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .order-number {
@@ -600,6 +651,34 @@
   background: #DC2626;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.reject-modal .modal-header svg {
+  color: #F59E0B;
+}
+
+.reject-btn-primary {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #F59E0B;
+  color: white;
+}
+
+.reject-btn-primary:hover:not(:disabled) {
+  background: #D97706;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.reject-btn-primary:disabled,
+.cancel-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {

@@ -18,6 +18,7 @@ class StaffNotesUpdate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: str
     cancellation_reason: Optional[str] = None
+    rejection_reason: Optional[str] = None
 
 # --------------------------------------------
 # Helpers for public image URLs
@@ -931,6 +932,8 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
         # Update status
         order.status = status
         
+        rejection_reason = status_data.rejection_reason
+        
         # If cancelling, save cancellation reason
         if status == 'cancelled' and cancellation_reason:
             # Check if cancellation_reason column exists
@@ -954,6 +957,30 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
             except Exception as col_err:
                 # If column operation fails, log but don't break the status update
                 print(f"Warning: Could not update cancellation_reason: {col_err}")
+        
+        # If rejecting, save rejection reason
+        if status == 'rejected' and rejection_reason:
+            # Check if rejection_reason column exists
+            try:
+                check_col = text("""
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='orders' AND column_name='rejection_reason'
+                """)
+                has_col = db.execute(check_col).fetchone()
+                
+                if not has_col:
+                    # Add column if it doesn't exist
+                    db.execute(text("ALTER TABLE orders ADD COLUMN rejection_reason TEXT"))
+                    db.commit()
+                
+                # Update rejection reason
+                db.execute(
+                    text("UPDATE orders SET rejection_reason = :reason WHERE id = :id"),
+                    {"reason": rejection_reason, "id": order_id}
+                )
+            except Exception as col_err:
+                # If column operation fails, log but don't break the status update
+                print(f"Warning: Could not update rejection_reason: {col_err}")
         
         db.commit()
         db.refresh(order)

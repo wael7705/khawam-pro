@@ -26,6 +26,7 @@ const statusTabs = [
   { id: 'shipping', label: 'قيد التوصيل', count: 0 },
   { id: 'completed', label: 'مكتمل', count: 0 },
   { id: 'cancelled', label: 'ملغى', count: 0 },
+  { id: 'rejected', label: 'مرفوض', count: 0 },
 ]
 
 const statusOptions = [
@@ -47,7 +48,10 @@ export default function OrdersManagement() {
   const [activeTab, setActiveTab] = useState<string>('pending')
   const [dropdownOpen, setDropdownOpen] = useState<number | null>(null)
   const [cancelModalOpen, setCancelModalOpen] = useState<number | null>(null)
+  const [rejectModalOpen, setRejectModalOpen] = useState<number | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [rejectReason, setRejectReason] = useState('')
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
 
   const loadOrders = async () => {
     try {
@@ -155,13 +159,30 @@ export default function OrdersManagement() {
 
   const handleStatusChange = async (orderId: number, newStatus: string) => {
     try {
+      setUpdatingOrderId(orderId)
       await adminAPI.orders.updateStatus(orderId, newStatus)
-      showSuccess('تم تحديث حالة الطلب بنجاح')
+      
+      // Update order status locally without full reload
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus }
+            : order
+        )
+      )
+      
+      // Find order number for notification
+      const order = orders.find(o => o.id === orderId)
+      const orderNumber = order?.order_number || `#${orderId}`
+      const statusLabel = getStatusLabel(newStatus)
+      
+      showSuccess(`تم تحديث حالة الطلب إلى "${statusLabel}" - ${orderNumber}`)
       setDropdownOpen(null)
-      await loadOrders()
     } catch (e) {
       console.error('Error updating status:', e)
       showError('حدث خطأ في تحديث حالة الطلب')
+    } finally {
+      setUpdatingOrderId(null)
     }
   }
 
@@ -172,14 +193,62 @@ export default function OrdersManagement() {
     }
     
     try {
+      setUpdatingOrderId(orderId)
       await adminAPI.orders.updateStatus(orderId, 'cancelled', cancelReason)
-      showSuccess('تم إلغاء الطلب بنجاح')
+      
+      // Update order status locally
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: 'cancelled' }
+            : order
+        )
+      )
+      
+      const order = orders.find(o => o.id === orderId)
+      const orderNumber = order?.order_number || `#${orderId}`
+      
+      showSuccess(`تم إلغاء الطلب بنجاح - ${orderNumber}`)
       setCancelModalOpen(null)
       setCancelReason('')
-      await loadOrders()
     } catch (e) {
       console.error('Error cancelling order:', e)
       showError('حدث خطأ في إلغاء الطلب')
+    } finally {
+      setUpdatingOrderId(null)
+    }
+  }
+
+  const handleRejectOrder = async (orderId: number) => {
+    if (!rejectReason.trim()) {
+      showError('يرجى إدخال سبب الرفض')
+      return
+    }
+    
+    try {
+      setUpdatingOrderId(orderId)
+      await adminAPI.orders.updateStatus(orderId, 'rejected', undefined, rejectReason)
+      
+      // Update order status locally
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: 'rejected' }
+            : order
+        )
+      )
+      
+      const order = orders.find(o => o.id === orderId)
+      const orderNumber = order?.order_number || `#${orderId}`
+      
+      showSuccess(`تم رفض الطلب بنجاح - ${orderNumber}`)
+      setRejectModalOpen(null)
+      setRejectReason('')
+    } catch (e) {
+      console.error('Error rejecting order:', e)
+      showError('حدث خطأ في رفض الطلب')
+    } finally {
+      setUpdatingOrderId(null)
     }
   }
 
@@ -234,7 +303,7 @@ export default function OrdersManagement() {
       ) : (
         <div className="orders-list">
           {filteredOrders.map((order) => (
-            <div key={order.id} className="order-card-horizontal">
+            <div key={order.id} className={`order-card-horizontal ${updatingOrderId === order.id ? 'updating' : ''}`}>
               {order.image_url && (
                 <div className="order-image-container">
                   <img 
@@ -260,9 +329,10 @@ export default function OrdersManagement() {
                   <div className="order-status-controls">
                     <div className="status-dropdown-container">
                       <button
-                        className="status-dropdown-btn"
+                        className={`status-dropdown-btn ${updatingOrderId === order.id ? 'updating' : ''}`}
                         onClick={() => setDropdownOpen(dropdownOpen === order.id ? null : order.id)}
                         style={{ backgroundColor: getStatusColor(order.status) }}
+                        disabled={updatingOrderId === order.id}
                       >
                         <span>{getStatusLabel(order.status)}</span>
                         <ChevronDown size={16} />
@@ -281,11 +351,24 @@ export default function OrdersManagement() {
                         </div>
                       )}
                     </div>
-                    {order.status !== 'cancelled' && (
+                    {/* Reject button - only show for pending orders */}
+                    {order.status === 'pending' && (
+                      <button
+                        className="reject-order-btn"
+                        onClick={() => setRejectModalOpen(order.id)}
+                        title="رفض الطلب"
+                        disabled={updatingOrderId === order.id}
+                      >
+                        <AlertCircle size={16} />
+                      </button>
+                    )}
+                    {/* Cancel button - show for all statuses except pending and cancelled */}
+                    {order.status !== 'pending' && order.status !== 'cancelled' && (
                       <button
                         className="cancel-order-btn"
                         onClick={() => setCancelModalOpen(order.id)}
                         title="إلغاء الطلب"
+                        disabled={updatingOrderId === order.id}
                       >
                         <X size={16} />
                       </button>
@@ -362,7 +445,7 @@ export default function OrdersManagement() {
         <div className="modal-overlay" onClick={() => { setCancelModalOpen(null); setCancelReason('') }}>
           <div className="cancel-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <AlertCircle size={24} />
+              <X size={24} />
               <h3>إلغاء الطلب</h3>
               <button className="modal-close" onClick={() => { setCancelModalOpen(null); setCancelReason('') }}>
                 <X size={20} />
@@ -388,8 +471,49 @@ export default function OrdersManagement() {
               <button
                 className="cancel-btn-primary"
                 onClick={() => handleCancelOrder(cancelModalOpen)}
+                disabled={updatingOrderId === cancelModalOpen}
               >
-                تأكيد الإلغاء
+                {updatingOrderId === cancelModalOpen ? 'جاري الإلغاء...' : 'تأكيد الإلغاء'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModalOpen && (
+        <div className="modal-overlay" onClick={() => { setRejectModalOpen(null); setRejectReason('') }}>
+          <div className="cancel-modal reject-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <AlertCircle size={24} />
+              <h3>رفض الطلب</h3>
+              <button className="modal-close" onClick={() => { setRejectModalOpen(null); setRejectReason('') }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>يرجى إدخال سبب رفض الطلب:</p>
+              <textarea
+                className="cancel-reason-input"
+                placeholder="مثال: الطلب غير متوافق مع المتطلبات..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="modal-footer">
+              <button
+                className="cancel-btn-secondary"
+                onClick={() => { setRejectModalOpen(null); setRejectReason('') }}
+              >
+                إلغاء
+              </button>
+              <button
+                className="reject-btn-primary"
+                onClick={() => handleRejectOrder(rejectModalOpen)}
+                disabled={updatingOrderId === rejectModalOpen}
+              >
+                {updatingOrderId === rejectModalOpen ? 'جاري الرفض...' : 'تأكيد الرفض'}
               </button>
             </div>
           </div>

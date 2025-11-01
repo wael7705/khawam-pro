@@ -728,6 +728,7 @@ export default function OrdersManagement() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Cancel Modal */}

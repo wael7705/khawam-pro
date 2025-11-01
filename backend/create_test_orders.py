@@ -5,6 +5,16 @@ import sys
 import os
 import requests
 import json
+import time
+
+# Fix encoding for Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
+# Disable SSL verification warnings (for Railway)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -185,14 +195,31 @@ def create_test_orders():
     print(f"API URL: {BASE_URL}\n")
     
     for i, order_data in enumerate(orders_data):
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                # Create order with retry logic
+                response = requests.post(
+                    f"{BASE_URL}/orders/",
+                    json=order_data,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30,
+                    verify=False  # Disable SSL verification if needed
+                )
+                break  # Success, exit retry loop
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                if attempt < max_retries - 1:
+                    print(f"  [RETRY {attempt+1}/{max_retries}] Connection error, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    print(f"[ERROR] Failed after {max_retries} attempts")
+                    raise
+        
         try:
-            # Create order
-            response = requests.post(
-                f"{BASE_URL}/orders/",
-                json=order_data,
-                headers={"Content-Type": "application/json"},
-                timeout=30
-            )
             
             if response.status_code == 200 or response.status_code == 201:
                 order_result = response.json()
@@ -211,10 +238,10 @@ def create_test_orders():
                         continue
                 
                 if not order_id:
-                    print(f"⚠️ Order {i+1}: Created but could not get ID")
+                    print(f"[WARNING] Order {i+1}: Created but could not get ID")
                     continue
                 
-                print(f"✓ Order {i+1} created with ID: {order_id}")
+                print(f"[OK] Order {i+1} created with ID: {order_id}")
                 created_orders.append(order_id)
                 
                 # Update status if needed
@@ -232,27 +259,28 @@ def create_test_orders():
                         f"{BASE_URL}/admin/orders/{order_id}/status",
                         json=update_data,
                         headers={"Content-Type": "application/json"},
-                        timeout=30
+                        timeout=30,
+                        verify=False
                     )
                     
                     if update_response.status_code == 200:
-                        print(f"  → Status updated to: {new_status}")
+                        print(f"  -> Status updated to: {new_status}")
                     else:
-                        print(f"  ⚠️ Failed to update status: {update_response.status_code}")
+                        print(f"  [WARNING] Failed to update status: {update_response.status_code}")
                         print(f"  Response: {update_response.text[:100]}")
                 else:
-                    print(f"  → Status: pending (default)")
+                    print(f"  -> Status: pending (default)")
             else:
-                print(f"✗ Failed to create order {i+1}: {response.status_code}")
+                print(f"[FAILED] Failed to create order {i+1}: {response.status_code}")
                 print(f"  Response: {response.text[:200]}")
         
         except Exception as e:
-            print(f"✗ Error creating order {i+1}: {str(e)}")
+            print(f"[ERROR] Error creating order {i+1}: {str(e)}")
             import traceback
             traceback.print_exc()
     
     print(f"\n{'='*50}")
-    print(f"✓ Created {len(created_orders)} orders successfully")
+    print(f"[SUCCESS] Created {len(created_orders)} orders successfully")
     print(f"{'='*50}")
     
     return created_orders

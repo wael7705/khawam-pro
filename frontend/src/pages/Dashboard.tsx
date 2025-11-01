@@ -12,7 +12,7 @@ import './Dashboard.css'
 export default function Dashboard() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   
   const tabs = [
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard' },

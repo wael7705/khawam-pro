@@ -95,6 +95,8 @@ class Order(Base):
     payment_status = Column(String(20), default="pending")
     delivery_type = Column(String(20), default="self")  # self or delivery
     delivery_address = Column(Text)
+    delivery_latitude = Column(DECIMAL(10, 8))  # خط العرض
+    delivery_longitude = Column(DECIMAL(11, 8))  # خط الطول
     notes = Column(Text)  # ملاحظات العميل
     staff_notes = Column(Text)  # ملاحظات الموظف
     created_at = Column(TIMESTAMP, server_default=func.now())

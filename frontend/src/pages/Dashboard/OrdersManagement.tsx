@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
-import OrderMap from '../../components/OrderMap'
+import SimpleMap from '../../components/SimpleMap'
 
 interface Order {
   id: number
@@ -22,6 +22,8 @@ interface Order {
   cancellation_reason?: string
   rejection_reason?: string
   delivery_address?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
 }
 
 const statusTabs = [
@@ -46,7 +48,7 @@ export default function OrdersManagement() {
   const [cancelReason, setCancelReason] = useState('')
   const [rejectReason, setRejectReason] = useState('')
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
-  const [mapOpen, setMapOpen] = useState<number | null>(null)
+  const [selectedOrderForMap, setSelectedOrderForMap] = useState<number | null>(null)
 
   const loadOrders = async (showLoading = false) => {
     try {
@@ -182,6 +184,16 @@ export default function OrdersManagement() {
     
     const matchesTab = order.status === activeTab
     
+    // Additional validation: shipping tab should only show delivery orders, not self-pickup
+    if (activeTab === 'shipping' && order.delivery_type !== 'delivery') {
+      return false
+    }
+    
+    // Additional validation: awaiting_pickup tab should only show self-pickup orders
+    if (activeTab === 'awaiting_pickup' && order.delivery_type !== 'self') {
+      return false
+    }
+    
     return matchesSearch && matchesTab
   })
 
@@ -217,25 +229,46 @@ export default function OrdersManagement() {
       const order = orders.find(o => o.id === orderId)
       if (!order) return
       
-      // Move to awaiting_pickup if self delivery, shipping if delivery
-      const newStatus = order.delivery_type === 'self' ? 'awaiting_pickup' : 'shipping'
-      
-      // Update in background first for smooth UX
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId 
-            ? { ...order, status: newStatus }
-            : order
+      // Validation: Check delivery type and ensure correct status
+      if (order.delivery_type === 'self') {
+        // Self pickup orders can only go to awaiting_pickup
+        const newStatus = 'awaiting_pickup'
+        
+        // Update in background first
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId 
+              ? { ...order, status: newStatus }
+              : order
+          )
         )
-      )
-      
-      // Then update in backend
-      await adminAPI.orders.updateStatus(orderId, newStatus)
-      
-      const orderNumber = order?.order_number || `#${orderId}`
-      const statusLabel = newStatus === 'awaiting_pickup' ? 'استلام ذاتي' : 'قيد التوصيل'
-      
-      showSuccess(`تم الانتهاء من التحضير ونقل الطلب إلى ${statusLabel} - ${orderNumber}`)
+        
+        await adminAPI.orders.updateStatus(orderId, newStatus)
+        showSuccess(`تم الانتهاء من التحضير ونقل الطلب إلى استلام ذاتي - ${order.order_number}`)
+      } else if (order.delivery_type === 'delivery') {
+        // Delivery orders can only go to shipping, and must have address
+        if (!order.delivery_address) {
+          showError('يجب إدخال عنوان التوصيل للطلبات التي تتطلب التوصيل')
+          return
+        }
+        
+        const newStatus = 'shipping'
+        
+        // Update in background first
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId 
+              ? { ...order, status: newStatus }
+              : order
+          )
+        )
+        
+        await adminAPI.orders.updateStatus(orderId, newStatus)
+        showSuccess(`تم الانتهاء من التحضير ونقل الطلب إلى قيد التوصيل - ${order.order_number}`)
+      } else {
+        showError('نوع التوصيل غير معروف')
+        return
+      }
     } catch (e) {
       console.error('Error finishing preparation:', e)
       showError('حدث خطأ في إنهاء التحضير')
@@ -404,8 +437,73 @@ export default function OrdersManagement() {
           <p>{searchQuery ? 'لا توجد طلبات تطابق البحث' : `لا توجد طلبات بحالة "${statusTabs.find(t => t.id === activeTab)?.label}"`}</p>
         </div>
       ) : (
-        <div className="orders-list">
-          {filteredOrders.map((order) => (
+        <>
+          {/* Map Section - Always visible when shipping tab is active */}
+          {activeTab === 'shipping' && filteredOrders.length > 0 && (
+            <div className="shipping-map-container">
+              <h3 className="map-section-title">خريطة مواقع التوصيل</h3>
+              <div className="shipping-map-wrapper">
+                {selectedOrderForMap ? (
+                  // Show single order map
+                  (() => {
+                    const order = filteredOrders.find(o => o.id === selectedOrderForMap)
+                    if (!order || !order.delivery_address) return null
+                    
+                    return (
+                      <div className="single-order-map">
+                        <div className="map-order-info">
+                          <strong>{order.order_number}</strong> - {order.customer_name}
+                          <span className="map-close-btn" onClick={() => setSelectedOrderForMap(null)}>
+                            <X size={16} />
+                          </span>
+                        </div>
+                        <SimpleMap
+                          address={order.delivery_address}
+                          latitude={order.delivery_latitude}
+                          longitude={order.delivery_longitude}
+                        />
+                        <div className="map-actions">
+                          <a
+                            href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(order.delivery_address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="map-link-btn"
+                          >
+                            <MapPin size={18} />
+                            فتح في OpenStreetMap
+                          </a>
+                        </div>
+                      </div>
+                    )
+                  })()
+                ) : (
+                  // Show overview map with all shipping orders
+                  <div className="all-orders-map">
+                    <SimpleMap
+                      defaultCenter={[33.5138, 36.2765]}
+                      defaultZoom={12}
+                      markers={filteredOrders
+                        .filter(o => o.delivery_latitude && o.delivery_longitude)
+                        .map(o => ({
+                          lat: o.delivery_latitude!,
+                          lng: o.delivery_longitude!,
+                          title: `${o.order_number} - ${o.customer_name}`,
+                          description: o.delivery_address || ''
+                        }))
+                      }
+                    />
+                    <div className="map-hint">
+                      <MapPin size={16} />
+                      <span>اضغط على أيقونة الخريطة في بطاقة الطلب لعرض موقعه المحدد</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <div className="orders-list">
+            {filteredOrders.map((order) => (
             <div key={order.id} className={`order-card-horizontal ${updatingOrderId === order.id ? 'updating' : ''}`}>
               {order.image_url && (
                 <div className="order-image-container">
@@ -510,12 +608,12 @@ export default function OrdersManagement() {
                       <>
                         <button
                           className="action-btn map-btn"
-                          onClick={() => setMapOpen(order.id)}
+                          onClick={() => setSelectedOrderForMap(order.id === selectedOrderForMap ? null : order.id)}
                           disabled={updatingOrderId === order.id}
                           title="عرض على الخريطة"
+                          style={{ backgroundColor: order.id === selectedOrderForMap ? '#8b5cf6' : undefined }}
                         >
                           <MapPin size={18} />
-                          <span>عرض الخريطة</span>
                         </button>
                         <button
                           className="action-btn complete-btn"
@@ -712,81 +810,6 @@ export default function OrdersManagement() {
         </div>
       )}
 
-      {/* Map Modal */}
-      {mapOpen && (() => {
-        const order = orders.find(o => o.id === mapOpen)
-        if (!order || !order.delivery_address) {
-          return (
-            <div className="modal-overlay" onClick={() => setMapOpen(null)}>
-              <div className="map-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                  <MapPin size={24} />
-                  <h3>موقع العميل - {order?.order_number}</h3>
-                  <button className="modal-close" onClick={() => setMapOpen(null)}>
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="map-modal-body">
-                  <p>لا يوجد عنوان توصيل لهذا الطلب</p>
-                </div>
-              </div>
-            </div>
-          )
-        }
-        
-        const address = order.delivery_address
-        const encodedAddress = encodeURIComponent(address)
-        
-        return (
-          <div className="modal-overlay" onClick={() => setMapOpen(null)}>
-            <div className="map-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <MapPin size={24} />
-                <h3>موقع العميل - {order.order_number}</h3>
-                <button className="modal-close" onClick={() => setMapOpen(null)}>
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="map-modal-body">
-                <div className="address-info">
-                  <strong>العنوان:</strong>
-                  <p>{address}</p>
-                  <strong>العميل:</strong>
-                  <p>{order.customer_name} - {order.customer_phone}</p>
-                </div>
-                
-                <OrderMap
-                  address={address}
-                  customerName={order.customer_name}
-                  orderNumber={order.order_number}
-                  onClose={() => setMapOpen(null)}
-                />
-                
-                <div className="map-actions">
-                  <a
-                    href={`https://www.google.com/maps?q=${encodedAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="map-link-btn"
-                  >
-                    <MapPin size={18} />
-                    فتح في Google Maps
-                  </a>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="map-link-btn"
-                  >
-                    <MapPin size={18} />
-                    فتح تطبيق الخرائط
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }

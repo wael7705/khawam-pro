@@ -663,6 +663,16 @@ async def get_all_orders(db: Session = Depends(get_db)):
             else:
                 select_parts.append("NULL as rejection_reason")
             
+            if "delivery_latitude" in available_cols:
+                select_parts.append("delivery_latitude")
+            else:
+                select_parts.append("NULL as delivery_latitude")
+                
+            if "delivery_longitude" in available_cols:
+                select_parts.append("delivery_longitude")
+            else:
+                select_parts.append("NULL as delivery_longitude")
+            
             query = f"""
                 SELECT {', '.join(select_parts)}
                 FROM orders 
@@ -722,10 +732,16 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 
                 cancellation_reason = None
                 rejection_reason = None
+                delivery_latitude = None
+                delivery_longitude = None
                 if len(row) > 15:
                     cancellation_reason = (row[15] or "").strip() if row[15] else None
                 if len(row) > 16:
                     rejection_reason = (row[16] or "").strip() if row[16] else None
+                if len(row) > 17:
+                    delivery_latitude = float(row[17]) if row[17] is not None else None
+                if len(row) > 18:
+                    delivery_longitude = float(row[18]) if row[18] is not None else None
                 
                 orders_list.append({
                     "id": row[0],
@@ -745,6 +761,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     "staff_notes": row[14] if len(row) > 14 else None,
                     "cancellation_reason": cancellation_reason,
                     "rejection_reason": rejection_reason,
+                    "delivery_latitude": delivery_latitude,
+                    "delivery_longitude": delivery_longitude,
                     "image_url": raw_image
                 })
             print(f"Returning {len(orders_list)} orders from raw SQL")
@@ -821,6 +839,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
 
             cancellation_reason = None
             rejection_reason = None
+            delivery_latitude = None
+            delivery_longitude = None
             try:
                 cancellation_reason = getattr(o, 'cancellation_reason', None)
                 if cancellation_reason:
@@ -831,6 +851,18 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 rejection_reason = getattr(o, 'rejection_reason', None)
                 if rejection_reason:
                     rejection_reason = str(rejection_reason).strip()
+            except:
+                pass
+            try:
+                delivery_latitude = getattr(o, 'delivery_latitude', None)
+                if delivery_latitude is not None:
+                    delivery_latitude = float(delivery_latitude)
+            except:
+                pass
+            try:
+                delivery_longitude = getattr(o, 'delivery_longitude', None)
+                if delivery_longitude is not None:
+                    delivery_longitude = float(delivery_longitude)
             except:
                 pass
             
@@ -847,6 +879,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 "total_amount": float(o.total_amount) if o.total_amount is not None else 0,
                 "payment_status": getattr(o, 'payment_status', 'pending'),
                 "delivery_address": getattr(o, 'delivery_address', None),
+                "delivery_latitude": delivery_latitude,
+                "delivery_longitude": delivery_longitude,
                 "notes": getattr(o, 'notes', None),
                 "staff_notes": staff_notes,
                 "cancellation_reason": cancellation_reason,

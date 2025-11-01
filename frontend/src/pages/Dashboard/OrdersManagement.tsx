@@ -196,7 +196,34 @@ export default function OrdersManagement() {
     
     return matchesSearch && matchesTab
   })
-
+  
+  // Debug logging for shipping tab
+  useEffect(() => {
+    if (activeTab === 'shipping') {
+      console.log('=== Shipping Tab Debug ===')
+      console.log('Total orders:', orders.length)
+      console.log('Filtered orders:', filteredOrders.length)
+      console.log('Orders with shipping status:', orders.filter(o => o.status === 'shipping').length)
+      console.log('Orders with delivery_type=delivery:', orders.filter(o => o.delivery_type === 'delivery').length)
+      console.log('Orders with shipping status AND delivery_type=delivery:', 
+        orders.filter(o => o.status === 'shipping' && o.delivery_type === 'delivery').length)
+      
+      filteredOrders.forEach(order => {
+        console.log(`Order ${order.order_number}:`, {
+          status: order.status,
+          delivery_type: order.delivery_type,
+          has_address: !!order.delivery_address,
+          has_lat: !!order.delivery_latitude,
+          has_lng: !!order.delivery_longitude,
+          lat: order.delivery_latitude,
+          lng: order.delivery_longitude,
+          address: order.delivery_address
+        })
+      })
+      console.log('========================')
+    }
+  }, [activeTab, orders, filteredOrders])
+  
   const handleAcceptOrder = async (orderId: number) => {
     try {
       setUpdatingOrderId(orderId)
@@ -439,7 +466,7 @@ export default function OrdersManagement() {
       ) : (
         <>
           {/* Map Section - Always visible when shipping tab is active */}
-          {activeTab === 'shipping' && filteredOrders.length > 0 && (
+          {activeTab === 'shipping' && (
             <div className="shipping-map-container">
               <h3 className="map-section-title">خريطة مواقع التوصيل</h3>
               <div className="shipping-map-wrapper">
@@ -494,7 +521,11 @@ export default function OrdersManagement() {
                     />
                     <div className="map-hint">
                       <MapPin size={16} />
-                      <span>اضغط على أيقونة الخريطة في بطاقة الطلب لعرض موقعه المحدد</span>
+                      <span>
+                        {filteredOrders.length > 0 
+                          ? 'اضغط على أيقونة الخريطة في بطاقة الطلب لعرض موقعه المحدد'
+                          : 'لا توجد طلبات قيد التوصيل لعرضها على الخريطة'}
+                      </span>
                     </div>
                   </div>
                 )}

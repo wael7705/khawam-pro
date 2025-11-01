@@ -1071,6 +1071,61 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
         print(f"Error updating order status: {e}")
         raise HTTPException(status_code=500, detail=f"خطأ في تحديث حالة الطلب: {str(e)}")
 
+@router.put("/orders/{order_id}/delivery-coordinates")
+async def update_delivery_coordinates(
+    order_id: int, 
+    coordinates: dict,
+    db: Session = Depends(get_db)
+):
+    """Update delivery coordinates for an order"""
+    try:
+        from sqlalchemy import text
+        
+        latitude = coordinates.get('latitude')
+        longitude = coordinates.get('longitude')
+        
+        if latitude is None or longitude is None:
+            raise HTTPException(status_code=400, detail="يجب إدخال خط العرض وخط الطول")
+        
+        # Check if columns exist
+        check_cols = db.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'orders' 
+            AND column_name IN ('delivery_latitude', 'delivery_longitude')
+        """))
+        available_cols = [row[0] for row in check_cols.fetchall()]
+        
+        # Add columns if they don't exist
+        if 'delivery_latitude' not in available_cols:
+            db.execute(text("ALTER TABLE orders ADD COLUMN delivery_latitude DECIMAL(10, 8)"))
+            db.commit()
+        
+        if 'delivery_longitude' not in available_cols:
+            db.execute(text("ALTER TABLE orders ADD COLUMN delivery_longitude DECIMAL(11, 8)"))
+            db.commit()
+        
+        # Update coordinates
+        db.execute(
+            text("UPDATE orders SET delivery_latitude = :lat, delivery_longitude = :lng WHERE id = :id"),
+            {"lat": float(latitude), "lng": float(longitude), "id": order_id}
+        )
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "تم تحديث الإحداثيات بنجاح",
+            "order_id": order_id,
+            "latitude": latitude,
+            "longitude": longitude
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating coordinates: {e}")
+        raise HTTPException(status_code=500, detail=f"خطأ في تحديث الإحداثيات: {str(e)}")
+
 @router.put("/orders/{order_id}/staff-notes")
 async def update_staff_notes(order_id: int, notes_data: StaffNotesUpdate, db: Session = Depends(get_db)):
     """Update staff notes for an order"""

@@ -147,7 +147,12 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
       }
 
       // العودة للصفحة السابقة أو المسار المحدد
-      if (location.state?.from) {
+      // إذا كان returnTo = 'order-modal'، نعيد إلى الصفحة ونخزن flag لفتح Modal
+      if (location.state?.returnTo === 'order-modal' && location.state?.from) {
+        localStorage.setItem('shouldReopenOrderModal', 'true')
+        localStorage.setItem('orderModalService', location.state.serviceName || '')
+        navigate(location.state.from)
+      } else if (location.state?.from) {
         navigate(location.state.from)
       } else {
         navigate(redirectTo)

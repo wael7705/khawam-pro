@@ -29,6 +29,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const [shopName, setShopName] = useState('')
   const [deliveryType, setDeliveryType] = useState('self')
   const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
+  const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [totalPrice, setTotalPrice] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -41,6 +42,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
       try {
         const address = JSON.parse(savedAddress)
         setDeliveryAddress(address)
+        setAddressConfirmed(true)
         if (address.street || address.neighborhood) {
           setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
         }
@@ -60,7 +62,10 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   // Handle delivery type change - navigate to location picker if delivery
   const handleDeliveryTypeChange = (type: string) => {
     setDeliveryType(type)
-    if (type === 'delivery') {
+    // Clear address confirmation when switching to self-pickup
+    if (type === 'self') {
+      setAddressConfirmed(false)
+    } else if (type === 'delivery') {
       // Save current form state
       localStorage.setItem('orderFormState', JSON.stringify({
         quantity,
@@ -79,7 +84,8 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
       navigate('/location-picker', { 
         state: { 
           from: window.location.pathname,
-          returnTo: 'order-modal'
+          returnTo: 'order-modal',
+          serviceName: serviceName
         } 
       })
       onClose()
@@ -479,19 +485,24 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
                 <div className="delivery-address-info" style={{ 
                   marginTop: '12px', 
                   padding: '12px', 
-                  background: '#f0f9ff', 
+                  background: addressConfirmed ? '#f0fdf4' : '#f0f9ff', 
                   borderRadius: '8px',
-                  border: '1px solid #bae6fd'
+                  border: `1px solid ${addressConfirmed ? '#86efac' : '#bae6fd'}`
                 }}>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#0369a1' }}>
-                    <strong>✓ العنوان المحفوظ:</strong> {
+                  {addressConfirmed && (
+                    <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
+                      ✓ تم تأكيد العنوان بنجاح
+                    </p>
+                  )}
+                  <p style={{ margin: 0, fontSize: '14px', color: addressConfirmed ? '#15803d' : '#0369a1' }}>
+                    <strong>العنوان المحفوظ:</strong> {
                       [deliveryAddress.street, deliveryAddress.neighborhood, deliveryAddress.building]
                         .filter(Boolean)
                         .join(', ') || 'تم تحديد الموقع'
                     }
                   </p>
                   {deliveryAddress.latitude && deliveryAddress.longitude && (
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#0284c7' }}>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: addressConfirmed ? '#15803d' : '#0284c7' }}>
                       الإحداثيات: {deliveryAddress.latitude.toFixed(4)}, {deliveryAddress.longitude.toFixed(4)}
                     </p>
                   )}

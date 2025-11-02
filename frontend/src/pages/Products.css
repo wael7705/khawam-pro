@@ -21,127 +21,24 @@
   margin-bottom: 60px;
 }
 
-/* Horizontal Scroll Wrapper with Arrows */
-.products-horizontal-wrapper {
-  position: relative;
-  margin: 40px 0;
-}
-
-.products-horizontal-container {
-  width: 100%;
-  overflow: hidden;
-  position: relative;
-}
-
-.products-horizontal {
-  display: flex;
+/* Products Grid */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 30px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
-  padding: 20px 0;
-  scroll-snap-type: x proximity;
-  
-  /* Start from center */
-  padding-left: 50%;
-  padding-right: 50%;
-  
-  /* Hide scrollbar on desktop */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  margin-top: 40px;
 }
 
-.products-horizontal::-webkit-scrollbar {
-  display: none;
-}
-
-.products-horizontal > * {
-  flex: 0 0 320px;
-  min-width: 320px;
-  scroll-snap-align: center;
-}
-
-/* Scroll Buttons - Desktop Only */
-.scroll-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border: none;
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-}
-
-.scroll-btn:hover {
-  transform: translateY(-50%) scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-}
-
-.scroll-btn-left {
-  left: -25px;
-}
-
-.scroll-btn-right {
-  right: -25px;
-}
-
-.scroll-btn:active {
-  transform: translateY(-50%) scale(0.95);
-}
-
-/* Mobile: Hide buttons, enable touch scroll with visible scrollbar */
-@media (max-width: 678px) {
-  .scroll-btn {
-    display: none;
-  }
-  
-  .products-horizontal {
-    padding-left: 20px;
-    padding-right: 20px;
-    gap: 15px;
-    scrollbar-width: thin;
-    -ms-overflow-style: auto;
-  }
-  
-  .products-horizontal::-webkit-scrollbar {
-    display: block;
-    height: 6px;
-  }
-  
-  .products-horizontal::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 3px;
-  }
-  
-  .products-horizontal::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-radius: 3px;
-  }
-  
-  /* نفس الأبعاد على الموبايل - الحفاظ على aspect-ratio 1:1 */
-  .products-horizontal > * {
-    flex: 0 0 280px;
-    min-width: 280px;
-    max-width: 280px;
+@media (max-width: 768px) {
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
   }
 }
 
-/* Adjust buttons position on smaller desktop */
-@media (max-width: 1024px) {
-  .scroll-btn-left {
-    left: 10px;
-  }
-  
-  .scroll-btn-right {
-    right: 10px;
+@media (max-width: 480px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
 }

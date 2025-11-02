@@ -19,7 +19,7 @@ function App() {
   const location = useLocation()
   const [toasts, setToasts] = useState<Toast[]>([])
   const hideFooterPaths = ['/products']
-  const hideAllPaths = ['/dashboard']
+  const hideAllPaths = ['/dashboard', '/location-picker']
   const shouldHideFooter = hideFooterPaths.includes(location.pathname)
   const shouldHideAll = hideAllPaths.some(path => location.pathname.startsWith(path))
 

@@ -22,6 +22,24 @@ export default function Services() {
     loadServices()
   }, [])
 
+  // Check if we should reopen order modal after returning from location picker
+  useEffect(() => {
+    const shouldReopen = localStorage.getItem('shouldReopenOrderModal')
+    const serviceName = localStorage.getItem('orderModalService')
+    
+    if (shouldReopen === 'true' && serviceName && services.length > 0) {
+      // Find the service by name
+      const service = services.find(s => s.name_ar === serviceName)
+      if (service) {
+        setSelectedService(service)
+        setIsModalOpen(true)
+      }
+      // Clear the flag
+      localStorage.removeItem('shouldReopenOrderModal')
+      localStorage.removeItem('orderModalService')
+    }
+  }, [services])
+
   const loadServices = async () => {
     try {
       const response = await servicesAPI.getAll()

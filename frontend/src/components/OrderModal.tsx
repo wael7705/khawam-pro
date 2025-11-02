@@ -38,13 +38,21 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   // Load saved form state and delivery address from localStorage when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Restore form state if exists
+      // Check if we should restore state (only when returning from location picker)
+      const shouldReopen = localStorage.getItem('shouldReopenOrderModal')
+      
+      // Restore form state if exists and we're returning from location picker
       const savedFormState = localStorage.getItem('orderFormState')
-      if (savedFormState) {
+      if (savedFormState && shouldReopen === 'true') {
         try {
           const formState = JSON.parse(savedFormState)
           // Only restore if it's for the same service
           if (formState.serviceName === serviceName) {
+            // Restore step first
+            if (formState.step) {
+              setStep(formState.step)
+            }
+            // Restore all form fields
             setQuantity(formState.quantity || 1)
             setLength(formState.length || '')
             setWidth(formState.width || '')
@@ -55,7 +63,13 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             setNotes(formState.notes || '')
             setCustomerName(formState.customerName || '')
             setCustomerWhatsApp(formState.customerWhatsApp || '')
-            // Keep current step or go to step 5 (where delivery info is shown)
+            if (formState.shopName) {
+              setShopName(formState.shopName)
+            }
+            if (formState.totalPrice) {
+              setTotalPrice(formState.totalPrice)
+            }
+            // Restore delivery type
             if (formState.deliveryType === 'delivery') {
               setDeliveryType('delivery')
             }
@@ -72,19 +86,27 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
           const address = JSON.parse(savedAddress)
           setDeliveryAddress(address)
           setAddressConfirmed(true)
-          if (address.street || address.neighborhood) {
+          // Only update shopName if it's not already set from formState
+          if (!shopName && (address.street || address.neighborhood)) {
             setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
-          }
-          // If we have address and delivery type is delivery, go to step 5
-          if (deliveryType === 'delivery') {
-            setStep(5)
           }
         } catch (error) {
           console.error('Error loading delivery address:', error)
         }
       }
+      
+      // Clear the reopen flag after restoring state
+      if (shouldReopen === 'true') {
+        // Small delay to ensure state is restored first
+        setTimeout(() => {
+          localStorage.removeItem('shouldReopenOrderModal')
+        }, 100)
+      }
+    } else {
+      // When modal closes, don't clear form state (we might be going to location picker)
+      // Only clear if explicitly needed
     }
-  }, [isOpen, serviceName, deliveryType])
+  }, [isOpen, serviceName])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -100,8 +122,9 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
     if (type === 'self') {
       setAddressConfirmed(false)
     } else if (type === 'delivery') {
-      // Save current form state
+      // Save current form state including current step
       localStorage.setItem('orderFormState', JSON.stringify({
+        step,
         quantity,
         length,
         width,
@@ -112,7 +135,10 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         notes,
         customerName,
         customerWhatsApp,
-        serviceName
+        shopName,
+        deliveryType: 'delivery',
+        serviceName,
+        totalPrice
       }))
       // Navigate to location picker
       navigate('/location-picker', { 
@@ -269,6 +295,11 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
       
       if (response.data.success) {
         showSuccess(`تم إرسال الطلب بنجاح! رقم الطلب: ${response.data.order.order_number}`)
+        // Clear saved form state and delivery address
+        localStorage.removeItem('orderFormState')
+        localStorage.removeItem('deliveryAddress')
+        localStorage.removeItem('shouldReopenOrderModal')
+        localStorage.removeItem('orderModalService')
         // Reset form
         setStep(1)
         setQuantity(1)
@@ -283,6 +314,8 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         setCustomerWhatsApp('')
         setShopName('')
         setDeliveryType('self')
+        setDeliveryAddress(null)
+        setAddressConfirmed(false)
         setTotalPrice(0)
         onClose()
       } else {

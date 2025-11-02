@@ -32,6 +32,8 @@ class OrderCreate(BaseModel):
     final_amount: Decimal
     delivery_type: str = "self"  # self or delivery
     delivery_address: Optional[str] = None
+    delivery_latitude: Optional[Decimal] = None
+    delivery_longitude: Optional[Decimal] = None
     notes: Optional[str] = None
     service_name: Optional[str] = None
 
@@ -55,22 +57,56 @@ async def create_order(
         random_suffix = uuid.uuid4().hex[:3].upper()
         order_number = f"ORD{date_str}-{random_suffix}"
         
+        # Check and add delivery_latitude/delivery_longitude columns if they don't exist
+        from sqlalchemy import text, inspect
+        
+        inspector = inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('orders')]
+        
+        # Add columns if they don't exist
+        if 'delivery_latitude' not in columns:
+            try:
+                db.execute(text("ALTER TABLE orders ADD COLUMN delivery_latitude DECIMAL(10, 8)"))
+                db.commit()
+                print("✅ Added delivery_latitude column")
+            except Exception as e:
+                print(f"Warning: Could not add delivery_latitude: {e}")
+                db.rollback()
+        
+        if 'delivery_longitude' not in columns:
+            try:
+                db.execute(text("ALTER TABLE orders ADD COLUMN delivery_longitude DECIMAL(11, 8)"))
+                db.commit()
+                print("✅ Added delivery_longitude column")
+            except Exception as e:
+                print(f"Warning: Could not add delivery_longitude: {e}")
+                db.rollback()
+        
         # Create order
-        new_order = Order(
-            order_number=order_number,
-            customer_id=None,  # TODO: Link to User if authenticated
-            customer_name=order_data.customer_name,
-            customer_phone=order_data.customer_phone,
-            customer_whatsapp=order_data.customer_whatsapp or order_data.customer_phone,
-            shop_name=order_data.shop_name,
-            status="pending",
-            total_amount=order_data.total_amount,
-            final_amount=order_data.final_amount,
-            payment_status="pending",
-            delivery_type=order_data.delivery_type,
-            delivery_address=order_data.delivery_address if order_data.delivery_type == "delivery" else None,
-            notes=order_data.notes
-        )
+        order_dict = {
+            'order_number': order_number,
+            'customer_id': None,  # TODO: Link to User if authenticated
+            'customer_name': order_data.customer_name,
+            'customer_phone': order_data.customer_phone,
+            'customer_whatsapp': order_data.customer_whatsapp or order_data.customer_phone,
+            'shop_name': order_data.shop_name,
+            'status': 'pending',
+            'total_amount': order_data.total_amount,
+            'final_amount': order_data.final_amount,
+            'payment_status': 'pending',
+            'delivery_type': order_data.delivery_type,
+            'delivery_address': order_data.delivery_address if order_data.delivery_type == "delivery" else None,
+            'notes': order_data.notes
+        }
+        
+        # Add delivery coordinates only if provided and delivery type is delivery
+        if order_data.delivery_type == "delivery":
+            if order_data.delivery_latitude is not None:
+                order_dict['delivery_latitude'] = order_data.delivery_latitude
+            if order_data.delivery_longitude is not None:
+                order_dict['delivery_longitude'] = order_data.delivery_longitude
+        
+        new_order = Order(**order_dict)
         db.add(new_order)
         db.flush()  # Get the order ID
         

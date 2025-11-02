@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { MapPin, ArrowLeft, ArrowRight, Image, XCircle } from 'lucide-react'
+import { MapPin, ArrowLeft, ArrowRight, Image, XCircle, CheckCircle } from 'lucide-react'
 import SimpleMap from '../components/SimpleMap'
+import './LocationPickerPage.css'
 
 interface DeliveryAddress {
   latitude?: number
@@ -160,294 +161,296 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="location-picker-page">
       {/* Header */}
-      <header className="bg-white border-b-2 border-red-100 shadow-lg sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+      <header className="location-picker-header">
+        <div className="location-picker-header-content">
+          <div className="location-picker-header-left">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+              className="back-button"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span className="font-tajawal">العودة</span>
+              <span>العودة</span>
             </button>
-            <div className="flex items-center space-x-4 rtl-space-x-reverse">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-red-600 to-orange-600 rounded-xl shadow-lg">
-                <MapPin className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-2xl font-cairo font-bold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">
-                تحديد موقع التوصيل
-              </h1>
+          </div>
+          <div className="location-picker-header-right">
+            <div className="location-icon-wrapper">
+              <MapPin className="w-6 h-6 text-white" />
             </div>
+            <h1 className="page-title">
+              تحديد موقع التوصيل
+            </h1>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto">
-          {/* الخريطة */}
-          <div className="mb-6">
-            <div className="bg-white rounded-2xl border-2 border-gray-200 shadow-lg overflow-hidden">
-              <div className="p-4 bg-gray-50 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <MapPin className="w-6 h-6 text-blue-600" />
-                    <h3 className="text-lg font-cairo font-semibold text-blue-800">
-                      اختر موقعك على الخريطة
-                    </h3>
+      {/* الخريطة */}
+      <div className="map-section-wrapper">
+        <div className="map-card">
+          <div className="map-header">
+            <div className="map-header-left">
+              <MapPin className="map-icon" />
+              <h3 className="map-header-title">
+                اختر موقعك على الخريطة
+              </h3>
+            </div>
+            <button
+              onClick={handleLocateMe}
+              className="locate-me-btn"
+            >
+              <MapPin className="w-4 h-4" />
+              تحديد موقعي تلقائياً
+            </button>
+          </div>
+          {latitude && longitude && (
+            <div className="location-info" style={{ margin: '0 24px 12px 24px' }}>
+              <CheckCircle className="w-4 h-4" />
+              الموقع المحدد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+            </div>
+          )}
+          <div className="map-container-wrapper" style={{ height: `${mapHeight}px` }}>
+            <SimpleMap
+              latitude={latitude}
+              longitude={longitude}
+              defaultCenter={latitude && longitude ? [latitude, longitude] : [33.5138, 36.2765]}
+              defaultZoom={latitude && longitude ? 17 : 12}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* نموذج العنوان */}
+      <div className="form-section-wrapper">
+        <div className="form-card">
+          <h3 className="form-title">
+            تفاصيل العنوان
+          </h3>
+          <p className="form-subtitle">
+            أدخل تفاصيل عنوانك لتسهيل عملية التوصيل
+          </p>
+          
+          {error && (
+            <div className="error-alert">
+              {error}
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit}>
+            {/* GPS Location */}
+            <div className="gps-section">
+              <label className="gps-label">
+                <span className="required">*</span>
+                الموقع الجغرافي (GPS)
+              </label>
+              <div className="gps-actions">
+                <button
+                  type="button"
+                  onClick={handleLocateMe}
+                  className="locate-me-btn"
+                  disabled={isLoading}
+                >
+                  <MapPin className="w-4 h-4" />
+                  تحديد موقعي تلقائياً
+                </button>
+                {(latitude && longitude) && (
+                  <div className="gps-status">
+                    <CheckCircle className="w-4 h-4" />
+                    تم التحديد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
                   </div>
-                  <button
-                    onClick={handleLocateMe}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-tajawal font-semibold text-sm shadow-md flex items-center gap-2"
-                  >
-                    <MapPin className="w-4 h-4" />
-                    تحديد موقعي تلقائياً
-                  </button>
-                </div>
-                {latitude && longitude && (
-                  <p className="text-sm text-blue-700 mt-2">
-                    ✓ الموقع المحدد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
-                  </p>
                 )}
               </div>
-              <div style={{ height: `${mapHeight}px` }}>
-                <SimpleMap
-                  latitude={latitude}
-                  longitude={longitude}
-                  defaultCenter={latitude && longitude ? [latitude, longitude] : [33.5138, 36.2765]}
-                  defaultZoom={latitude && longitude ? 17 : 12}
+              <p className="gps-hint">
+                سيساعد تحديد الموقع في وصول طلبك بشكل أسرع وأدق
+              </p>
+            </div>
+
+            {/* Manual Address Input */}
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-field-label">
+                  اسم الشارع <span className="optional">(اختياري)</span>
+                </label>
+                <input
+                  type="text"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  className="form-input"
+                  placeholder="أدخل اسم الشارع"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field-label">
+                  اسم الحي <span className="optional">(اختياري)</span>
+                </label>
+                <input
+                  type="text"
+                  value={neighborhood}
+                  onChange={(e) => setNeighborhood(e.target.value)}
+                  className="form-input"
+                  placeholder="أدخل اسم الحي"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field-label">
+                  رقم البناء <span className="optional">(اختياري)</span>
+                </label>
+                <input
+                  type="text"
+                  value={building}
+                  onChange={(e) => setBuilding(e.target.value)}
+                  className="form-input"
+                  placeholder="أدخل رقم البناء"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-field-label">
+                  رقم الطابق <span className="optional">(اختياري)</span>
+                </label>
+                <input
+                  type="text"
+                  value={floor}
+                  onChange={(e) => setFloor(e.target.value)}
+                  className="form-input"
+                  placeholder="أدخل رقم الطابق"
+                  disabled={isLoading}
                 />
               </div>
             </div>
-          </div>
 
-          {/* نموذج العنوان */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-            <h3 className="text-xl font-cairo font-semibold text-gray-800 mb-6">
-              تفاصيل العنوان
-            </h3>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
-                {error}
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* GPS Location */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  الموقع الجغرافي (GPS) <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-3">
+            {/* Image Uploads */}
+            <div className="image-upload-section">
+              <div className="image-upload-grid">
+                {/* Entrance Image */}
+                <div className="image-upload-field">
+                  <label className="form-field-label">
+                    صورة المدخل <span className="optional">(اختياري)</span>
+                  </label>
+                  <input
+                    ref={entranceInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageChange(e, setEntranceImage, setEntranceImageUrl)}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
                   <button
                     type="button"
-                    onClick={handleLocateMe}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center gap-2"
+                    onClick={() => entranceInputRef.current?.click()}
+                    className="image-upload-button"
                     disabled={isLoading}
                   >
-                    <MapPin className="w-4 h-4" />
-                    تحديد موقعي تلقائياً
+                    <Image className="image-upload-icon" />
+                    <span className="image-upload-button-text">اختر صورة المدخل</span>
                   </button>
-                  {(latitude && longitude) && (
-                    <span className="text-sm text-green-600">
-                      ✓ تم التحديد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
-                    </span>
+                  {entranceImageUrl && (
+                    <div className="image-preview-wrapper">
+                      <img
+                        src={entranceImageUrl}
+                        alt="صورة المدخل"
+                        className="image-preview"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleImageRemove(setEntranceImage, setEntranceImageUrl)}
+                        className="remove-image-btn"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  سيساعد تحديد الموقع في وصول طلبك بشكل أسرع وأدق.
-                </p>
-              </div>
-
-              {/* Manual Address Input */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    اسم الشارع <span className="text-gray-400">(اختياري)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
-                    placeholder="أدخل اسم الشارع"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    اسم الحي <span className="text-gray-400">(اختياري)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
-                    placeholder="أدخل اسم الحي"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    رقم البناء <span className="text-gray-400">(اختياري)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={building}
-                    onChange={(e) => setBuilding(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
-                    placeholder="أدخل رقم البناء"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    رقم الطابق <span className="text-gray-400">(اختياري)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
-                    placeholder="أدخل رقم الطابق"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Image Uploads */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Entrance Image */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    صورة المدخل (اختياري)
-                  </label>
-                  <div className="space-y-3">
-                    <input
-                      ref={entranceInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageChange(e, setEntranceImage, setEntranceImageUrl)}
-                      className="hidden"
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => entranceInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
-                      disabled={isLoading}
-                    >
-                      <Image className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-600">اختر صورة المدخل</span>
-                    </button>
-                    {entranceImageUrl && (
-                      <div className="relative">
-                        <img
-                          src={entranceImageUrl}
-                          alt="صورة المدخل"
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleImageRemove(setEntranceImage, setEntranceImageUrl)}
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 {/* House Image */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    صورة المنزل (اختياري)
+                <div className="image-upload-field">
+                  <label className="form-field-label">
+                    صورة المنزل <span className="optional">(اختياري)</span>
                   </label>
-                  <div className="space-y-3">
-                    <input
-                      ref={houseInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageChange(e, setHouseImage, setHouseImageUrl)}
-                      className="hidden"
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => houseInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors"
-                      disabled={isLoading}
-                    >
-                      <Image className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-600">اختر صورة المنزل</span>
-                    </button>
-                    {houseImageUrl && (
-                      <div className="relative">
-                        <img
-                          src={houseImageUrl}
-                          alt="صورة المنزل"
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleImageRemove(setHouseImage, setHouseImageUrl)}
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <input
+                    ref={houseInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageChange(e, setHouseImage, setHouseImageUrl)}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => houseInputRef.current?.click()}
+                    className="image-upload-button"
+                    disabled={isLoading}
+                  >
+                    <Image className="image-upload-icon" />
+                    <span className="image-upload-button-text">اختر صورة المنزل</span>
+                  </button>
+                  {houseImageUrl && (
+                    <div className="image-preview-wrapper">
+                      <img
+                        src={houseImageUrl}
+                        alt="صورة المنزل"
+                        className="image-preview"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleImageRemove(setHouseImage, setHouseImageUrl)}
+                        className="remove-image-btn"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Additional Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  ملاحظات إضافية (اختياري)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900"
-                  placeholder="أي ملاحظات إضافية قد تساعد في الوصول إليك..."
-                  disabled={isLoading}
-                />
-              </div>
+            {/* Additional Notes */}
+            <div className="form-field">
+              <label className="form-field-label">
+                ملاحظات إضافية <span className="optional">(اختياري)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="form-textarea"
+                placeholder="أي ملاحظات إضافية قد تساعد في الوصول إليك..."
+                disabled={isLoading}
+              />
+            </div>
 
-              {/* Submit Button */}
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold flex items-center justify-center gap-2"
-                  disabled={isLoading}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading || !latitude || !longitude}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg hover:from-red-700 hover:to-orange-700 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>جاري الحفظ...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>تأكيد الموقع</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+            {/* Action Buttons */}
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="cancel-btn"
+                disabled={isLoading}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !latitude || !longitude}
+                className="submit-btn"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="loading-spinner"></div>
+                    <span>جاري الحفظ...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>تأكيد الموقع</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

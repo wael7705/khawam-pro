@@ -182,7 +182,7 @@ export default function ColorPicker({
       {/* Selected Colors Section */}
       <div className="selected-colors-section">
         <h4 className="selected-colors-title">
-          الألوان المختارة ({selectedColors.length}/{maxColors})
+          عدد الألوان المختارة: {selectedColors.length} / {maxColors}
         </h4>
         <div className="selected-colors-list">
           {selectedColors.map((color) => (

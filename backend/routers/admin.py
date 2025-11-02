@@ -25,6 +25,9 @@ class OrderRatingUpdate(BaseModel):
     rating: int  # 1-5
     rating_comment: Optional[str] = None
 
+class CustomerNotesUpdate(BaseModel):
+    notes: str
+
 # --------------------------------------------
 # Helpers for public image URLs
 # --------------------------------------------

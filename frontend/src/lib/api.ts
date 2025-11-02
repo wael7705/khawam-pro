@@ -105,6 +105,15 @@ export const adminAPI = {
     delete: (id: number) => api.delete(`/admin/orders/${id}`),
   },
   
+  // Dashboard Statistics
+  dashboard: {
+    getStats: () => api.get('/admin/dashboard/stats'),
+    getTopProducts: () => api.get('/admin/dashboard/top-products'),
+    getTopCategories: () => api.get('/admin/dashboard/top-categories'),
+    getSalesOverview: (period: string = 'month') => api.get(`/admin/dashboard/sales-overview?period=${period}`),
+    getRecentOrders: (limit: number = 10) => api.get(`/admin/dashboard/recent-orders?limit=${limit}`),
+  },
+  
   // Upload
   upload: async (file: File) => {
     const formData = new FormData()

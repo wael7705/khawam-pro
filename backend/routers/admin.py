@@ -1619,6 +1619,294 @@ async def upload_image_by_url(url: str = Form(...)):
 # Maintenance: Normalize and persist image URLs
 # ============================================
 
+@router.get("/dashboard/stats")
+async def get_dashboard_stats(db: Session = Depends(get_db)):
+    """Get dashboard statistics"""
+    try:
+        from sqlalchemy import func
+        from datetime import datetime, timedelta
+        
+        # Get total products
+        total_products = db.query(Product).filter(Product.is_visible == True).count()
+        
+        # Get active orders (not completed, cancelled, or rejected)
+        active_orders = db.query(Order).filter(
+            Order.status.notin_(['completed', 'cancelled', 'rejected'])
+        ).count()
+        
+        # Get total revenue (sum of final_amount for completed orders)
+        total_revenue_result = db.query(func.sum(Order.final_amount)).filter(
+            Order.status == 'completed'
+        ).scalar()
+        total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
+        
+        # Low stock (placeholder - implement based on your inventory system)
+        low_stock = 0
+        
+        # Get this month's revenue
+        start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        this_month_revenue = db.query(func.sum(Order.final_amount)).filter(
+            Order.status == 'completed',
+            Order.created_at >= start_of_month
+        ).scalar()
+        this_month_revenue = float(this_month_revenue) if this_month_revenue else 0.0
+        
+        # Get last month's revenue for comparison
+        if start_of_month.month == 1:
+            last_month_start = datetime(start_of_month.year - 1, 12, 1)
+        else:
+            last_month_start = datetime(start_of_month.year, start_of_month.month - 1, 1)
+        
+        last_month_end = start_of_month - timedelta(days=1)
+        last_month_revenue = db.query(func.sum(Order.final_amount)).filter(
+            Order.status == 'completed',
+            Order.created_at >= last_month_start,
+            Order.created_at < start_of_month
+        ).scalar()
+        last_month_revenue = float(last_month_revenue) if last_month_revenue else 0.0
+        
+        # Calculate revenue trend
+        revenue_trend = 0.0
+        if last_month_revenue > 0:
+            revenue_trend = ((this_month_revenue - last_month_revenue) / last_month_revenue) * 100
+        
+        # Get active orders trend
+        this_month_active = db.query(func.count(Order.id)).filter(
+            Order.created_at >= start_of_month,
+            Order.status.notin_(['completed', 'cancelled', 'rejected'])
+        ).scalar()
+        last_month_active = db.query(func.count(Order.id)).filter(
+            Order.created_at >= last_month_start,
+            Order.created_at < start_of_month,
+            Order.status.notin_(['completed', 'cancelled', 'rejected'])
+        ).scalar()
+        this_month_active = this_month_active or 0
+        last_month_active = last_month_active or 0
+        
+        orders_trend = 0.0
+        if last_month_active > 0:
+            orders_trend = ((this_month_active - last_month_active) / last_month_active) * 100
+        
+        return {
+            "success": True,
+            "stats": {
+                "low_stock": low_stock,
+                "total_products": total_products,
+                "active_orders": active_orders,
+                "total_revenue": total_revenue,
+                "this_month_revenue": this_month_revenue,
+                "revenue_trend": round(revenue_trend, 1),
+                "orders_trend": round(orders_trend, 1)
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching dashboard stats: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب الإحصائيات: {str(e)}")
+
+@router.get("/dashboard/top-products")
+async def get_top_products(db: Session = Depends(get_db)):
+    """Get top selling products"""
+    try:
+        from sqlalchemy import func
+        from datetime import datetime, timedelta
+        
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        
+        top_items = db.query(
+            OrderItem.product_name,
+            func.sum(OrderItem.quantity).label('total_sold'),
+            func.sum(OrderItem.total_price).label('total_revenue')
+        ).join(Order).filter(
+            Order.created_at >= thirty_days_ago,
+            Order.status == 'completed'
+        ).group_by(OrderItem.product_name).order_by(
+            func.sum(OrderItem.quantity).desc()
+        ).limit(5).all()
+        
+        products = []
+        for item in top_items:
+            products.append({
+                "id": hash(item.product_name),  # Generate ID from name
+                "name": item.product_name,
+                "sold": int(item.total_sold),
+                "revenue": float(item.total_revenue) if item.total_revenue else 0
+            })
+        
+        return {
+            "success": True,
+            "products": products
+        }
+    except Exception as e:
+        print(f"Error fetching top products: {e}")
+        return {
+            "success": True,
+            "products": []
+        }
+
+@router.get("/dashboard/top-categories")
+async def get_top_categories(db: Session = Depends(get_db)):
+    """Get top selling categories"""
+    try:
+        from sqlalchemy import func
+        from datetime import datetime, timedelta
+        
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        
+        # Try to get categories from products
+        try:
+            top_cats = db.query(
+                ProductCategory.name_ar,
+                func.sum(OrderItem.quantity).label('total_sold'),
+                func.sum(OrderItem.total_price).label('total_revenue')
+            ).join(
+                Product, ProductCategory.id == Product.category_id
+            ).join(
+                OrderItem, OrderItem.product_id == Product.id
+            ).join(
+                Order, Order.id == OrderItem.order_id
+            ).filter(
+                Order.created_at >= thirty_days_ago,
+                Order.status == 'completed'
+            ).group_by(ProductCategory.name_ar).order_by(
+                func.sum(OrderItem.total_price).desc()
+            ).limit(5).all()
+            
+            categories = []
+            for cat in top_cats:
+                categories.append({
+                    "name": cat.name_ar,
+                    "sold": int(cat.total_sold),
+                    "revenue": float(cat.total_revenue) if cat.total_revenue else 0
+                })
+        except:
+            # If categories join fails, return empty
+            categories = []
+        
+        return {
+            "success": True,
+            "categories": categories
+        }
+    except Exception as e:
+        print(f"Error fetching top categories: {e}")
+        return {
+            "success": True,
+            "categories": []
+        }
+
+@router.get("/dashboard/sales-overview")
+async def get_sales_overview(period: str = "month", db: Session = Depends(get_db)):
+    """Get sales overview for charts"""
+    try:
+        from sqlalchemy import func, extract
+        from datetime import datetime, timedelta
+        
+        if period == "week":
+            days = 7
+            start_date = datetime.now() - timedelta(days=days)
+            query = db.query(
+                func.date(Order.created_at).label('date'),
+                func.sum(Order.final_amount).label('total')
+            ).filter(
+                Order.created_at >= start_date,
+                Order.status == 'completed'
+            ).group_by(func.date(Order.created_at)).order_by('date').all()
+        elif period == "month":
+            days = 30
+            start_date = datetime.now() - timedelta(days=days)
+            query = db.query(
+                func.date(Order.created_at).label('date'),
+                func.sum(Order.final_amount).label('total')
+            ).filter(
+                Order.created_at >= start_date,
+                Order.status == 'completed'
+            ).group_by(func.date(Order.created_at)).order_by('date').all()
+        else:  # year
+            days = 365
+            start_date = datetime.now() - timedelta(days=days)
+            query = db.query(
+                extract('month', Order.created_at).label('month'),
+                func.sum(Order.final_amount).label('total')
+            ).filter(
+                Order.created_at >= start_date,
+                Order.status == 'completed'
+            ).group_by(extract('month', Order.created_at)).order_by('month').all()
+        
+        data = []
+        for row in query:
+            if period == "year":
+                data.append({
+                    "label": f"شهر {int(row.month)}",
+                    "value": float(row.total) if row.total else 0
+                })
+            else:
+                date_str = row.date.isoformat() if hasattr(row.date, 'isoformat') else str(row.date)
+                data.append({
+                    "label": date_str,
+                    "value": float(row.total) if row.total else 0
+                })
+        
+        return {
+            "success": True,
+            "period": period,
+            "data": data
+        }
+    except Exception as e:
+        print(f"Error fetching sales overview: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": True,
+            "period": period,
+            "data": []
+        }
+
+@router.get("/dashboard/recent-orders")
+async def get_recent_orders(limit: int = 10, db: Session = Depends(get_db)):
+    """Get recent orders for dashboard"""
+    try:
+        orders = db.query(Order).order_by(Order.created_at.desc()).limit(limit).all()
+        
+        recent_orders = []
+        for order in orders:
+            try:
+                customer_name = order.customer_name or "عميل"
+            except:
+                customer_name = "عميل"
+            
+            try:
+                final_amount = float(order.final_amount) if order.final_amount else 0
+            except:
+                final_amount = 0
+            
+            # Format time
+            created_at = order.created_at if order.created_at else datetime.now()
+            time_str = created_at.strftime('%I:%M %p') if isinstance(created_at, datetime) else 'الآن'
+            
+            recent_orders.append({
+                "id": order.id,
+                "order_number": getattr(order, 'order_number', f'#{order.id}'),
+                "customer": customer_name,
+                "amount": final_amount,
+                "status": getattr(order, 'status', 'pending'),
+                "time": time_str,
+                "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None
+            })
+        
+        return {
+            "success": True,
+            "orders": recent_orders
+        }
+    except Exception as e:
+        print(f"Error fetching recent orders: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": True,
+            "orders": []
+        }
+
 @router.post("/maintenance/normalize-images")
 async def normalize_image_urls(db: Session = Depends(get_db)):
     """Normalize image URLs in DB to absolute public URLs for products, services, and portfolio works.

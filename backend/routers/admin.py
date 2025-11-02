@@ -1144,6 +1144,34 @@ async def update_delivery_coordinates(
         print(f"Error updating coordinates: {e}")
         raise HTTPException(status_code=500, detail=f"خطأ في تحديث الإحداثيات: {str(e)}")
 
+@router.delete("/orders/{order_id}")
+async def delete_order(order_id: int, db: Session = Depends(get_db)):
+    """Delete an order and its items"""
+    try:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        # Delete order items first (foreign key constraint)
+        db.query(OrderItem).filter(OrderItem.order_id == order_id).delete()
+        
+        # Delete the order
+        db.delete(order)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"تم حذف الطلب {order.order_number} بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting order: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف الطلب: {str(e)}")
+
 @router.put("/orders/{order_id}/staff-notes")
 async def update_staff_notes(order_id: int, notes_data: StaffNotesUpdate, db: Session = Depends(get_db)):
     """Update staff notes for an order"""

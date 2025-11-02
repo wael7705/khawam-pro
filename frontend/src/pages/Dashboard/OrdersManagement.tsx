@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck, MapPin } from 'lucide-react'
+import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck, MapPin, Download, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
@@ -34,6 +34,7 @@ const statusTabs = [
   { id: 'completed', label: 'مكتمل', count: 0 },
   { id: 'cancelled', label: 'ملغى', count: 0 },
   { id: 'rejected', label: 'مرفوض', count: 0 },
+  { id: 'archived', label: 'الأرشيف', count: 0 },
 ]
 
 
@@ -49,6 +50,7 @@ export default function OrdersManagement() {
   const [rejectReason, setRejectReason] = useState('')
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
   const [selectedOrderForMap, setSelectedOrderForMap] = useState<number | null>(null)
+  const [archivedOrders, setArchivedOrders] = useState<Order[]>([])
 
   const loadOrders = async (showLoading = false) => {
     try {
@@ -114,10 +116,51 @@ export default function OrdersManagement() {
 
   useEffect(() => {
     loadOrders(true) // Show loading only on initial load
+    loadArchivedOrders()
     // Refresh every 30 seconds in background
     const interval = setInterval(() => loadOrders(false), 30000)
     return () => clearInterval(interval)
   }, [])
+
+  const loadArchivedOrders = () => {
+    const archived = localStorage.getItem('archivedOrders')
+    if (archived) {
+      try {
+        setArchivedOrders(JSON.parse(archived))
+      } catch (e) {
+        console.error('Error loading archived orders:', e)
+        setArchivedOrders([])
+      }
+    }
+  }
+
+  // Move completed orders to archive automatically
+  useEffect(() => {
+    const completedOrders = orders.filter(o => o.status === 'completed')
+    if (completedOrders.length > 0) {
+      const archived = localStorage.getItem('archivedOrders')
+      let existingArchived: Order[] = []
+      if (archived) {
+        try {
+          existingArchived = JSON.parse(archived)
+        } catch (e) {
+          existingArchived = []
+        }
+      }
+      
+      // Add new completed orders to archive (avoid duplicates)
+      const existingIds = new Set(existingArchived.map(o => o.id))
+      const newArchivedOrders = completedOrders.filter(o => !existingIds.has(o.id))
+      
+      if (newArchivedOrders.length > 0) {
+        const updatedArchived = [...existingArchived, ...newArchivedOrders]
+        localStorage.setItem('archivedOrders', JSON.stringify(updatedArchived))
+        setArchivedOrders(updatedArchived)
+        // Remove completed orders from main orders list
+        setOrders(prev => prev.filter(o => o.status !== 'completed'))
+      }
+    }
+  }, [orders])
 
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '')
@@ -164,23 +207,32 @@ export default function OrdersManagement() {
     })
   }
 
-  // Get orders count by status
+  // Get orders count by status (ignore search query for count)
   const getOrdersCountByStatus = (status: string) => {
-    return orders.filter(order => {
-      const matchesSearch = searchQuery === '' || 
-        order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customer_phone.includes(searchQuery)
-      return matchesSearch && order.status === status
-    }).length
+    if (status === 'archived') {
+      return archivedOrders.length
+    }
+    return orders.filter(order => order.status === status).length
+  }
+
+  // Get display orders (archived or active)
+  const getDisplayOrders = () => {
+    if (activeTab === 'archived') {
+      return archivedOrders
+    }
+    return orders
   }
 
   // Filter orders by active tab and search
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = getDisplayOrders().filter(order => {
     const matchesSearch = searchQuery === '' || 
       order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer_phone.includes(searchQuery)
+    
+    if (activeTab === 'archived') {
+      return matchesSearch
+    }
     
     const matchesTab = order.status === activeTab
     
@@ -415,6 +467,85 @@ export default function OrdersManagement() {
     }
   }
 
+  const handleDeleteOrder = async (orderId: number) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطلب؟ هذا الإجراء لا يمكن التراجع عنه.')) {
+      return
+    }
+    
+    try {
+      setUpdatingOrderId(orderId)
+      await adminAPI.orders.delete(orderId)
+      
+      // Remove from orders list
+      setOrders(prev => prev.filter(o => o.id !== orderId))
+      
+      // Also remove from archived if exists
+      setArchivedOrders(prev => {
+        const updated = prev.filter(o => o.id !== orderId)
+        localStorage.setItem('archivedOrders', JSON.stringify(updated))
+        return updated
+      })
+      
+      showSuccess('تم حذف الطلب بنجاح')
+      loadOrders(false)
+    } catch (e: any) {
+      console.error('Error deleting order:', e)
+      showError(e.response?.data?.detail || 'حدث خطأ في حذف الطلب')
+    } finally {
+      setUpdatingOrderId(null)
+    }
+  }
+
+  const handleExportArchive = () => {
+    if (archivedOrders.length === 0) {
+      showError('الأرشيف فارغ')
+      return
+    }
+
+    // Convert archived orders to CSV
+    const headers = ['رقم الطلب', 'اسم العميل', 'رقم الهاتف', 'واتساب', 'اسم المتجر', 'الحالة', 'نوع التوصيل', 'عنوان التوصيل', 'المبلغ الإجمالي', 'المبلغ النهائي', 'حالة الدفع', 'تاريخ الطلب', 'ملاحظات']
+    const rows = archivedOrders.map(order => [
+      order.order_number || '',
+      order.customer_name || '',
+      order.customer_phone || '',
+      order.customer_whatsapp || '',
+      order.shop_name || '',
+      order.status || '',
+      order.delivery_type || '',
+      order.delivery_address || '',
+      order.total_amount?.toString() || '',
+      order.final_amount?.toString() || '',
+      'pending', // payment_status
+      order.created_at || '',
+      order.notes || ''
+    ])
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+
+    // Add BOM for UTF-8 with Arabic
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    const date = new Date().toISOString().split('T')[0]
+    link.setAttribute('href', url)
+    link.setAttribute('download', `أرشيف_الطلبات_${date}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    // Clear archive after export
+    localStorage.removeItem('archivedOrders')
+    setArchivedOrders([])
+    showSuccess('تم تصدير الأرشيف بنجاح وتم مسح محتوياته')
+  }
+
   return (
     <div className="orders-management">
       <div className="section-header">
@@ -422,6 +553,15 @@ export default function OrdersManagement() {
           <h1>إدارة الطلبات</h1>
           <p>عرض وإدارة جميع الطلبات ({filteredOrders.length})</p>
         </div>
+        {activeTab === 'archived' && archivedOrders.length > 0 && (
+          <button
+            className="export-archive-btn"
+            onClick={handleExportArchive}
+          >
+            <Download size={18} />
+            تصدير الأرشيف
+          </button>
+        )}
       </div>
 
       <div className="orders-filters">
@@ -677,6 +817,32 @@ export default function OrdersManagement() {
                         title="إلغاء الطلب"
                       >
                         <X size={16} />
+                      </button>
+                    )}
+
+                    {/* Delete button for orders with delivery type but missing address data */}
+                    {order.delivery_type === 'delivery' && !order.delivery_address && !order.delivery_latitude && (
+                      <button
+                        className="action-btn delete-btn"
+                        onClick={() => handleDeleteOrder(order.id)}
+                        disabled={updatingOrderId === order.id}
+                        title="حذف الطلب المعطل"
+                      >
+                        <Trash2 size={16} />
+                        <span>حذف</span>
+                      </button>
+                    )}
+
+                    {/* Delete button in archive */}
+                    {activeTab === 'archived' && (
+                      <button
+                        className="action-btn delete-btn"
+                        onClick={() => handleDeleteOrder(order.id)}
+                        disabled={updatingOrderId === order.id}
+                        title="حذف من الأرشيف"
+                      >
+                        <Trash2 size={16} />
+                        <span>حذف</span>
                       </button>
                     )}
                   </div>

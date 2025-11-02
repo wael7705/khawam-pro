@@ -98,6 +98,7 @@ export const adminAPI = {
       rejection_reason: rejectionReason
     }),
     updateStaffNotes: (id: number, notes: string) => api.put(`/admin/orders/${id}/staff-notes`, { notes }),
+    delete: (id: number) => api.delete(`/admin/orders/${id}`),
   },
   
   // Upload

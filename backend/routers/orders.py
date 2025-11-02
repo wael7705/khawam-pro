@@ -60,36 +60,63 @@ async def create_order(
         # Check and add missing columns if they don't exist
         from sqlalchemy import text, inspect
         
-        inspector = inspect(db.bind)
-        
-        def add_column_if_not_exists(column_name: str, column_type: str):
-            """Helper to add column if it doesn't exist"""
-            try:
-                # Re-inspect to get fresh column list
-                current_columns = [col['name'] for col in inspector.get_columns('orders')]
-                if column_name not in current_columns:
-                    db.execute(text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}"))
+        # Check and add missing columns using safer approach
+        try:
+            inspector = inspect(db.bind)
+            current_columns = [col['name'] for col in inspector.get_columns('orders')]
+            
+            # Add delivery_latitude if missing
+            if 'delivery_latitude' not in current_columns:
+                try:
+                    db.execute(text("ALTER TABLE orders ADD COLUMN delivery_latitude DECIMAL(10, 8)"))
                     db.commit()
-                    print(f"✅ Added {column_name} column")
-                    # Refresh inspector after adding column
-                    inspector = inspect(db.bind)
-                    return True
-            except Exception as e:
-                print(f"Warning: Could not add {column_name}: {e}")
-                db.rollback()
-                return False
-            return False
+                    print("✅ Added delivery_latitude column")
+                except Exception as e:
+                    print(f"Warning: Could not add delivery_latitude: {e}")
+                    db.rollback()
+            
+            # Add delivery_longitude if missing
+            if 'delivery_longitude' not in current_columns:
+                try:
+                    db.execute(text("ALTER TABLE orders ADD COLUMN delivery_longitude DECIMAL(11, 8)"))
+                    db.commit()
+                    print("✅ Added delivery_longitude column")
+                except Exception as e:
+                    print(f"Warning: Could not add delivery_longitude: {e}")
+                    db.rollback()
+            
+            # Add rating if missing
+            if 'rating' not in current_columns:
+                try:
+                    db.execute(text("ALTER TABLE orders ADD COLUMN rating INTEGER"))
+                    db.commit()
+                    print("✅ Added rating column")
+                except Exception as e:
+                    print(f"Warning: Could not add rating: {e}")
+                    db.rollback()
+            
+            # Add rating_comment if missing
+            if 'rating_comment' not in current_columns:
+                try:
+                    db.execute(text("ALTER TABLE orders ADD COLUMN rating_comment TEXT"))
+                    db.commit()
+                    print("✅ Added rating_comment column")
+                except Exception as e:
+                    print(f"Warning: Could not add rating_comment: {e}")
+                    db.rollback()
+        except Exception as e:
+            print(f"Error checking/adding columns: {e}")
+            # Continue anyway - we'll handle missing columns in order_dict
         
-        # Add all missing columns
-        add_column_if_not_exists('delivery_latitude', 'DECIMAL(10, 8)')
-        add_column_if_not_exists('delivery_longitude', 'DECIMAL(11, 8)')
-        add_column_if_not_exists('rating', 'INTEGER')
-        add_column_if_not_exists('rating_comment', 'TEXT')
+        # Create order - use SQL directly to avoid SQLAlchemy trying to insert into non-existent columns
+        # First, check which columns actually exist
+        inspector = inspect(db.bind)
+        existing_columns = [col['name'] for col in inspector.get_columns('orders')]
         
-        # Create order
+        # Build order_dict with only existing columns
         order_dict = {
             'order_number': order_number,
-            'customer_id': None,  # TODO: Link to User if authenticated
+            'customer_id': None,
             'customer_name': order_data.customer_name,
             'customer_phone': order_data.customer_phone,
             'customer_whatsapp': order_data.customer_whatsapp or order_data.customer_phone,
@@ -103,16 +130,42 @@ async def create_order(
             'notes': order_data.notes
         }
         
-        # Add delivery coordinates only if provided and delivery type is delivery
-        if order_data.delivery_type == "delivery":
+        # Add delivery coordinates only if column exists and value provided
+        if 'delivery_latitude' in existing_columns and order_data.delivery_type == "delivery":
             if order_data.delivery_latitude is not None:
                 order_dict['delivery_latitude'] = order_data.delivery_latitude
+        
+        if 'delivery_longitude' in existing_columns and order_data.delivery_type == "delivery":
             if order_data.delivery_longitude is not None:
                 order_dict['delivery_longitude'] = order_data.delivery_longitude
         
-        new_order = Order(**order_dict)
-        db.add(new_order)
-        db.flush()  # Get the order ID
+        # Create order using raw SQL to avoid SQLAlchemy trying to insert into non-existent columns
+        # Build INSERT statement with only existing columns
+        columns_list = []
+        values_dict = {}
+        
+        for key, value in order_dict.items():
+            if key in existing_columns:
+                columns_list.append(key)
+                values_dict[key] = value
+        
+        # Build parameterized SQL query
+        columns_str = ', '.join(columns_list)
+        placeholders = ', '.join([f':{col}' for col in columns_list])
+        
+        sql_query = f"""
+            INSERT INTO orders ({columns_str})
+            VALUES ({placeholders})
+            RETURNING id
+        """
+        
+        # Execute SQL and get the order ID
+        result = db.execute(text(sql_query), values_dict)
+        order_id = result.scalar()
+        db.commit()
+        
+        # Refresh to get the full order object
+        new_order = db.query(Order).filter(Order.id == order_id).first()
         
         # Create order items
         for item_data in order_data.items:

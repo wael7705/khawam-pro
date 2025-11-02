@@ -35,22 +35,56 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load saved delivery address from localStorage
+  // Load saved form state and delivery address from localStorage when modal opens
   useEffect(() => {
-    const savedAddress = localStorage.getItem('deliveryAddress')
-    if (savedAddress) {
-      try {
-        const address = JSON.parse(savedAddress)
-        setDeliveryAddress(address)
-        setAddressConfirmed(true)
-        if (address.street || address.neighborhood) {
-          setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
+    if (isOpen) {
+      // Restore form state if exists
+      const savedFormState = localStorage.getItem('orderFormState')
+      if (savedFormState) {
+        try {
+          const formState = JSON.parse(savedFormState)
+          // Only restore if it's for the same service
+          if (formState.serviceName === serviceName) {
+            setQuantity(formState.quantity || 1)
+            setLength(formState.length || '')
+            setWidth(formState.width || '')
+            setHeight(formState.height || '')
+            setUnit(formState.unit || 'cm')
+            setSelectedColors(formState.selectedColors || [])
+            setWorkType(formState.workType || '')
+            setNotes(formState.notes || '')
+            setCustomerName(formState.customerName || '')
+            setCustomerWhatsApp(formState.customerWhatsApp || '')
+            // Keep current step or go to step 5 (where delivery info is shown)
+            if (formState.deliveryType === 'delivery') {
+              setDeliveryType('delivery')
+            }
+          }
+        } catch (error) {
+          console.error('Error loading form state:', error)
         }
-      } catch (error) {
-        console.error('Error loading delivery address:', error)
+      }
+
+      // Load saved delivery address
+      const savedAddress = localStorage.getItem('deliveryAddress')
+      if (savedAddress) {
+        try {
+          const address = JSON.parse(savedAddress)
+          setDeliveryAddress(address)
+          setAddressConfirmed(true)
+          if (address.street || address.neighborhood) {
+            setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
+          }
+          // If we have address and delivery type is delivery, go to step 5
+          if (deliveryType === 'delivery') {
+            setStep(5)
+          }
+        } catch (error) {
+          console.error('Error loading delivery address:', error)
+        }
       }
     }
-  }, [])
+  }, [isOpen, serviceName, deliveryType])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

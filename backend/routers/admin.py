@@ -940,6 +940,22 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         except:
             pass
         
+        # Get delivery coordinates
+        delivery_latitude = None
+        delivery_longitude = None
+        try:
+            delivery_latitude = getattr(order, 'delivery_latitude', None)
+            if delivery_latitude is not None:
+                delivery_latitude = float(delivery_latitude)
+        except:
+            pass
+        try:
+            delivery_longitude = getattr(order, 'delivery_longitude', None)
+            if delivery_longitude is not None:
+                delivery_longitude = float(delivery_longitude)
+        except:
+            pass
+        
         return {
             "success": True,
             "order": {
@@ -955,6 +971,8 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "final_amount": float(order.final_amount) if order.final_amount is not None else 0,
                 "payment_status": getattr(order, 'payment_status', 'pending'),
                 "delivery_address": getattr(order, 'delivery_address', None),
+                "delivery_latitude": delivery_latitude,
+                "delivery_longitude": delivery_longitude,
                 "notes": getattr(order, 'notes', None),
                 "staff_notes": staff_notes,
                 "created_at": order.created_at.isoformat() if order.created_at else None,

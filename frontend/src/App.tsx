@@ -9,6 +9,7 @@ import WorkDetail from './pages/WorkDetail'
 import Contact from './pages/Contact'
 import Studio from './pages/Studio'
 import Dashboard from './pages/Dashboard'
+import LocationPickerPage from './pages/LocationPickerPage'
 import Footer from './components/Footer'
 import { ToastContainer } from './components/Toast'
 import { subscribe, getToasts, removeToast, Toast } from './utils/toast'
@@ -46,6 +47,7 @@ function App() {
           <Route path="/work/:id" element={<WorkDetail />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/studio" element={<Studio />} />
+          <Route path="/location-picker" element={<LocationPickerPage />} />
           <Route path="/dashboard/*" element={<Dashboard />} />
         </Routes>
       </main>

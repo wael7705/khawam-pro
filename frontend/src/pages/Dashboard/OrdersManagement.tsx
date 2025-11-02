@@ -434,7 +434,7 @@ export default function OrdersManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-      </div>
+        </div>
 
       {/* Status Tabs */}
       <div className="status-tabs">
@@ -448,7 +448,7 @@ export default function OrdersManagement() {
             >
               <span className="tab-label">{tab.label}</span>
               <span className="tab-count">{count}</span>
-            </button>
+        </button>
           )
         })}
       </div>
@@ -482,7 +482,7 @@ export default function OrdersManagement() {
                           <strong>{order.order_number}</strong> - {order.customer_name}
                           <span className="map-close-btn" onClick={() => setSelectedOrderForMap(null)}>
                             <X size={16} />
-                          </span>
+                  </span>
                         </div>
                         <SimpleMap
                           address={order.delivery_address}
@@ -499,7 +499,7 @@ export default function OrdersManagement() {
                             <MapPin size={18} />
                             فتح في OpenStreetMap
                           </a>
-                        </div>
+      </div>
                       </div>
                     )
                   })()

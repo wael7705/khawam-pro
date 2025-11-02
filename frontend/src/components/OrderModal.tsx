@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { ordersAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
+import ColorPicker from './ColorPicker'
 import './OrderModal.css'
 
 interface OrderModalProps {
@@ -11,6 +13,7 @@ interface OrderModalProps {
 }
 
 export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalProps) {
+  const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [quantity, setQuantity] = useState(1)
   const [image, setImage] = useState<File | null>(null)
@@ -25,10 +28,27 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const [customerWhatsApp, setCustomerWhatsApp] = useState('')
   const [shopName, setShopName] = useState('')
   const [deliveryType, setDeliveryType] = useState('self')
+  const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
   const [totalPrice, setTotalPrice] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Load saved delivery address from localStorage
+  useEffect(() => {
+    const savedAddress = localStorage.getItem('deliveryAddress')
+    if (savedAddress) {
+      try {
+        const address = JSON.parse(savedAddress)
+        setDeliveryAddress(address)
+        if (address.street || address.neighborhood) {
+          setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
+        }
+      } catch (error) {
+        console.error('Error loading delivery address:', error)
+      }
+    }
+  }, [])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -37,10 +57,34 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
     }
   }
 
-  const colorPalette = [
-    '#FF6B35', '#F7931E', '#FFD23F', '#06FFA5', '#4ECDC4', '#45B7D1',
-    '#96CEB4', '#FFEAA7', '#DDA15E', '#BC4749', '#6A994E', '#A7C957'
-  ]
+  // Handle delivery type change - navigate to location picker if delivery
+  const handleDeliveryTypeChange = (type: string) => {
+    setDeliveryType(type)
+    if (type === 'delivery') {
+      // Save current form state
+      localStorage.setItem('orderFormState', JSON.stringify({
+        quantity,
+        length,
+        width,
+        height,
+        unit,
+        selectedColors,
+        workType,
+        notes,
+        customerName,
+        customerWhatsApp,
+        serviceName
+      }))
+      // Navigate to location picker
+      navigate('/location-picker', { 
+        state: { 
+          from: window.location.pathname,
+          returnTo: 'order-modal'
+        } 
+      })
+      onClose()
+    }
+  }
 
   const calculatePrice = () => {
     let price = 0
@@ -169,7 +213,15 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         total_amount: safeTotalPrice,
         final_amount: safeTotalPrice,
         delivery_type: deliveryType,
-        delivery_address: deliveryType === 'delivery' ? shopName : null,
+        delivery_address: deliveryType === 'delivery' 
+          ? (deliveryAddress?.street || shopName || null)
+          : null,
+        delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude 
+          ? deliveryAddress.latitude 
+          : null,
+        delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude 
+          ? deliveryAddress.longitude 
+          : null,
         notes: notes || workType || null
       }
 
@@ -326,38 +378,11 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
           <div className="modal-body">
             <h3>المرحلة 3: اختيار الألوان</h3>
             
-            <div className="color-picker">
-              <div className="color-palette">
-                {colorPalette.map((color) => (
-                  <button
-                    key={color}
-                    className={`color-option ${selectedColors.includes(color) ? 'selected' : ''}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => {
-                      if (selectedColors.includes(color)) {
-                        setSelectedColors(selectedColors.filter((c) => c !== color))
-                      } else if (selectedColors.length < 6) {
-                        setSelectedColors([...selectedColors, color])
-                      }
-                    }}
-                  />
-                ))}
-              </div>
-              <p className="color-hint">اختر حتى 6 ألوان</p>
-            </div>
-
-            {selectedColors.length > 0 && (
-              <div className="selected-colors">
-                <h4>الألوان المختارة:</h4>
-                <div className="selected-colors-list">
-                  {selectedColors.map((color) => (
-                    <div key={color} className="selected-color" style={{ backgroundColor: color }}>
-                      {color}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <ColorPicker
+              selectedColors={selectedColors}
+              onColorsChange={setSelectedColors}
+              maxColors={6}
+            />
           </div>
         )}
 
@@ -436,7 +461,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
                     type="radio"
                     value="self"
                     checked={deliveryType === 'self'}
-                    onChange={(e) => setDeliveryType(e.target.value)}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
                   />
                   <span>استلام ذاتي</span>
                 </label>
@@ -445,11 +470,33 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
                     type="radio"
                     value="delivery"
                     checked={deliveryType === 'delivery'}
-                    onChange={(e) => setDeliveryType(e.target.value)}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
                   />
                   <span>توصيل</span>
                 </label>
               </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="delivery-address-info" style={{ 
+                  marginTop: '12px', 
+                  padding: '12px', 
+                  background: '#f0f9ff', 
+                  borderRadius: '8px',
+                  border: '1px solid #bae6fd'
+                }}>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#0369a1' }}>
+                    <strong>✓ العنوان المحفوظ:</strong> {
+                      [deliveryAddress.street, deliveryAddress.neighborhood, deliveryAddress.building]
+                        .filter(Boolean)
+                        .join(', ') || 'تم تحديد الموقع'
+                    }
+                  </p>
+                  {deliveryAddress.latitude && deliveryAddress.longitude && (
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#0284c7' }}>
+                      الإحداثيات: {deliveryAddress.latitude.toFixed(4)}, {deliveryAddress.longitude.toFixed(4)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Invoice */}

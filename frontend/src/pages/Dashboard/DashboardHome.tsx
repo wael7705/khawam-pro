@@ -156,10 +156,10 @@ export default function DashboardHome() {
 
   const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b']
 
-  // Prepare chart data
-  const categoryChartData = topCategories.map(cat => ({
-    name: cat.name,
-    value: cat.revenue
+  // Prepare chart data for services
+  const serviceChartData = topServices.map(svc => ({
+    name: svc.name,
+    value: svc.orders
   }))
 
   if (loading) {

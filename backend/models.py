@@ -2,17 +2,29 @@ from sqlalchemy import Column, Integer, String, Text, Boolean, DECIMAL, TIMESTAM
 from sqlalchemy.sql import func
 from database import Base
 
+class UserType(Base):
+    __tablename__ = "user_types"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name_ar = Column(String(50), nullable=False)  # مدير، موظف، عميل
+    name_en = Column(String(50))
+    permissions = Column(JSON)  # صلاحيات إضافية
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
 class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    phone = Column(String(20), unique=True, nullable=False)
+    phone = Column(String(20), nullable=True)  # يمكن أن يكون NULL إذا سجل بالبريد الإلكتروني
     name = Column(String(100), nullable=False)
-    email = Column(String(100))
-    password_hash = Column(String(255))
-    user_type_id = Column(Integer, ForeignKey("user_types.id"))
+    email = Column(String(100), nullable=True)  # يمكن أن يكون NULL إذا سجل بالهاتف
+    password_hash = Column(String(255), nullable=False)
+    user_type_id = Column(Integer, ForeignKey("user_types.id"), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    # Unique constraint on phone or email (at least one must be provided)
+    # We'll handle this at application level since SQL doesn't support conditional unique constraints well
 
 class ProductCategory(Base):
     __tablename__ = "product_categories"
@@ -79,6 +91,20 @@ class PortfolioWork(Base):
     display_order = Column(Integer, default=0)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
+class PaymentSettings(Base):
+    __tablename__ = "payment_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    payment_method = Column(String(50), default="sham_cash")  # sham_cash, etc.
+    account_name = Column(String(200))  # اسم الحساب
+    account_number = Column(String(100))  # رقم الحساب
+    phone_number = Column(String(20))  # رقم الهاتف المرتبط بالحساب
+    api_key = Column(String(255))  # مفتاح API إذا لزم الأمر
+    api_secret = Column(String(255))  # سر API إذا لزم الأمر
+    is_active = Column(Boolean, default=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
 class Order(Base):
     __tablename__ = "orders"
     
@@ -90,9 +116,13 @@ class Order(Base):
     customer_whatsapp = Column(String(20))  # رقم واتساب
     shop_name = Column(String(200))  # اسم المتجر
     status = Column(String(20), default="pending")  # pending, accepted, preparing, shipping, awaiting_pickup, completed, cancelled, rejected
-    total_amount = Column(DECIMAL(12, 2), nullable=False)
-    final_amount = Column(DECIMAL(12, 2), nullable=False)
-    payment_status = Column(String(20), default="pending")
+    total_amount = Column(DECIMAL(12, 2), nullable=False)  # المبلغ الأصلي
+    final_amount = Column(DECIMAL(12, 2), nullable=False)  # المبلغ النهائي بعد الخصومات
+    # نظام التقسيط
+    paid_amount = Column(DECIMAL(12, 2), default=0)  # المبلغ المدفوع
+    remaining_amount = Column(DECIMAL(12, 2), default=0)  # المبلغ المتبقي
+    payment_method = Column(String(50), default="sham_cash")  # طريقة الدفع
+    payment_status = Column(String(20), default="pending")  # pending, partial, paid, refunded
     delivery_type = Column(String(20), default="self")  # self or delivery
     delivery_address = Column(Text)
     delivery_latitude = Column(DECIMAL(10, 8))  # خط العرض

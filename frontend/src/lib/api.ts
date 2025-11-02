@@ -7,6 +7,15 @@ const api = axios.create({
   },
 })
 
+// Add request interceptor to include auth token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 // Products API
 export const productsAPI = {
   getAll: async () => {
@@ -60,6 +69,13 @@ export const studioAPI = {
     })
     return response.data
   },
+}
+
+// Auth API
+export const authAPI = {
+  login: (username: string, password: string) => api.post('/auth/login', { username, password }),
+  getMe: () => api.get('/auth/me'),
+  logout: () => api.post('/auth/logout'),
 }
 
 // Admin API

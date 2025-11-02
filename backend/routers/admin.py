@@ -626,6 +626,22 @@ async def get_all_orders(db: Session = Depends(get_db)):
             select_parts = ["id", "order_number", "status", "total_amount", "final_amount", 
                            "payment_status", "delivery_address", "notes", "created_at"]
             
+            # Add installment payment fields if they exist
+            if "paid_amount" in available_cols:
+                select_parts.append("COALESCE(paid_amount, 0) as paid_amount")
+            else:
+                select_parts.append("0 as paid_amount")
+            
+            if "remaining_amount" in available_cols:
+                select_parts.append("COALESCE(remaining_amount, final_amount) as remaining_amount")
+            else:
+                select_parts.append("final_amount as remaining_amount")
+            
+            if "payment_method" in available_cols:
+                select_parts.append("COALESCE(payment_method, 'sham_cash') as payment_method")
+            else:
+                select_parts.append("'sham_cash' as payment_method")
+            
             if "customer_name" in available_cols:
                 select_parts.append("COALESCE(customer_name, '') as customer_name")
             else:
@@ -704,18 +720,31 @@ async def get_all_orders(db: Session = Depends(get_db)):
                             raw_image = str(u).strip()
                             break
                 
+                # حساب مؤشرات الأعمدة الجديدة للتقسيط (يجب تعريفها أولاً)
+                paid_amount = float(row[9]) if len(row) > 9 and row[9] is not None else 0.0
+                remaining_amount = float(row[10]) if len(row) > 10 and row[10] is not None else float(row[4]) if row[4] else 0.0
+                payment_method = row[11] if len(row) > 11 and row[11] else "sham_cash"
+                
+                # تعديل مؤشرات الأعمدة بعد إضافة حقول التقسيط
+                customer_name_idx = 12
+                customer_phone_idx = 13
+                customer_whatsapp_idx = 14
+                shop_name_idx = 15
+                delivery_type_idx = 16
+                staff_notes_idx = 17
+                
                 # Get customer data - check if columns exist in the row
                 customer_name = ""
                 customer_phone = ""
                 customer_whatsapp = ""
                 
-                # Row indices depend on query structure
-                if len(row) > 9:
-                    customer_name = (row[9] or "").strip() if row[9] else ""
-                if len(row) > 10:
-                    customer_phone = (row[10] or "").strip() if row[10] else ""
-                if len(row) > 11:
-                    customer_whatsapp = (row[11] or "").strip() if row[11] else customer_phone
+                # Row indices after adding installment fields: 0-8 basic, 9-11 installment, 12+ customer
+                if len(row) > customer_name_idx:
+                    customer_name = (row[customer_name_idx] or "").strip() if row[customer_name_idx] else ""
+                if len(row) > customer_phone_idx:
+                    customer_phone = (row[customer_phone_idx] or "").strip() if row[customer_phone_idx] else ""
+                if len(row) > customer_whatsapp_idx:
+                    customer_whatsapp = (row[customer_whatsapp_idx] or "").strip() if row[customer_whatsapp_idx] else customer_phone
                 
                 # If customer data is empty, try to extract from notes for old orders
                 notes_str = ""
@@ -742,14 +771,20 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 rejection_reason = None
                 delivery_latitude = None
                 delivery_longitude = None
-                if len(row) > 15:
-                    cancellation_reason = (row[15] or "").strip() if row[15] else None
-                if len(row) > 16:
-                    rejection_reason = (row[16] or "").strip() if row[16] else None
-                if len(row) > 17:
-                    delivery_latitude = float(row[17]) if row[17] is not None else None
-                if len(row) > 18:
-                    delivery_longitude = float(row[18]) if row[18] is not None else None
+                # تحديث المؤشرات بعد إضافة حقول التقسيط
+                cancellation_reason_idx = staff_notes_idx + 1
+                rejection_reason_idx = cancellation_reason_idx + 1
+                delivery_latitude_idx = rejection_reason_idx + 1
+                delivery_longitude_idx = delivery_latitude_idx + 1
+                
+                if len(row) > cancellation_reason_idx:
+                    cancellation_reason = (row[cancellation_reason_idx] or "").strip() if row[cancellation_reason_idx] else None
+                if len(row) > rejection_reason_idx:
+                    rejection_reason = (row[rejection_reason_idx] or "").strip() if row[rejection_reason_idx] else None
+                if len(row) > delivery_latitude_idx:
+                    delivery_latitude = float(row[delivery_latitude_idx]) if row[delivery_latitude_idx] is not None else None
+                if len(row) > delivery_longitude_idx:
+                    delivery_longitude = float(row[delivery_longitude_idx]) if row[delivery_longitude_idx] is not None else None
                 
                 orders_list.append({
                     "id": row[0],
@@ -757,6 +792,9 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     "status": row[2] or 'pending',
                     "total_amount": float(row[3]) if row[3] is not None else 0,
                     "final_amount": float(row[4]) if row[4] is not None else 0,
+                    "paid_amount": paid_amount,
+                    "remaining_amount": remaining_amount,
+                    "payment_method": payment_method,
                     "payment_status": row[5] or 'pending',
                     "delivery_address": row[6],
                     "notes": row[7],
@@ -764,9 +802,9 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     "customer_name": customer_name,
                     "customer_phone": customer_phone,
                     "customer_whatsapp": customer_whatsapp or customer_phone,
-                    "shop_name": (row[12] or "").strip() if len(row) > 12 else "",
-                    "delivery_type": (row[13] or "self") if len(row) > 13 else "self",
-                    "staff_notes": row[14] if len(row) > 14 else None,
+                    "shop_name": (row[shop_name_idx] or "").strip() if len(row) > shop_name_idx else "",
+                    "delivery_type": (row[delivery_type_idx] or "self") if len(row) > delivery_type_idx else "self",
+                    "staff_notes": row[staff_notes_idx] if len(row) > staff_notes_idx else None,
                     "cancellation_reason": cancellation_reason,
                     "rejection_reason": rejection_reason,
                     "delivery_latitude": delivery_latitude,
@@ -886,6 +924,23 @@ async def get_all_orders(db: Session = Depends(get_db)):
             except:
                 pass
             
+            # الحصول على بيانات التقسيط
+            paid_amount = 0.0
+            remaining_amount = float(o.final_amount) if o.final_amount is not None else 0.0
+            payment_method = "sham_cash"
+            try:
+                paid_amount = float(getattr(o, 'paid_amount', 0)) if getattr(o, 'paid_amount', None) is not None else 0.0
+            except:
+                pass
+            try:
+                remaining_amount = float(getattr(o, 'remaining_amount', remaining_amount)) if getattr(o, 'remaining_amount', None) is not None else remaining_amount
+            except:
+                pass
+            try:
+                payment_method = getattr(o, 'payment_method', 'sham_cash') or 'sham_cash'
+            except:
+                pass
+            
             orders_list.append({
                 "id": o.id,
                 "order_number": getattr(o, 'order_number', None),
@@ -897,6 +952,9 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 "delivery_type": delivery_type,
                 "final_amount": float(o.final_amount) if o.final_amount is not None else 0,
                 "total_amount": float(o.total_amount) if o.total_amount is not None else 0,
+                "paid_amount": paid_amount,
+                "remaining_amount": remaining_amount,
+                "payment_method": payment_method,
                 "payment_status": getattr(o, 'payment_status', 'pending'),
                 "delivery_address": getattr(o, 'delivery_address', None),
                 "delivery_latitude": delivery_latitude,
@@ -2142,3 +2200,231 @@ async def ensure_portfolio_images_column(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================
+# Payment Settings Management Endpoints
+# ============================================
+
+@router.get("/payment-settings")
+async def get_payment_settings_admin(db: Session = Depends(get_db)):
+    """Get payment settings (admin view with full details)"""
+    try:
+        from models import PaymentSettings
+        settings = db.query(PaymentSettings).filter(
+            PaymentSettings.payment_method == "sham_cash"
+        ).first()
+        
+        if not settings:
+            return {
+                "success": True,
+                "settings": None,
+                "message": "لم يتم إعداد الدفع بعد"
+            }
+        
+        return {
+            "success": True,
+            "settings": {
+                "id": settings.id,
+                "payment_method": settings.payment_method,
+                "account_name": settings.account_name,
+                "account_number": settings.account_number,
+                "phone_number": settings.phone_number,
+                "api_key": settings.api_key,
+                "api_secret": settings.api_secret,
+                "is_active": settings.is_active,
+                "created_at": settings.created_at.isoformat() if settings.created_at else None,
+                "updated_at": settings.updated_at.isoformat() if settings.updated_at else None
+            }
+        }
+    except Exception as e:
+        print(f"Error fetching payment settings: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب إعدادات الدفع: {str(e)}")
+
+@router.post("/payment-settings")
+async def create_payment_settings_admin(settings_data: dict, db: Session = Depends(get_db)):
+    """Create payment settings (admin)"""
+    try:
+        from models import PaymentSettings
+        
+        # التحقق من وجود إعدادات أخرى
+        existing = db.query(PaymentSettings).filter(
+            PaymentSettings.payment_method == settings_data.get("payment_method", "sham_cash")
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="توجد إعدادات موجودة بالفعل. يرجى تحديث الإعدادات الموجودة."
+            )
+        
+        new_settings = PaymentSettings(
+            payment_method=settings_data.get("payment_method", "sham_cash"),
+            account_name=settings_data.get("account_name", ""),
+            account_number=settings_data.get("account_number", ""),
+            phone_number=settings_data.get("phone_number"),
+            api_key=settings_data.get("api_key"),
+            api_secret=settings_data.get("api_secret"),
+            is_active=settings_data.get("is_active", True)
+        )
+        
+        db.add(new_settings)
+        db.commit()
+        db.refresh(new_settings)
+        
+        return {
+            "success": True,
+            "settings": {
+                "id": new_settings.id,
+                "payment_method": new_settings.payment_method,
+                "account_name": new_settings.account_name,
+                "account_number": new_settings.account_number,
+                "phone_number": new_settings.phone_number,
+                "is_active": new_settings.is_active
+            },
+            "message": "تم إعداد الدفع بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating payment settings: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في إعداد الدفع: {str(e)}")
+
+@router.put("/payment-settings/{settings_id}")
+async def update_payment_settings_admin(settings_id: int, settings_data: dict, db: Session = Depends(get_db)):
+    """Update payment settings (admin)"""
+    try:
+        from models import PaymentSettings
+        
+        settings = db.query(PaymentSettings).filter(
+            PaymentSettings.id == settings_id
+        ).first()
+        
+        if not settings:
+            raise HTTPException(
+                status_code=404,
+                detail="إعدادات الدفع غير موجودة"
+            )
+        
+        update_data = settings_data
+        for key, value in update_data.items():
+            if hasattr(settings, key):
+                setattr(settings, key, value)
+        
+        db.commit()
+        db.refresh(settings)
+        
+        return {
+            "success": True,
+            "settings": {
+                "id": settings.id,
+                "payment_method": settings.payment_method,
+                "account_name": settings.account_name,
+                "account_number": settings.account_number,
+                "phone_number": settings.phone_number,
+                "is_active": settings.is_active
+            },
+            "message": "تم تحديث إعدادات الدفع بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating payment settings: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في تحديث إعدادات الدفع: {str(e)}")
+
+# ============================================
+# Installment Payment Management
+# ============================================
+
+@router.put("/orders/{order_id}/payment")
+async def update_order_payment(
+    order_id: int,
+    payment_data: dict,
+    db: Session = Depends(get_db)
+):
+    """تحديث حالة الدفع للطلب (نظام التقسيط)"""
+    try:
+        from sqlalchemy import text
+        
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        paid_amount = float(payment_data.get("paid_amount", 0))
+        final_amount = float(order.final_amount)
+        
+        # التأكد من أن المبلغ المدفوع لا يتجاوز المبلغ النهائي
+        if paid_amount > final_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"المبلغ المدفوع ({paid_amount}) لا يمكن أن يتجاوز المبلغ النهائي ({final_amount})"
+            )
+        
+        remaining_amount = final_amount - paid_amount
+        
+        # تحديث حالة الدفع بناءً على المبلغ المدفوع
+        if paid_amount == 0:
+            payment_status = "pending"
+        elif paid_amount < final_amount:
+            payment_status = "partial"
+        else:
+            payment_status = "paid"
+        
+        # التحقق من وجود الأعمدة
+        from sqlalchemy import inspect
+        inspector = inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('orders')]
+        
+        updates = []
+        params = {"id": order_id, "paid": paid_amount, "remaining": remaining_amount, "status": payment_status}
+        
+        if 'paid_amount' in columns:
+            updates.append("paid_amount = :paid")
+        else:
+            db.execute(text("ALTER TABLE orders ADD COLUMN paid_amount DECIMAL(12, 2) DEFAULT 0"))
+            db.commit()
+            updates.append("paid_amount = :paid")
+        
+        if 'remaining_amount' in columns:
+            updates.append("remaining_amount = :remaining")
+        else:
+            db.execute(text("ALTER TABLE orders ADD COLUMN remaining_amount DECIMAL(12, 2) DEFAULT 0"))
+            db.commit()
+            updates.append("remaining_amount = :remaining")
+        
+        updates.append("payment_status = :status")
+        
+        if updates:
+            update_query = text(f"UPDATE orders SET {', '.join(updates)} WHERE id = :id")
+            db.execute(update_query, params)
+        
+        db.commit()
+        db.refresh(order)
+        
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "order_number": getattr(order, 'order_number', None),
+                "final_amount": float(final_amount),
+                "paid_amount": paid_amount,
+                "remaining_amount": remaining_amount,
+                "payment_status": payment_status
+            },
+            "message": f"تم تحديث حالة الدفع: المدفوع {paid_amount}، المتبقي {remaining_amount}"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating order payment: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في تحديث حالة الدفع: {str(e)}")

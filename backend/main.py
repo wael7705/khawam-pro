@@ -25,7 +25,7 @@ app.add_middleware(
 )
 
 # Import routers
-from routers import auth, products, services, portfolio, orders, studio, admin
+from routers import auth, products, services, portfolio, orders, studio, admin, payments
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(products.router, prefix="/api/products", tags=["Products"])
@@ -34,6 +34,7 @@ app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"]
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
 
 # Mount static files
 if not os.path.exists("uploads"):

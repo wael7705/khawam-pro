@@ -114,6 +114,10 @@ async def create_order(
         existing_columns = [col['name'] for col in inspector.get_columns('orders')]
         
         # Build order_dict with only existing columns
+        # حساب المبالغ للتقسيط (في البداية المبلغ المدفوع = 0)
+        paid_amount = 0.0  # يبدأ من 0 عند إنشاء الطلب
+        remaining_amount = float(order_data.final_amount) - paid_amount
+        
         order_dict = {
             'order_number': order_number,
             'customer_id': None,
@@ -124,11 +128,19 @@ async def create_order(
             'status': 'pending',
             'total_amount': order_data.total_amount,
             'final_amount': order_data.final_amount,
-            'payment_status': 'pending',
+            'payment_status': 'pending',  # سيتم تحديثه تلقائياً عند الدفع
             'delivery_type': order_data.delivery_type,
             'delivery_address': order_data.delivery_address if order_data.delivery_type == "delivery" else None,
             'notes': order_data.notes
         }
+        
+        # إضافة حقول التقسيط إذا كانت موجودة
+        if 'paid_amount' in existing_columns:
+            order_dict['paid_amount'] = paid_amount
+        if 'remaining_amount' in existing_columns:
+            order_dict['remaining_amount'] = remaining_amount
+        if 'payment_method' in existing_columns:
+            order_dict['payment_method'] = 'sham_cash'  # افتراضي
         
         # Add delivery coordinates only if column exists and value provided
         if 'delivery_latitude' in existing_columns and order_data.delivery_type == "delivery":

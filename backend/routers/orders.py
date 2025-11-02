@@ -57,30 +57,34 @@ async def create_order(
         random_suffix = uuid.uuid4().hex[:3].upper()
         order_number = f"ORD{date_str}-{random_suffix}"
         
-        # Check and add delivery_latitude/delivery_longitude columns if they don't exist
+        # Check and add missing columns if they don't exist
         from sqlalchemy import text, inspect
         
         inspector = inspect(db.bind)
-        columns = [col['name'] for col in inspector.get_columns('orders')]
         
-        # Add columns if they don't exist
-        if 'delivery_latitude' not in columns:
+        def add_column_if_not_exists(column_name: str, column_type: str):
+            """Helper to add column if it doesn't exist"""
             try:
-                db.execute(text("ALTER TABLE orders ADD COLUMN delivery_latitude DECIMAL(10, 8)"))
-                db.commit()
-                print("✅ Added delivery_latitude column")
+                # Re-inspect to get fresh column list
+                current_columns = [col['name'] for col in inspector.get_columns('orders')]
+                if column_name not in current_columns:
+                    db.execute(text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}"))
+                    db.commit()
+                    print(f"✅ Added {column_name} column")
+                    # Refresh inspector after adding column
+                    inspector = inspect(db.bind)
+                    return True
             except Exception as e:
-                print(f"Warning: Could not add delivery_latitude: {e}")
+                print(f"Warning: Could not add {column_name}: {e}")
                 db.rollback()
+                return False
+            return False
         
-        if 'delivery_longitude' not in columns:
-            try:
-                db.execute(text("ALTER TABLE orders ADD COLUMN delivery_longitude DECIMAL(11, 8)"))
-                db.commit()
-                print("✅ Added delivery_longitude column")
-            except Exception as e:
-                print(f"Warning: Could not add delivery_longitude: {e}")
-                db.rollback()
+        # Add all missing columns
+        add_column_if_not_exists('delivery_latitude', 'DECIMAL(10, 8)')
+        add_column_if_not_exists('delivery_longitude', 'DECIMAL(11, 8)')
+        add_column_if_not_exists('rating', 'INTEGER')
+        add_column_if_not_exists('rating_comment', 'TEXT')
         
         # Create order
         order_dict = {
@@ -198,6 +202,20 @@ async def get_order(order_id: int, db: Session = Depends(get_db)):
         
         items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
         
+        # Safely get rating fields
+        rating = None
+        rating_comment = None
+        try:
+            rating = getattr(order, 'rating', None)
+            if rating is not None:
+                rating = int(rating)
+        except:
+            pass
+        try:
+            rating_comment = getattr(order, 'rating_comment', None)
+        except:
+            pass
+        
         return {
             "success": True,
             "order": {
@@ -208,6 +226,8 @@ async def get_order(order_id: int, db: Session = Depends(get_db)):
                 "final_amount": float(order.final_amount),
                 "payment_status": order.payment_status,
                 "delivery_address": order.delivery_address,
+                "rating": rating,
+                "rating_comment": rating_comment,
                 "notes": order.notes,
                 "created_at": order.created_at.isoformat() if order.created_at else None,
                 "items": [
@@ -228,4 +248,6 @@ async def get_order(order_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         print(f"Error fetching order: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في جلب الطلب: {str(e)}")

@@ -32,79 +32,98 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [totalPrice, setTotalPrice] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const hasRestoredState = useRef(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load saved form state and delivery address from localStorage when modal opens
-  useEffect(() => {
-    if (isOpen) {
+  // Use useLayoutEffect to restore state synchronously before render
+  useLayoutEffect(() => {
+    if (isOpen && !hasRestoredState.current) {
       // Check if we should restore state (only when returning from location picker)
       const shouldReopen = localStorage.getItem('shouldReopenOrderModal')
+      const savedServiceName = localStorage.getItem('orderModalService')
       
-      // Restore form state if exists and we're returning from location picker
-      const savedFormState = localStorage.getItem('orderFormState')
-      if (savedFormState && shouldReopen === 'true') {
-        try {
-          const formState = JSON.parse(savedFormState)
-          // Only restore if it's for the same service
-          if (formState.serviceName === serviceName) {
-            // Restore step first
-            if (formState.step) {
-              setStep(formState.step)
+      // Only restore if flag is set and service name matches
+      const shouldRestore = shouldReopen === 'true' && savedServiceName === serviceName
+      
+      if (shouldRestore) {
+        // Restore form state if exists and we're returning from location picker
+        const savedFormState = localStorage.getItem('orderFormState')
+        if (savedFormState) {
+          try {
+            const formState = JSON.parse(savedFormState)
+            // Only restore if it's for the same service
+            if (formState.serviceName === serviceName) {
+              console.log('🔵 Restoring form state:', formState)
+              
+              // Restore step FIRST (this is critical!)
+              if (formState.step) {
+                setStep(formState.step)
+              }
+              
+              // Restore all form fields
+              if (formState.quantity !== undefined) setQuantity(formState.quantity)
+              if (formState.length !== undefined) setLength(formState.length)
+              if (formState.width !== undefined) setWidth(formState.width)
+              if (formState.height !== undefined) setHeight(formState.height)
+              if (formState.unit !== undefined) setUnit(formState.unit)
+              if (formState.selectedColors !== undefined) setSelectedColors(formState.selectedColors)
+              if (formState.workType !== undefined) setWorkType(formState.workType)
+              if (formState.notes !== undefined) setNotes(formState.notes)
+              if (formState.customerName !== undefined) setCustomerName(formState.customerName)
+              if (formState.customerWhatsApp !== undefined) setCustomerWhatsApp(formState.customerWhatsApp)
+              if (formState.shopName !== undefined) setShopName(formState.shopName)
+              if (formState.totalPrice !== undefined) setTotalPrice(formState.totalPrice)
+              
+              // Restore delivery type
+              if (formState.deliveryType === 'delivery') {
+                setDeliveryType('delivery')
+              }
+              
+              hasRestoredState.current = true
+              console.log('✅ Form state restored successfully, step:', formState.step)
             }
-            // Restore all form fields
-            setQuantity(formState.quantity || 1)
-            setLength(formState.length || '')
-            setWidth(formState.width || '')
-            setHeight(formState.height || '')
-            setUnit(formState.unit || 'cm')
-            setSelectedColors(formState.selectedColors || [])
-            setWorkType(formState.workType || '')
-            setNotes(formState.notes || '')
-            setCustomerName(formState.customerName || '')
-            setCustomerWhatsApp(formState.customerWhatsApp || '')
-            if (formState.shopName) {
-              setShopName(formState.shopName)
-            }
-            if (formState.totalPrice) {
-              setTotalPrice(formState.totalPrice)
-            }
-            // Restore delivery type
-            if (formState.deliveryType === 'delivery') {
-              setDeliveryType('delivery')
-            }
+          } catch (error) {
+            console.error('❌ Error loading form state:', error)
           }
-        } catch (error) {
-          console.error('Error loading form state:', error)
         }
-      }
 
-      // Load saved delivery address
-      const savedAddress = localStorage.getItem('deliveryAddress')
-      if (savedAddress) {
-        try {
-          const address = JSON.parse(savedAddress)
-          setDeliveryAddress(address)
-          setAddressConfirmed(true)
-          // Only update shopName if it's not already set from formState
-          if (!shopName && (address.street || address.neighborhood)) {
-            setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
+        // Load saved delivery address
+        const savedAddress = localStorage.getItem('deliveryAddress')
+        if (savedAddress) {
+          try {
+            const address = JSON.parse(savedAddress)
+            setDeliveryAddress(address)
+            setAddressConfirmed(true)
+            // Only update shopName if it's not already set from formState
+            const formStateStr = localStorage.getItem('orderFormState')
+            if (formStateStr) {
+              const formState = JSON.parse(formStateStr)
+              if (!formState.shopName && (address.street || address.neighborhood)) {
+                setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
+              }
+            } else if (address.street || address.neighborhood) {
+              setShopName([address.street, address.neighborhood, address.building].filter(Boolean).join(', '))
+            }
+            console.log('✅ Delivery address restored')
+          } catch (error) {
+            console.error('❌ Error loading delivery address:', error)
           }
-        } catch (error) {
-          console.error('Error loading delivery address:', error)
         }
-      }
-      
-      // Clear the reopen flag after restoring state
-      if (shouldReopen === 'true') {
-        // Small delay to ensure state is restored first
+        
+        // Clear the reopen flags after restoring state
         setTimeout(() => {
           localStorage.removeItem('shouldReopenOrderModal')
-        }, 100)
+          localStorage.removeItem('orderModalService')
+          console.log('🧹 Cleared reopen flags')
+        }, 1000)
       }
-    } else {
-      // When modal closes, don't clear form state (we might be going to location picker)
-      // Only clear if explicitly needed
+    }
+    
+    // Reset restoration flag when modal closes
+    if (!isOpen) {
+      hasRestoredState.current = false
     }
   }, [isOpen, serviceName])
 
@@ -149,6 +168,9 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         } 
       })
       onClose()
+    } else {
+      // Reset restoration flag if delivery type changed to self
+      hasRestoredState.current = false
     }
   }
 

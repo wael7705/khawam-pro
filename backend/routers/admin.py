@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Product, Service, PortfolioWork, Order, OrderItem
+from models import Product, Service, PortfolioWork, Order, OrderItem, ProductCategory
 from typing import Optional
 from pydantic import BaseModel, Field, validator
 from utils import handle_error, success_response, validate_price, validate_string
@@ -1866,6 +1866,8 @@ async def get_sales_overview(period: str = "month", db: Session = Depends(get_db
 async def get_recent_orders(limit: int = 10, db: Session = Depends(get_db)):
     """Get recent orders for dashboard"""
     try:
+        from datetime import datetime
+        
         orders = db.query(Order).order_by(Order.created_at.desc()).limit(limit).all()
         
         recent_orders = []

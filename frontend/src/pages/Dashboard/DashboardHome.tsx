@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Package, ShoppingCart, DollarSign, AlertTriangle, RefreshCw } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts'
 import { adminAPI } from '../../lib/api'
-import { showError } from '../../utils/toast'
 import './DashboardHome.css'
 
 interface DashboardStats {
@@ -99,7 +98,7 @@ export default function DashboardHome() {
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error)
-      showError('حدث خطأ في تحميل بيانات لوحة التحكم')
+      // Error handling - can add toast notification here
     } finally {
       setLoading(false)
       setRefreshing(false)

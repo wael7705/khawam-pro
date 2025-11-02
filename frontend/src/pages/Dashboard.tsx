@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import DashboardHome from './Dashboard/DashboardHome'
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
 import ProductsManagement from './Dashboard/ProductsManagement'
 import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
+import CustomersManagement from './Dashboard/CustomersManagement'
 import './Dashboard.css'
 
 export default function Dashboard() {
@@ -17,6 +18,7 @@ export default function Dashboard() {
   const tabs = [
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard' },
     { id: 'orders', name: 'الطلبات', icon: ShoppingCartIcon, path: '/dashboard/orders' },
+    { id: 'customers', name: 'العملاء', icon: Users, path: '/dashboard/customers' },
     { id: 'products', name: 'المنتجات', icon: Package, path: '/dashboard/products' },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services' },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works' },
@@ -27,6 +29,7 @@ export default function Dashboard() {
     const path = location.pathname
     if (path === '/dashboard' || path === '/dashboard/') return 'home'
     if (path.startsWith('/dashboard/orders')) return 'orders'
+    if (path.startsWith('/dashboard/customers')) return 'customers'
     if (path.startsWith('/dashboard/products')) return 'products'
     if (path.startsWith('/dashboard/services')) return 'services'
     if (path.startsWith('/dashboard/works')) return 'works'
@@ -94,6 +97,7 @@ export default function Dashboard() {
             <Route path="/" element={<DashboardHome />} />
             <Route path="/orders" element={<OrdersManagement />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
+            <Route path="/customers" element={<CustomersManagement />} />
             <Route path="/products" element={<ProductsManagement />} />
             <Route path="/services" element={<ServicesManagement />} />
             <Route path="/works" element={<WorksManagement />} />

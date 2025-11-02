@@ -394,7 +394,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             </div>
 
             <div className="form-group">
-              <label>رفع الصورة</label>
+              <label>رفع الصورة <span className="optional">(اختياري)</span></label>
               <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
                 <input
                   ref={fileInputRef}
@@ -424,7 +424,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             <h3>المرحلة 2: الأبعاد</h3>
             
             <div className="form-group">
-              <label>الطول</label>
+              <label>الطول <span className="optional">(اختياري)</span></label>
               <input
                 type="number"
                 value={length}
@@ -435,7 +435,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             </div>
 
             <div className="form-group">
-              <label>العرض</label>
+              <label>العرض <span className="optional">(اختياري)</span></label>
               <input
                 type="number"
                 value={width}
@@ -446,7 +446,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             </div>
 
             <div className="form-group">
-              <label>الارتفاع</label>
+              <label>الارتفاع <span className="optional">(اختياري)</span></label>
               <input
                 type="number"
                 value={height}
@@ -487,7 +487,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             <h3>المرحلة 4: نوع العمل</h3>
             
             <div className="form-group">
-              <label>نوع العمل / الغرض</label>
+              <label>نوع العمل / الغرض <span className="optional">(اختياري)</span></label>
               <textarea
                 value={workType}
                 onChange={(e) => setWorkType(e.target.value)}
@@ -498,7 +498,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             </div>
 
             <div className="form-group">
-              <label>ملاحظات إضافية</label>
+              <label>ملاحظات إضافية <span className="optional">(اختياري)</span></label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -527,11 +527,15 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             </div>
 
             <div className="form-group">
-              <label>رقم واتساب</label>
+              <label>رقم واتساب <span className="required">*</span></label>
               <input
                 type="tel"
                 value={customerWhatsApp}
-                onChange={(e) => setCustomerWhatsApp(e.target.value)}
+                onChange={(e) => {
+                  // Only allow numbers and + sign
+                  const value = e.target.value.replace(/[^0-9+]/g, '')
+                  setCustomerWhatsApp(value)
+                }}
                 className="form-input"
                 placeholder="963xxxxxxxxx"
                 required
@@ -539,7 +543,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
             </div>
 
             <div className="form-group">
-              <label>اسم المتجر</label>
+              <label>اسم المتجر <span className="optional">(اختياري)</span></label>
               <input
                 type="text"
                 value={shopName}

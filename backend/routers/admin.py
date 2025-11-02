@@ -1903,6 +1903,138 @@ async def get_recent_orders(limit: int = 10, db: Session = Depends(get_db)):
             "orders": []
         }
 
+@router.get("/customers")
+async def get_all_customers(db: Session = Depends(get_db)):
+    """Get all customers with aggregated statistics"""
+    try:
+        from sqlalchemy import func
+        from datetime import datetime
+        
+        # Group orders by customer phone to get statistics
+        customer_stats = db.query(
+            Order.customer_phone,
+            func.max(Order.customer_name).label('name'),
+            func.count(Order.id).label('total_orders'),
+            func.sum(Order.final_amount).label('total_spent'),
+            func.max(Order.created_at).label('last_order_date')
+        ).filter(
+            Order.customer_phone.isnot(None),
+            Order.customer_phone != ''
+        ).group_by(Order.customer_phone).order_by(func.count(Order.id).desc()).all()
+        
+        customers = []
+        for stat in customer_stats:
+            customers.append({
+                "phone": stat.customer_phone,
+                "name": stat.name or "عميل",
+                "total_orders": int(stat.total_orders),
+                "total_spent": float(stat.total_spent) if stat.total_spent else 0.0,
+                "last_order_date": stat.last_order_date.isoformat() if stat.last_order_date else None
+            })
+        
+        return {
+            "success": True,
+            "customers": customers
+        }
+    except Exception as e:
+        print(f"Error fetching customers: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب العملاء: {str(e)}")
+
+@router.get("/customers/{phone}")
+async def get_customer_details(phone: str, db: Session = Depends(get_db)):
+    """Get customer details including all orders"""
+    try:
+        from sqlalchemy import func
+        from models import OrderItem
+        
+        # Get customer info from orders
+        orders = db.query(Order).filter(
+            Order.customer_phone == phone
+        ).order_by(Order.created_at.desc()).all()
+        
+        if not orders:
+            raise HTTPException(status_code=404, detail="العميل غير موجود")
+        
+        # Get aggregated stats
+        stats = db.query(
+            func.max(Order.customer_name).label('name'),
+            func.max(Order.customer_whatsapp).label('whatsapp'),
+            func.count(Order.id).label('total_orders'),
+            func.sum(Order.final_amount).label('total_spent')
+        ).filter(
+            Order.customer_phone == phone
+        ).first()
+        
+        # Get staff notes (from first order or create new)
+        staff_notes = orders[0].staff_notes if hasattr(orders[0], 'staff_notes') else None
+        
+        # Get orders with items
+        orders_list = []
+        for order in orders:
+            items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+            orders_list.append({
+                "id": order.id,
+                "order_number": getattr(order, 'order_number', f'#{order.id}'),
+                "shop_name": getattr(order, 'shop_name', None),
+                "status": getattr(order, 'status', 'pending'),
+                "final_amount": float(order.final_amount) if order.final_amount else 0,
+                "created_at": order.created_at.isoformat() if order.created_at else None,
+                "items": [
+                    {
+                        "product_name": item.product_name,
+                        "quantity": item.quantity
+                    } for item in items
+                ]
+            })
+        
+        return {
+            "success": True,
+            "customer": {
+                "phone": phone,
+                "name": stats.name or "عميل",
+                "whatsapp": stats.whatsapp,
+                "total_orders": int(stats.total_orders),
+                "total_spent": float(stats.total_spent) if stats.total_spent else 0.0,
+                "orders": orders_list,
+                "staff_notes": staff_notes
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching customer details: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب تفاصيل العميل: {str(e)}")
+
+@router.put("/customers/{phone}/notes")
+async def update_customer_notes(phone: str, data: CustomerNotesUpdate, db: Session = Depends(get_db)):
+    """Update staff notes for a customer (update all orders with same phone)"""
+    try:
+        # Update staff_notes for all orders of this customer
+        orders = db.query(Order).filter(Order.customer_phone == phone).all()
+        
+        if not orders:
+            raise HTTPException(status_code=404, detail="العميل غير موجود")
+        
+        for order in orders:
+            order.staff_notes = data.notes
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "تم حفظ الملاحظات بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating customer notes: {e}")
+        raise HTTPException(status_code=500, detail=f"خطأ في حفظ الملاحظات: {str(e)}")
+
 @router.post("/maintenance/normalize-images")
 async def normalize_image_urls(db: Session = Depends(get_db)):
     """Normalize image URLs in DB to absolute public URLs for products, services, and portfolio works.

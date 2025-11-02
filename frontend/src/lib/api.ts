@@ -114,6 +114,13 @@ export const adminAPI = {
     getRecentOrders: (limit: number = 10) => api.get(`/admin/dashboard/recent-orders?limit=${limit}`),
   },
   
+  // Customers
+  customers: {
+    getAll: () => api.get('/admin/customers'),
+    getByPhone: (phone: string) => api.get(`/admin/customers/${encodeURIComponent(phone)}`),
+    updateNotes: (phone: string, notes: string) => api.put(`/admin/customers/${encodeURIComponent(phone)}/notes`, { notes }),
+  },
+  
   // Upload
   upload: async (file: File) => {
     const formData = new FormData()

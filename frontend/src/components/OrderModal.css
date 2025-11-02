@@ -105,6 +105,18 @@
   color: var(--text);
 }
 
+.form-group label .required {
+  color: #EF4444;
+  margin-right: 4px;
+}
+
+.form-group label .optional {
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 0.9em;
+  margin-right: 4px;
+}
+
 .form-input {
   width: 100%;
   padding: 14px 16px;

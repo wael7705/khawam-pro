@@ -8,6 +8,7 @@ from utils import handle_error, success_response, validate_price, validate_strin
 import os
 import uuid
 import requests
+import urllib.parse
 
 router = APIRouter()
 
@@ -19,6 +20,10 @@ class OrderStatusUpdate(BaseModel):
     status: str
     cancellation_reason: Optional[str] = None
     rejection_reason: Optional[str] = None
+
+class OrderRatingUpdate(BaseModel):
+    rating: int  # 1-5
+    rating_comment: Optional[str] = None
 
 # --------------------------------------------
 # Helpers for public image URLs
@@ -841,6 +846,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
             rejection_reason = None
             delivery_latitude = None
             delivery_longitude = None
+            rating = None
+            rating_comment = None
             try:
                 cancellation_reason = getattr(o, 'cancellation_reason', None)
                 if cancellation_reason:
@@ -865,6 +872,16 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     delivery_longitude = float(delivery_longitude)
             except:
                 pass
+            try:
+                rating = getattr(o, 'rating', None)
+                if rating is not None:
+                    rating = int(rating)
+            except:
+                pass
+            try:
+                rating_comment = getattr(o, 'rating_comment', None)
+            except:
+                pass
             
             orders_list.append({
                 "id": o.id,
@@ -881,6 +898,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 "delivery_address": getattr(o, 'delivery_address', None),
                 "delivery_latitude": delivery_latitude,
                 "delivery_longitude": delivery_longitude,
+                "rating": rating,
+                "rating_comment": rating_comment,
                 "notes": getattr(o, 'notes', None),
                 "staff_notes": staff_notes,
                 "cancellation_reason": cancellation_reason,
@@ -956,6 +975,20 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         except:
             pass
         
+        # Get rating
+        rating = None
+        rating_comment = None
+        try:
+            rating = getattr(order, 'rating', None)
+            if rating is not None:
+                rating = int(rating)
+        except:
+            pass
+        try:
+            rating_comment = getattr(order, 'rating_comment', None)
+        except:
+            pass
+        
         return {
             "success": True,
             "order": {
@@ -973,6 +1006,8 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "delivery_address": getattr(order, 'delivery_address', None),
                 "delivery_latitude": delivery_latitude,
                 "delivery_longitude": delivery_longitude,
+                "rating": rating,
+                "rating_comment": rating_comment,
                 "notes": getattr(order, 'notes', None),
                 "staff_notes": staff_notes,
                 "created_at": order.created_at.isoformat() if order.created_at else None,
@@ -1073,6 +1108,53 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
         db.commit()
         db.refresh(order)
         
+        # If order is completed, send rating request to customer via WhatsApp
+        if status == 'completed':
+            try:
+                # Get customer WhatsApp number
+                customer_whatsapp = ""
+                customer_name = ""
+                order_number = getattr(order, 'order_number', '')
+                
+                try:
+                    customer_whatsapp = order.customer_whatsapp or order.customer_phone or ""
+                except:
+                    pass
+                try:
+                    customer_name = order.customer_name or ""
+                except:
+                    pass
+                
+                if customer_whatsapp:
+                    # Create rating link (we'll create a page for rating)
+                    base_url = os.getenv("FRONTEND_URL", "https://khawam-pro-production.up.railway.app")
+                    rating_url = f"{base_url}/rate-order/{order_id}"
+                    
+                    # Send WhatsApp message (you can integrate with WhatsApp API here)
+                    message = f"""
+🎉 شكراً لك {customer_name}!
+
+تم استلام طلبك #{order_number} بنجاح!
+
+نرجو منك تقييم خدمتنا لمساعدتنا على التحسين 🌟
+
+اضغط هنا لتقييم الخدمة:
+{rating_url}
+
+شكراً لثقتك بنا 💙
+                    """.strip()
+                    
+                    # Clean phone number
+                    clean_phone = ''.join(filter(str.isdigit, str(customer_whatsapp)))
+                    if clean_phone:
+                        whatsapp_url = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(message)}"
+                        print(f"📱 Rating request WhatsApp URL: {whatsapp_url}")
+                        print(f"📝 Message: {message}")
+                        # Note: In production, integrate with WhatsApp Business API to send message automatically
+                        # For now, admin can copy the URL and send manually or integrate with WhatsApp API
+            except Exception as rating_err:
+                print(f"Warning: Could not send rating request: {rating_err}")
+        
         return {
             "success": True,
             "order": {
@@ -1088,6 +1170,73 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
         db.rollback()
         print(f"Error updating order status: {e}")
         raise HTTPException(status_code=500, detail=f"خطأ في تحديث حالة الطلب: {str(e)}")
+
+@router.put("/orders/{order_id}/rating")
+async def update_order_rating(
+    order_id: int,
+    rating_data: OrderRatingUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update order rating from customer"""
+    try:
+        from sqlalchemy import text
+        
+        if rating_data.rating < 1 or rating_data.rating > 5:
+            raise HTTPException(status_code=400, detail="التقييم يجب أن يكون بين 1 و 5")
+        
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        # Check and add rating columns if they don't exist
+        try:
+            check_rating_col = text("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='orders' AND column_name='rating'
+            """)
+            has_rating_col = db.execute(check_rating_col).fetchone()
+            
+            if not has_rating_col:
+                db.execute(text("ALTER TABLE orders ADD COLUMN rating INTEGER"))
+                db.commit()
+            
+            check_rating_comment_col = text("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='orders' AND column_name='rating_comment'
+            """)
+            has_rating_comment_col = db.execute(check_rating_comment_col).fetchone()
+            
+            if not has_rating_comment_col:
+                db.execute(text("ALTER TABLE orders ADD COLUMN rating_comment TEXT"))
+                db.commit()
+        except Exception as col_err:
+            print(f"Warning: Could not check/add rating columns: {col_err}")
+        
+        # Update rating
+        db.execute(
+            text("UPDATE orders SET rating = :rating, rating_comment = :comment WHERE id = :id"),
+            {
+                "rating": rating_data.rating,
+                "comment": rating_data.rating_comment or None,
+                "id": order_id
+            }
+        )
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "تم حفظ التقييم بنجاح",
+            "rating": rating_data.rating,
+            "rating_comment": rating_data.rating_comment
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating rating: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حفظ التقييم: {str(e)}")
 
 @router.put("/orders/{order_id}/delivery-coordinates")
 async def update_delivery_coordinates(

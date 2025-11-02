@@ -24,6 +24,8 @@ interface Order {
   delivery_address?: string
   delivery_latitude?: number
   delivery_longitude?: number
+  rating?: number
+  rating_comment?: string
 }
 
 const statusTabs = [
@@ -134,7 +136,7 @@ export default function OrdersManagement() {
     }
   }
 
-  // Move completed orders to archive automatically
+  // Move completed orders to archive automatically (but keep them in completed tab too)
   useEffect(() => {
     const completedOrders = orders.filter(o => o.status === 'completed')
     if (completedOrders.length > 0) {
@@ -156,8 +158,7 @@ export default function OrdersManagement() {
         const updatedArchived = [...existingArchived, ...newArchivedOrders]
         localStorage.setItem('archivedOrders', JSON.stringify(updatedArchived))
         setArchivedOrders(updatedArchived)
-        // Remove completed orders from main orders list
-        setOrders(prev => prev.filter(o => o.status !== 'completed'))
+        // DON'T remove from main orders list - keep them visible in completed tab
       }
     }
   }, [orders])
@@ -496,54 +497,85 @@ export default function OrdersManagement() {
     }
   }
 
-  const handleExportArchive = () => {
+  const handleExportArchive = async () => {
     if (archivedOrders.length === 0) {
       showError('الأرشيف فارغ')
       return
     }
 
-    // Convert archived orders to CSV
-    const headers = ['رقم الطلب', 'اسم العميل', 'رقم الهاتف', 'واتساب', 'اسم المتجر', 'الحالة', 'نوع التوصيل', 'عنوان التوصيل', 'المبلغ الإجمالي', 'المبلغ النهائي', 'حالة الدفع', 'تاريخ الطلب', 'ملاحظات']
-    const rows = archivedOrders.map(order => [
-      order.order_number || '',
-      order.customer_name || '',
-      order.customer_phone || '',
-      order.customer_whatsapp || '',
-      order.shop_name || '',
-      order.status || '',
-      order.delivery_type || '',
-      order.delivery_address || '',
-      order.total_amount?.toString() || '',
-      order.final_amount?.toString() || '',
-      'pending', // payment_status
-      order.created_at || '',
-      order.notes || ''
-    ])
+    try {
+      // Dynamically import xlsx library
+      const XLSX = await import('xlsx')
+      
+      // Prepare data for Excel
+      const headers = ['رقم الطلب', 'اسم العميل', 'رقم الهاتف', 'واتساب', 'اسم المتجر', 'الحالة', 'نوع التوصيل', 'عنوان التوصيل', 'المبلغ الإجمالي', 'المبلغ النهائي', 'حالة الدفع', 'تاريخ الطلب', 'التقييم', 'تعليق التقييم', 'ملاحظات']
+      const rows = archivedOrders.map(order => [
+        order.order_number || '',
+        order.customer_name || '',
+        order.customer_phone || '',
+        order.customer_whatsapp || '',
+        order.shop_name || '',
+        order.status || '',
+        order.delivery_type || '',
+        order.delivery_address || '',
+        order.total_amount?.toString() || '0',
+        order.final_amount?.toString() || '0',
+        'pending', // payment_status
+        order.created_at || '',
+        order.rating ? `${order.rating} ⭐` : '',
+        order.rating_comment || '',
+        order.notes || ''
+      ])
 
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n')
+      // Create worksheet
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      
+      // Set column widths
+      worksheet['!cols'] = [
+        { wch: 15 }, // رقم الطلب
+        { wch: 20 }, // اسم العميل
+        { wch: 15 }, // رقم الهاتف
+        { wch: 15 }, // واتساب
+        { wch: 20 }, // اسم المتجر
+        { wch: 12 }, // الحالة
+        { wch: 12 }, // نوع التوصيل
+        { wch: 30 }, // عنوان التوصيل
+        { wch: 15 }, // المبلغ الإجمالي
+        { wch: 15 }, // المبلغ النهائي
+        { wch: 12 }, // حالة الدفع
+        { wch: 20 }, // تاريخ الطلب
+        { wch: 10 }, // التقييم
+        { wch: 40 }, // تعليق التقييم
+        { wch: 40 }  // ملاحظات
+      ]
 
-    // Add BOM for UTF-8 with Arabic
-    const BOM = '\uFEFF'
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    
-    const date = new Date().toISOString().split('T')[0]
-    link.setAttribute('href', url)
-    link.setAttribute('download', `أرشيف_الطلبات_${date}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+      // Create workbook
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'أرشيف الطلبات')
 
-    // Clear archive after export
-    localStorage.removeItem('archivedOrders')
-    setArchivedOrders([])
-    showSuccess('تم تصدير الأرشيف بنجاح وتم مسح محتوياته')
+      // Generate file and download
+      const date = new Date().toISOString().split('T')[0]
+      XLSX.writeFile(workbook, `أرشيف_الطلبات_${date}.xlsx`)
+
+      // Get completed order IDs from archive
+      const completedOrderIds = archivedOrders.map(o => o.id)
+      
+      // Clear archive after export
+      localStorage.removeItem('archivedOrders')
+      setArchivedOrders([])
+      
+      // Remove completed orders from main orders list
+      setOrders(prev => prev.filter(o => !completedOrderIds.includes(o.id)))
+      
+      showSuccess('تم تصدير الأرشيف بنجاح وتم مسح محتوياته من الأرشيف وتبويب مكتمل')
+    } catch (error: any) {
+      console.error('Error exporting archive:', error)
+      if (error.message?.includes('xlsx') || error.code === 'MODULE_NOT_FOUND') {
+        showError('مكتبة Excel غير مثبتة. يرجى تثبيتها: npm install xlsx')
+      } else {
+        showError('حدث خطأ في تصدير الأرشيف')
+      }
+    }
   }
 
   return (
@@ -904,6 +936,30 @@ export default function OrdersManagement() {
                     <div className="reason-display rejection-reason">
                       <strong>سبب الرفض:</strong>
                       <span>{order.rejection_reason}</span>
+                    </div>
+                  )}
+
+                  {/* Rating Display */}
+                  {order.rating && (
+                    <div className="rating-display">
+                      <strong>تقييم العميل:</strong>
+                      <div className="rating-stars">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <span 
+                            key={star} 
+                            className={star <= order.rating! ? 'star-filled' : 'star-empty'}
+                          >
+                            ⭐
+                          </span>
+                        ))}
+                        <span className="rating-value">({order.rating}/5)</span>
+                      </div>
+                      {order.rating_comment && (
+                        <div className="rating-comment">
+                          <strong>التعليق:</strong>
+                          <p>{order.rating_comment}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

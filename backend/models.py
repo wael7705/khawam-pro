@@ -99,6 +99,8 @@ class Order(Base):
     delivery_longitude = Column(DECIMAL(11, 8))  # خط الطول
     notes = Column(Text)  # ملاحظات العميل
     staff_notes = Column(Text)  # ملاحظات الموظف
+    rating = Column(Integer)  # التقييم (1-5 نجوم)
+    rating_comment = Column(Text)  # تعليق التقييم
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 class OrderItem(Base):

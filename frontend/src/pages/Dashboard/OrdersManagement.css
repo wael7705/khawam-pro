@@ -1089,7 +1089,7 @@
 .export-archive-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
-}
+  }
 
 .export-archive-btn:active {
   transform: translateY(0);
@@ -1105,5 +1105,64 @@
 .action-btn.delete-btn:hover {
   background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Rating Display */
+.rating-display {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fef3c7;
+  border-radius: 12px;
+  border-right: 4px solid #F59E0B;
+}
+
+.rating-display strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #92400e;
+  font-size: 14px;
+}
+
+.rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.star-filled {
+  color: #F59E0B;
+  font-size: 20px;
+}
+
+.star-empty {
+  color: #d1d5db;
+  font-size: 20px;
+}
+
+.rating-value {
+  margin-right: 8px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.rating-comment {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #fbbf24;
+}
+
+.rating-comment strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #92400e;
+  font-size: 14px;
+}
+
+.rating-comment p {
+  margin: 0;
+  color: #78350f;
+  line-height: 1.6;
+  font-size: 14px;
 }
 

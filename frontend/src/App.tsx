@@ -10,6 +10,7 @@ import Contact from './pages/Contact'
 import Studio from './pages/Studio'
 import Dashboard from './pages/Dashboard'
 import LocationPickerPage from './pages/LocationPickerPage'
+import RateOrderPage from './pages/RateOrderPage'
 import Footer from './components/Footer'
 import { ToastContainer } from './components/Toast'
 import { subscribe, getToasts, removeToast, Toast } from './utils/toast'
@@ -19,7 +20,7 @@ function App() {
   const location = useLocation()
   const [toasts, setToasts] = useState<Toast[]>([])
   const hideFooterPaths = ['/products']
-  const hideAllPaths = ['/dashboard', '/location-picker']
+  const hideAllPaths = ['/dashboard', '/location-picker', '/rate-order']
   const shouldHideFooter = hideFooterPaths.includes(location.pathname)
   const shouldHideAll = hideAllPaths.some(path => location.pathname.startsWith(path))
 
@@ -48,6 +49,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/location-picker" element={<LocationPickerPage />} />
+          <Route path="/rate-order/:id" element={<RateOrderPage />} />
           <Route path="/dashboard/*" element={<Dashboard />} />
         </Routes>
       </main>

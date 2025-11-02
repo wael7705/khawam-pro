@@ -98,6 +98,10 @@ export const adminAPI = {
       rejection_reason: rejectionReason
     }),
     updateStaffNotes: (id: number, notes: string) => api.put(`/admin/orders/${id}/staff-notes`, { notes }),
+    updateRating: (id: number, rating: number, ratingComment?: string) => api.put(`/admin/orders/${id}/rating`, { 
+      rating, 
+      rating_comment: ratingComment 
+    }),
     delete: (id: number) => api.delete(`/admin/orders/${id}`),
   },
   

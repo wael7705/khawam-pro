@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, MessageSquare, X, Save } from 'lucide-react'
+import { ArrowRight, MessageSquare, X, Save, MapPin } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
+import SimpleMap from '../../components/SimpleMap'
 import './OrderDetail.css'
 
 interface OrderItem {
@@ -29,6 +30,8 @@ interface Order {
   final_amount: number
   payment_status: string
   delivery_address?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
   notes?: string
   staff_notes?: string
   created_at: string
@@ -44,6 +47,7 @@ export default function OrderDetail() {
   const [staffNotes, setStaffNotes] = useState('')
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [showLocationMap, setShowLocationMap] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -197,30 +201,6 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Order Status Card */}
-        <div className="detail-card status-card">
-          <h2>حالة الطلب</h2>
-          <div className="status-controls">
-            <div className="current-status">
-              <span className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
-                {getStatusLabel(order.status)}
-              </span>
-            </div>
-            <div className="status-buttons">
-              {['accepted', 'preparing', 'shipping', 'awaiting_pickup', 'completed', 'cancelled', 'rejected'].map(status => (
-                <button
-                  key={status}
-                  className={`status-btn ${order.status === status ? 'active' : ''}`}
-                  onClick={() => handleStatusChange(status)}
-                  disabled={isUpdatingStatus}
-                  style={{ '--status-color': getStatusColor(status) } as React.CSSProperties}
-                >
-                  {getStatusLabel(status)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {/* Order Items */}
         <div className="detail-card items-card">
@@ -240,14 +220,40 @@ export default function OrderDetail() {
                   {item.specifications && (
                     <div className="item-specs">
                       {item.specifications.dimensions && (
-                        <div className="spec-group">
+                        <div className="spec-group dimensions-group">
                           <label>الأبعاد:</label>
-                          <span>
-                            {item.specifications.dimensions.length || '-'} × 
-                            {item.specifications.dimensions.width || '-'} × 
-                            {item.specifications.dimensions.height || '-'} 
-                            {item.specifications.dimensions.unit || 'سم'}
-                          </span>
+                          <div className="dimensions-details">
+                            {item.specifications.dimensions.length && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">الطول:</span>
+                                <span className="dimension-value">
+                                  {item.specifications.dimensions.length} {item.specifications.dimensions.unit || 'سم'}
+                                </span>
+                              </div>
+                            )}
+                            {item.specifications.dimensions.width && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">العرض:</span>
+                                <span className="dimension-value">
+                                  {item.specifications.dimensions.width} {item.specifications.dimensions.unit || 'سم'}
+                                </span>
+                              </div>
+                            )}
+                            {item.specifications.dimensions.height && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">الارتفاع:</span>
+                                <span className="dimension-value">
+                                  {item.specifications.dimensions.height} {item.specifications.dimensions.unit || 'سم'}
+                                </span>
+                              </div>
+                            )}
+                            {item.specifications.dimensions.unit && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">وحدة القياس:</span>
+                                <span className="dimension-value">{item.specifications.dimensions.unit}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                       {item.specifications.colors && item.specifications.colors.length > 0 && (
@@ -306,13 +312,47 @@ export default function OrderDetail() {
             </div>
             <div className="summary-item">
               <label>نوع التوصيل:</label>
-              <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-            </div>
-            {order.delivery_address && (
-              <div className="summary-item">
-                <label>عنوان التوصيل:</label>
-                <span>{order.delivery_address}</span>
+              <div className="delivery-info-wrapper">
+                <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+                {order.delivery_type === 'delivery' && (order.delivery_latitude && order.delivery_longitude) && (
+                  <button
+                    className="show-location-btn"
+                    onClick={() => setShowLocationMap(!showLocationMap)}
+                  >
+                    <MapPin size={16} />
+                    {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
+                  </button>
+                )}
               </div>
+            </div>
+            {order.delivery_type === 'delivery' && (
+              <>
+                {order.delivery_address && (
+                  <div className="summary-item">
+                    <label>عنوان التوصيل:</label>
+                    <span>{order.delivery_address}</span>
+                  </div>
+                )}
+                {order.delivery_latitude && order.delivery_longitude && (
+                  <div className="summary-item">
+                    <label>الإحداثيات:</label>
+                    <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
+                  </div>
+                )}
+                {showLocationMap && order.delivery_latitude && order.delivery_longitude && (
+                  <div className="summary-item location-map-item">
+                    <label>الموقع على الخريطة:</label>
+                    <div className="location-map-container">
+                      <SimpleMap
+                        latitude={order.delivery_latitude}
+                        longitude={order.delivery_longitude}
+                        defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                        defaultZoom={17}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div className="summary-item">
               <label>حالة الدفع:</label>

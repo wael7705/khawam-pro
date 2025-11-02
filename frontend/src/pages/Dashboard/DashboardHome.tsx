@@ -21,9 +21,9 @@ interface TopProduct {
   revenue: number
 }
 
-interface TopCategory {
+interface TopService {
   name: string
-  sold: number
+  orders: number
   revenue: number
 }
 
@@ -54,7 +54,7 @@ export default function DashboardHome() {
   })
   const [loading, setLoading] = useState(true)
   const [topProducts, setTopProducts] = useState<TopProduct[]>([])
-  const [topCategories, setTopCategories] = useState<TopCategory[]>([])
+  const [topServices, setTopServices] = useState<TopService[]>([])
   const [salesData, setSalesData] = useState<SalesData[]>([])
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const [salesPeriod, setSalesPeriod] = useState<'week' | 'month' | 'year'>('month')
@@ -69,10 +69,10 @@ export default function DashboardHome() {
       }
 
       // Load all data in parallel
-      const [statsRes, productsRes, categoriesRes, salesRes, ordersRes] = await Promise.all([
+      const [statsRes, productsRes, servicesRes, salesRes, ordersRes] = await Promise.all([
         adminAPI.dashboard.getStats(),
         adminAPI.dashboard.getTopProducts(),
-        adminAPI.dashboard.getTopCategories(),
+        adminAPI.dashboard.getTopServices(),
         adminAPI.dashboard.getSalesOverview(salesPeriod),
         adminAPI.dashboard.getRecentOrders(10)
       ])
@@ -85,8 +85,8 @@ export default function DashboardHome() {
         setTopProducts(productsRes.data.products || [])
       }
 
-      if (categoriesRes.data.success) {
-        setTopCategories(categoriesRes.data.categories || [])
+      if (servicesRes.data.success) {
+        setTopServices(servicesRes.data.services || [])
       }
 
       if (salesRes.data.success) {
@@ -264,14 +264,14 @@ export default function DashboardHome() {
       <div className="charts-grid">
         <div className="chart-card">
           <div className="chart-header">
-            <h3>أفضل الفئات مبيعاً</h3>
+            <h3>الخدمات الأكثر طلباً</h3>
           </div>
-          {topCategories.length > 0 ? (
+          {topServices.length > 0 ? (
             <div className="chart-container">
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
-                    data={categoryChartData}
+                    data={serviceChartData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -280,12 +280,12 @@ export default function DashboardHome() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {categoryChartData.map((entry, index) => (
+                    {serviceChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value: number) => [`${value.toLocaleString()} ل.س`, 'الإيرادات']}
+                    formatter={(value: number) => [`${value} طلب`, 'عدد الطلبات']}
                   />
                 </PieChart>
               </ResponsiveContainer>

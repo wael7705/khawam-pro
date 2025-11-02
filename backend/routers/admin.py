@@ -1745,54 +1745,48 @@ async def get_top_products(db: Session = Depends(get_db)):
             "products": []
         }
 
-@router.get("/dashboard/top-categories")
-async def get_top_categories(db: Session = Depends(get_db)):
-    """Get top selling categories"""
+@router.get("/dashboard/top-services")
+async def get_top_services(db: Session = Depends(get_db)):
+    """Get top ordered services"""
     try:
         from sqlalchemy import func
         from datetime import datetime, timedelta
         
         thirty_days_ago = datetime.now() - timedelta(days=30)
         
-        # Try to get categories from products
-        try:
-            top_cats = db.query(
-                ProductCategory.name_ar,
-                func.sum(OrderItem.quantity).label('total_sold'),
-                func.sum(OrderItem.total_price).label('total_revenue')
-            ).join(
-                Product, ProductCategory.id == Product.category_id
-            ).join(
-                OrderItem, OrderItem.product_id == Product.id
-            ).join(
-                Order, Order.id == OrderItem.order_id
-            ).filter(
-                Order.created_at >= thirty_days_ago,
-                Order.status == 'completed'
-            ).group_by(ProductCategory.name_ar).order_by(
-                func.sum(OrderItem.total_price).desc()
-            ).limit(5).all()
-            
-            categories = []
-            for cat in top_cats:
-                categories.append({
-                    "name": cat.name_ar,
-                    "sold": int(cat.total_sold),
-                    "revenue": float(cat.total_revenue) if cat.total_revenue else 0
-                })
-        except:
-            # If categories join fails, return empty
-            categories = []
+        # Get services ordered by count of orders
+        top_services = db.query(
+            Order.shop_name,
+            func.count(Order.id).label('total_orders'),
+            func.sum(Order.final_amount).label('total_revenue')
+        ).filter(
+            Order.created_at >= thirty_days_ago,
+            Order.status == 'completed',
+            Order.shop_name.isnot(None),
+            Order.shop_name != ''
+        ).group_by(Order.shop_name).order_by(
+            func.count(Order.id).desc()
+        ).limit(5).all()
+        
+        services = []
+        for svc in top_services:
+            services.append({
+                "name": svc.shop_name,
+                "orders": int(svc.total_orders),
+                "revenue": float(svc.total_revenue) if svc.total_revenue else 0
+            })
         
         return {
             "success": True,
-            "categories": categories
+            "services": services
         }
     except Exception as e:
-        print(f"Error fetching top categories: {e}")
+        print(f"Error fetching top services: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": True,
-            "categories": []
+            "services": []
         }
 
 @router.get("/dashboard/sales-overview")

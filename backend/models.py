@@ -6,8 +6,10 @@ class UserType(Base):
     __tablename__ = "user_types"
     
     id = Column(Integer, primary_key=True, index=True)
-    name_ar = Column(String(50), nullable=False)  # مدير، موظف، عميل
-    name_en = Column(String(50))
+    # name_ar و name_en قد لا يكونان موجودين في قاعدة البيانات
+    # لذلك نجعلهما optional
+    name_ar = Column(String(50), nullable=True)  # مدير، موظف، عميل
+    name_en = Column(String(50), nullable=True)
     permissions = Column(JSON)  # صلاحيات إضافية
     created_at = Column(TIMESTAMP, server_default=func.now())
 

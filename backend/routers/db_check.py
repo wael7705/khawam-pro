@@ -25,7 +25,8 @@ async def check_users():
         
         result = []
         for u in users:
-            hash_preview = u[5][:50] + "..." if u[5] and len(u[5]) > 50 else u[5]
+            full_hash = u[5] if u[5] else None
+            hash_preview = full_hash[:50] + "..." if full_hash and len(full_hash) > 50 else full_hash
             result.append({
                 "id": u[0],
                 "name": u[1],
@@ -33,7 +34,7 @@ async def check_users():
                 "email": u[3],
                 "hash_length": u[4],
                 "hash_preview": hash_preview,
-                "hash_full": u[5] if u[5] else None
+                "hash_full": full_hash
             })
         
         conn.close()

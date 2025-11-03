@@ -87,39 +87,39 @@ async def _init_pricing_table():
         else:
             # إنشاء الجدول
             conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS pricing_rules (
-                        id SERIAL PRIMARY KEY,
-                        name_ar VARCHAR(200) NOT NULL,
-                        name_en VARCHAR(200),
-                        description_ar TEXT,
-                        description_en TEXT,
-                        calculation_type VARCHAR(20) NOT NULL,
-                        base_price DECIMAL(10, 4) NOT NULL,
-                        price_multipliers JSONB,
-                        specifications JSONB,
-                        unit VARCHAR(50),
-                        is_active BOOLEAN DEFAULT true,
-                        display_order INTEGER DEFAULT 0,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        updated_at TIMESTAMP DEFAULT NOW()
-                    )
-                """))
-                conn.commit()
-                print("✅ تم إنشاء جدول pricing_rules بنجاح")
+                CREATE TABLE IF NOT EXISTS pricing_rules (
+                    id SERIAL PRIMARY KEY,
+                    name_ar VARCHAR(200) NOT NULL,
+                    name_en VARCHAR(200),
+                    description_ar TEXT,
+                    description_en TEXT,
+                    calculation_type VARCHAR(20) NOT NULL,
+                    base_price DECIMAL(10, 4) NOT NULL,
+                    price_multipliers JSONB,
+                    specifications JSONB,
+                    unit VARCHAR(50),
+                    is_active BOOLEAN DEFAULT true,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+            print("✅ تم إنشاء جدول pricing_rules بنجاح")
 
-        except Exception as e:
-            print(f"⚠️ تحذير: خطأ في تهيئة جدول pricing_rules: {str(e)[:200]}")
-            if conn:
-                try:
-                    conn.rollback()
-                except:
-                    pass
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except:
-                    pass
+    except Exception as e:
+        print(f"⚠️ Warning: Error initializing pricing_rules table: {str(e)[:200]}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
     
     # تشغيل الكود في الخلفية
     asyncio.create_task(_init_table())

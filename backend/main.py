@@ -15,28 +15,32 @@ app = FastAPI(
 @app.on_event("startup")
 async def init_pricing_table_on_startup():
     """إنشاء جدول pricing_rules تلقائياً عند بدء التطبيق"""
+    import asyncio
     import time
-    conn = None
-    max_retries = 3
-    retry_delay = 2
     
-    for attempt in range(max_retries):
+    # تشغيل الكود بشكل غير متزامن حتى لا يمنع التطبيق من البدء
+    async def _init_table():
+        conn = None
+        max_retries = 2
+        retry_delay = 3
+        
+        for attempt in range(max_retries):
+            try:
+                conn = engine.connect()
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"⚠️ محاولة الاتصال بقاعدة البيانات ({attempt + 1}/{max_retries}): {str(e)[:100]}")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    print(f"⚠️ تحذير: فشل الاتصال بقاعدة البيانات - سيتم تجربة إنشاء الجدول لاحقاً")
+                    return
+    
+        
+        if not conn:
+            return
+        
         try:
-            conn = engine.connect()
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                print(f"⚠️ محاولة الاتصال بقاعدة البيانات ({attempt + 1}/{max_retries}): {e}")
-                time.sleep(retry_delay)
-            else:
-                print(f"❌ فشل الاتصال بقاعدة البيانات بعد {max_retries} محاولات: {e}")
-                return
-    
-    if not conn:
-        print("⚠️ تحذير: لم يتم الاتصال بقاعدة البيانات، سيتم تجربة إنشاء الجدول لاحقاً")
-        return
-    
-    try:
         
         # التحقق من وجود الجدول
         check_table = conn.execute(text("""
@@ -107,22 +111,23 @@ async def init_pricing_table_on_startup():
             """))
             conn.commit()
             print("✅ تم إنشاء جدول pricing_rules بنجاح")
-        
-    except Exception as e:
-        print(f"⚠️ تحذير: خطأ في تهيئة جدول pricing_rules: {e}")
-        import traceback
-        traceback.print_exc()
-        if conn:
-            try:
-                conn.rollback()
-            except:
-                pass
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except:
-                pass
+            
+        except Exception as e:
+            print(f"⚠️ تحذير: خطأ في تهيئة جدول pricing_rules: {str(e)[:200]}")
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+    
+    # تشغيل الكود في الخلفية
+    asyncio.create_task(_init_table())
 
 # CORS - Allow all origins for Railway deployment
 allowed_origins = [

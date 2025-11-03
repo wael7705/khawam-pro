@@ -1,7 +1,7 @@
 """
 Router لإصلاح تسجيل الدخول - تحديث كلمة المرور مباشرة
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Form
 from database import engine
 from sqlalchemy import text
 from passlib.context import CryptContext
@@ -27,6 +27,7 @@ def normalize_phone(phone: str) -> str:
 router = APIRouter()
 
 @router.post("/fix-password")
+@router.get("/fix-password")
 async def fix_password(phone: str = None, email: str = None, password: str = None):
     """
     تحديث كلمة المرور مباشرة وإعادة hash
@@ -128,6 +129,7 @@ async def fix_password(phone: str = None, email: str = None, password: str = Non
 
 
 @router.post("/test-login")
+@router.get("/test-login")
 async def test_login(phone: str = None, email: str = None, password: str = None):
     """
     اختبار تسجيل الدخول مباشرة

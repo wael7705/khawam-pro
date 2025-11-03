@@ -19,9 +19,10 @@ def test_fix_password(phone=None, email=None, password=None):
         data["email"] = email
     
     try:
-        r = requests.post(
+        # استخدم GET مع query parameters
+        r = requests.get(
             f"{BASE_URL}/api/fix/fix-password",
-            json=data,
+            params=data,
             timeout=30
         )
         print(f"Status: {r.status_code}")
@@ -44,9 +45,10 @@ def test_login(phone=None, email=None, password=None):
         data["email"] = email
     
     try:
-        r = requests.post(
+        # استخدم GET مع query parameters
+        r = requests.get(
             f"{BASE_URL}/api/fix/test-login",
-            json=data,
+            params=data,
             timeout=30
         )
         print(f"Status: {r.status_code}")

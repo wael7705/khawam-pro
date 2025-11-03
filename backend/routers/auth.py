@@ -141,7 +141,7 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
-    """الحصول على المستخدم الحالي من الـ token"""
+    """الحصول على المستخدم الحالي من الـ token - استخدام raw SQL"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -155,9 +155,20 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+    # استخدام raw SQL لتجنب مشكلة UserType ORM
+    from sqlalchemy import text
+    user_row = db.execute(text("""
+        SELECT id, name, email, phone, password_hash, user_type_id, is_active
+        FROM users
+        WHERE id = :id
+    """), {"id": user_id}).fetchone()
+    
+    if user_row is None:
         raise credentials_exception
+    
+    # إنشاء كائن User يدوياً (بدون ORM)
+    user = User()
+    user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
     
     return user
 

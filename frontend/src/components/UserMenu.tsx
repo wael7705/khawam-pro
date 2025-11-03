@@ -14,6 +14,29 @@ export default function UserMenu() {
   useEffect(() => {
     const userData = getUserData()
     setUser(userData)
+    
+    // إذا كان name_ar null، حاول تحديث البيانات من API
+    if (userData && isAuthenticated() && (!userData.user_type?.name_ar || userData.user_type?.name_ar === null)) {
+      // تحديث البيانات من API
+      const token = localStorage.getItem('auth_token')
+      if (token) {
+        api.get('/auth/me', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+          .then(response => {
+            const updatedUser = response.data
+            localStorage.setItem('user_data', JSON.stringify(updatedUser))
+            setUser(updatedUser)
+            // إعادة تحميل الصفحة لتحديث Navbar
+            window.location.reload()
+          })
+          .catch(err => {
+            console.error('Error updating user data:', err)
+          })
+      }
+    }
   }, [])
 
   const isLoggedIn = isAuthenticated()

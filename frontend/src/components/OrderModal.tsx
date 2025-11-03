@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ordersAPI } from '../lib/api'
+import { ordersAPI, pricingAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import './OrderModal.css'
@@ -33,6 +33,14 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const [totalPrice, setTotalPrice] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hasRestoredState = useRef(false)
+  
+  // Pricing system states
+  const [pricingRule, setPricingRule] = useState<any>(null)
+  const [calculationType, setCalculationType] = useState<'piece' | 'area' | 'page'>('piece')
+  const [printColor, setPrintColor] = useState<'bw' | 'color'>('bw')
+  const [printSides, setPrintSides] = useState<'single' | 'double'>('single')
+  const [numberOfPages, setNumberOfPages] = useState<number>(1)
+  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -174,58 +182,109 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
     }
   }
 
-  const calculatePrice = () => {
-    let price = 0
-    // احسب السعر حسب الأبعاد
-    if (length && width) {
-      const l = parseFloat(String(length)) || 0
-      const w = parseFloat(String(width)) || 0
-      const h = parseFloat(String(height)) || 0
+  const calculatePrice = async () => {
+    try {
+      setIsCalculatingPrice(true)
       
-      // حساب المساحة (للبوستر: الطول × العرض، للأشياء ثلاثية: السطح)
-      if (h > 0 && l > 0 && w > 0) {
-        // جسم ثلاثي الأبعاد
-        const area = (l * w * 2) + (l * h * 2) + (w * h * 2)
-        price = area * 100 // 100 ل.س لكل وحدة مساحة
-      } else if (l > 0 && w > 0) {
-        // بوستر ثنائي الأبعاد
-        const area = l * w
-        price = area * 50 // 50 ل.س لكل سم²
-      } else {
-        price = 2000 // سعر افتراضي
+      // تحديد نوع الحساب بناءً على اسم الخدمة والأبعاد
+      let calcType: 'piece' | 'area' | 'page' = 'piece'
+      let qty = Number(quantity) || 1
+      
+      // إذا كان اسم الخدمة يحتوي على "طباعة" أو "محاضرات"، استخدم حساب الصفحات
+      if (serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) {
+        calcType = 'page'
+        qty = numberOfPages || qty
+      } else if (length && width) {
+        // حساب المساحة بالمتر المربع
+        const l = parseFloat(String(length)) || 0
+        const w = parseFloat(String(width)) || 0
+        const h = parseFloat(String(height)) || 0
+        
+        if (h > 0 && l > 0 && w > 0) {
+          // جسم ثلاثي الأبعاد - حساب المساحة الإجمالية
+          const area = ((l * w * 2) + (l * h * 2) + (w * h * 2)) / 10000 // تحويل من سم² إلى م²
+          calcType = 'area'
+          qty = area
+        } else if (l > 0 && w > 0) {
+          // بوستر ثنائي الأبعاد
+          const area = (l * w) / 10000 // تحويل من سم² إلى م²
+          calcType = 'area'
+          qty = area
+        }
       }
-    } else {
-      // سعر افتراضي إذا لم تكن هناك أبعاد
-      price = 2000
-    }
-    
-    // التأكد من أن price و quantity أرقام صحيحة
-    const safeQuantity = Number(quantity) || 1
-    const safePrice = Number(price) || 2000
-    
-    const total = safePrice * safeQuantity
-    
-    // التأكد من عدم وجود NaN
-    if (isNaN(total) || total < 0) {
-      const fallbackTotal = 2000 * safeQuantity
+      
+      setCalculationType(calcType)
+      
+      // بناء المواصفات
+      const specifications: any = {
+        color: printColor,
+        sides: printSides,
+      }
+      
+      if (length && width) {
+        specifications.length = length
+        specifications.width = width
+        if (height) specifications.height = height
+        specifications.unit = unit
+      }
+      
+      if (calcType === 'page') {
+        specifications.paper_size = 'A4' // افتراضي
+      }
+      
+      // حساب السعر باستخدام API
+      try {
+        const response = await pricingAPI.calculatePrice({
+          calculation_type: calcType,
+          quantity: qty,
+          specifications: specifications,
+        })
+        
+        if (response.data.success) {
+          const calculatedPrice = response.data.total_price || 0
+          setTotalPrice(calculatedPrice)
+          setPricingRule(response.data)
+          return calculatedPrice
+        }
+      } catch (apiError) {
+        console.warn('Error calculating price from API, using fallback:', apiError)
+      }
+      
+      // Fallback: حساب يدوي إذا فشل API
+      let fallbackPrice = 0
+      if (calcType === 'page') {
+        fallbackPrice = qty * 50 // 50 ل.س لكل صفحة
+        if (printColor === 'color') fallbackPrice *= 1.5
+        if (printSides === 'double') fallbackPrice *= 1.3
+      } else if (calcType === 'area') {
+        fallbackPrice = qty * 5000 // 5000 ل.س لكل متر مربع
+      } else {
+        fallbackPrice = qty * 2000 // 2000 ل.س لكل قطعة
+      }
+      
+      setTotalPrice(fallbackPrice)
+      return fallbackPrice
+      
+    } catch (error) {
+      console.error('Error calculating price:', error)
+      const fallbackTotal = 2000 * (Number(quantity) || 1)
       setTotalPrice(fallbackTotal)
       return fallbackTotal
+    } finally {
+      setIsCalculatingPrice(false)
     }
-    
-    setTotalPrice(total)
-    return total
   }
 
-  // تحديث السعر عند تغيير الأبعاد أو الكمية
+  // تحديث السعر عند تغيير الأبعاد أو الكمية أو الخيارات
   useEffect(() => {
     if (step >= 2) {
-      calculatePrice()
+      calculatePrice().catch(err => console.error('Error calculating price:', err))
     }
-  }, [length, width, height, quantity, step])
+  }, [length, width, height, quantity, step, printColor, printSides, numberOfPages, serviceName])
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 5) {
-      calculatePrice()
+      await calculatePrice()
     }
     setStep(step + 1)
   }
@@ -261,9 +320,12 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         }
       }
 
-      // Prepare order data - التأكد من عدم وجود NaN
-      const safeQuantity = Number(quantity) || 1
-      const safeTotalPrice = Number(totalPrice) || calculatePrice() || 2000
+              // Prepare order data - التأكد من عدم وجود NaN
+        const safeQuantity = Number(quantity) || 1
+        let safeTotalPrice = Number(totalPrice)
+        if (!safeTotalPrice || safeTotalPrice === 0) {
+          safeTotalPrice = await calculatePrice() || 2000
+        }
       const unitPrice = safeTotalPrice / safeQuantity
       
       // التأكد من أن unitPrice ليس NaN
@@ -456,17 +518,91 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
               />
             </div>
 
-            <div className="form-group">
-              <label>وحدة القياس</label>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
-                <option value="cm">سم (cm)</option>
-                <option value="mm">ملم (mm)</option>
-                <option value="in">إنش (in)</option>
-                <option value="m">متر (m)</option>
-              </select>
+                          <div className="form-group">
+                <label>وحدة القياس</label>
+                <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
+                  <option value="cm">سم (cm)</option>
+                  <option value="mm">ملم (mm)</option>
+                  <option value="in">إنش (in)</option>
+                  <option value="m">متر (m)</option>
+                </select>
+              </div>
+
+              {/* خيارات الطباعة - للخدمات التي تتطلب طباعة */}
+              {(serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) && (
+                <>
+                  <div className="form-group">
+                    <label>عدد الصفحات <span className="required">*</span></label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={numberOfPages}
+                      onChange={(e) => {
+                        const pages = parseInt(e.target.value) || 1
+                        setNumberOfPages(pages)
+                        setQuantity(pages) // تحديث الكمية أيضاً
+                      }}
+                      className="form-input"
+                      placeholder="1"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>نوع الطباعة</label>
+                    <div className="delivery-options">
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printColor"
+                          value="bw"
+                          checked={printColor === 'bw'}
+                          onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                        />
+                        <span>أبيض وأسود</span>
+                      </label>
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printColor"
+                          value="color"
+                          checked={printColor === 'color'}
+                          onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                        />
+                        <span>ملون</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>الطباعة</label>
+                    <div className="delivery-options">
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printSides"
+                          value="single"
+                          checked={printSides === 'single'}
+                          onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                        />
+                        <span>وجه واحد</span>
+                      </label>
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printSides"
+                          value="double"
+                          checked={printSides === 'double'}
+                          onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                        />
+                        <span>وجهين</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
         {/* Step 3: الألوان */}
         {step === 3 && (

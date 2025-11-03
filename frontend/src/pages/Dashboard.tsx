@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign } from 'lucide-react'
 import DashboardHome from './Dashboard/DashboardHome'
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
@@ -8,6 +8,7 @@ import ProductsManagement from './Dashboard/ProductsManagement'
 import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
 import CustomersManagement from './Dashboard/CustomersManagement'
+import PricingManagement from './Dashboard/PricingManagement'
 import Studio from './Studio'
 import ProfileSettings from './ProfileSettings'
 import { isEmployee, isAdmin, getUserData, isAuthenticated } from '../lib/auth'
@@ -40,6 +41,7 @@ export default function Dashboard() {
     { id: 'products', name: 'المنتجات', icon: Package, path: '/dashboard/products', adminOnly: true },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services', adminOnly: true },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works', adminOnly: true },
+    { id: 'pricing', name: 'إدارة مالية', icon: DollarSign, path: '/dashboard/pricing', adminOnly: true },
     { id: 'studio', name: 'الاستديو', icon: Sparkles, path: '/dashboard/studio', adminOnly: false },
   ]
 
@@ -60,12 +62,16 @@ export default function Dashboard() {
   // Determine active tab based on current pathname
   const getActiveTab = () => {
     const path = location.pathname
-    if (path === '/dashboard' || path === '/dashboard/') return isEmployee() ? 'orders' : 'home'
+    if (path === '/dashboard' || path === '/dashboard/') {
+      // الموظف يبدأ من الطلبات، المدير من الرئيسية
+      return isEmployee() ? 'orders' : 'home'
+    }
     if (path.startsWith('/dashboard/orders')) return 'orders'
     if (path.startsWith('/dashboard/customers')) return 'customers'
     if (path.startsWith('/dashboard/products')) return 'products'
     if (path.startsWith('/dashboard/services')) return 'services'
     if (path.startsWith('/dashboard/works')) return 'works'
+    if (path.startsWith('/dashboard/pricing')) return 'pricing'
     if (path.startsWith('/dashboard/studio')) return 'studio'
     return isEmployee() ? 'orders' : 'home'
   }
@@ -153,6 +159,7 @@ export default function Dashboard() {
             {isAdmin() && <Route path="/products" element={<ProductsManagement />} />}
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}
             {isAdmin() && <Route path="/works" element={<WorksManagement />} />}
+            {isAdmin() && <Route path="/pricing" element={<PricingManagement />} />}
             <Route path="/studio" element={<Studio />} />
             <Route path="/profile" element={<ProfileSettings />} />
             <Route path="*" element={<Navigate to={isEmployee() ? "/dashboard/orders" : "/dashboard"} replace />} />

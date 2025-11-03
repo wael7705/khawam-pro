@@ -151,4 +151,22 @@ export const adminAPI = {
   },
 }
 
+// Pricing API
+export const pricingAPI = {
+  getAll: (params?: { is_active?: boolean; calculation_type?: string }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.is_active !== undefined) queryParams.append('is_active', params.is_active.toString())
+    if (params?.calculation_type) queryParams.append('calculation_type', params.calculation_type)
+    return api.get(`/pricing/pricing-rules?${queryParams.toString()}`)
+  },
+  getById: (id: number) => api.get(`/pricing/pricing-rules/${id}`),
+  create: (data: any) => api.post('/pricing/pricing-rules', data),
+  update: (id: number, data: any) => api.put(`/pricing/pricing-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/pricing/pricing-rules/${id}`),
+  calculatePrice: (data: { calculation_type: string; quantity: number; specifications: any }) => 
+    api.post('/pricing/calculate-price', data),
+  calculatePriceByRule: (ruleId: number, data: { quantity: number; specifications: any }) => 
+    api.post(`/pricing/calculate-price-by-rule/${ruleId}`, data),
+}
+
 export default api

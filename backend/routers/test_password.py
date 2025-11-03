@@ -74,3 +74,4 @@ async def test_password(email: str = None, password: str = None):
     except Exception as e:
         return {"error": str(e)}
 
+

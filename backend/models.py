@@ -152,3 +152,38 @@ class OrderItem(Base):
     production_notes = Column(Text)
     status = Column(String(20), default="pending")
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+class PricingRule(Base):
+    __tablename__ = "pricing_rules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name_ar = Column(String(200), nullable=False)  # اسم قاعدة السعر
+    name_en = Column(String(200))
+    description_ar = Column(Text)  # وصف قاعدة السعر
+    description_en = Column(Text)
+    
+    # نوع الحساب: "piece" (قطعة), "area" (متر مربع), "page" (صفحة)
+    calculation_type = Column(String(20), nullable=False)  # piece, area, page
+    
+    # السعر الأساسي
+    base_price = Column(DECIMAL(10, 4), nullable=False)  # السعر الأساسي
+    
+    # معاملات إضافية للسعر (JSON)
+    # مثال: {"color": {"bw": 1.0, "color": 1.5}, "sides": {"single": 1.0, "double": 1.3}}
+    price_multipliers = Column(JSON, nullable=True)
+    
+    # المواصفات (JSON)
+    # مثال: {"paper_size": "A4", "paper_type": "normal", "color": true/false}
+    specifications = Column(JSON, nullable=True)
+    
+    # الوحدة
+    unit = Column(String(50), nullable=True)  # قطعة، متر مربع، صفحة
+    
+    # حالة التفعيل
+    is_active = Column(Boolean, default=True)
+    
+    # ترتيب العرض
+    display_order = Column(Integer, default=0)
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())

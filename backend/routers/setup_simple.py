@@ -23,37 +23,45 @@ async def force_reset_users(db: Session = Depends(get_db)):
         print("🔥 FORCE RESET: Using raw SQL for guaranteed execution")
         print("=" * 70)
         
-        with engine.begin() as conn:  # begin() = transaction that auto-commits
-            # Step 1: Delete all order_items
-            print("\n1️⃣ Deleting order_items...")
+        # استخدام معاملات منفصلة لتجنب مشاكل transaction
+        orders_deleted = 0
+        users_deleted = 0
+        studio_deleted = 0
+        
+        # Step 1: Delete all order_items
+        print("\n1️⃣ Deleting order_items...")
+        with engine.begin() as conn:
             conn.execute(text("DELETE FROM order_items"))
-            print("   ✅ Done")
-            
-            # Step 2: Delete all orders
-            print("\n2️⃣ Deleting orders...")
+        print("   ✅ Done")
+        
+        # Step 2: Delete all orders
+        print("\n2️⃣ Deleting orders...")
+        with engine.begin() as conn:
             result = conn.execute(text("DELETE FROM orders"))
             orders_deleted = result.rowcount
-            print(f"   ✅ Deleted {orders_deleted} orders")
-            
-            # Step 3: Delete studio_projects (if table exists)
-            print("\n3️⃣ Deleting studio_projects...")
-            try:
+        print(f"   ✅ Deleted {orders_deleted} orders")
+        
+        # Step 3: Delete studio_projects (if table exists) - معاملة منفصلة
+        print("\n3️⃣ Deleting studio_projects...")
+        try:
+            with engine.begin() as conn:
                 result = conn.execute(text("DELETE FROM studio_projects"))
                 studio_deleted = result.rowcount
-                print(f"   ✅ Deleted {studio_deleted} studio projects")
-            except Exception as e:
-                print(f"   ⚠️  No studio_projects table or already empty: {e}")
-                studio_deleted = 0
-            
-            # Step 4: Delete all users
-            print("\n4️⃣ Deleting users...")
+            print(f"   ✅ Deleted {studio_deleted} studio projects")
+        except Exception as e:
+            print(f"   ⚠️  No studio_projects table or already empty")
+            studio_deleted = 0
+        
+        # Step 4: Delete all users - معاملة منفصلة
+        print("\n4️⃣ Deleting users...")
+        with engine.begin() as conn:
             result = conn.execute(text("DELETE FROM users"))
             users_deleted = result.rowcount
-            print(f"   ✅ Deleted {users_deleted} users")
-            
-            print("\n" + "=" * 70)
-            print("✅ Database cleared successfully!")
-            print("=" * 70)
+        print(f"   ✅ Deleted {users_deleted} users")
+        
+        print("\n" + "=" * 70)
+        print("✅ Database cleared successfully!")
+        print("=" * 70)
         
         # Step 4: Create user types if needed
         print("\n4️⃣ Ensuring user types exist...")

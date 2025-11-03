@@ -4,7 +4,22 @@ Router بسيط جداً لإصلاح قاعدة البيانات - بدون أ�
 from fastapi import APIRouter
 from database import engine
 from sqlalchemy import text
-from routers.auth import get_password_hash, normalize_phone
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def normalize_phone(phone: str) -> str:
+    """تطبيع رقم الهاتف"""
+    if not phone:
+        return ""
+    # إزالة المسافات والأحرف غير الرقمية
+    phone = ''.join(filter(str.isdigit, phone))
+    # التأكد من أن يبدأ بـ 963
+    if phone.startswith('0'):
+        phone = '963' + phone[1:]
+    elif not phone.startswith('963'):
+        phone = '963' + phone
+    return phone
 
 router = APIRouter()
 
@@ -41,7 +56,7 @@ async def fix_admin():
         
         # خطوة 2: تطبيع الهاتف وكلمة المرور
         phone = normalize_phone("0966320114")
-        password_hash = get_password_hash("admin123")
+        password_hash = pwd_context.hash("admin123")
         
         # خطوة 3: حذف القديم
         try:

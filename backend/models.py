@@ -7,11 +7,16 @@ class UserType(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     # name_ar و name_en قد لا يكونان موجودين في قاعدة البيانات
-    # لذلك نجعلهما optional
-    name_ar = Column(String(50), nullable=True)  # مدير، موظف، عميل
-    name_en = Column(String(50), nullable=True)
-    permissions = Column(JSON)  # صلاحيات إضافية
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    # لذلك نجعلهما optional ونستخدم __mapper_args__ لتجاهل الأعمدة المفقودة
+    name_ar = Column(Text, nullable=True)  # مدير، موظف، عميل - TEXT بدلاً من String
+    name_en = Column(Text, nullable=True)  # TEXT بدلاً من String
+    permissions = Column(JSON, nullable=True)  # صلاحيات إضافية
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=True)
+    
+    # تجاهل الأعمدة المفقودة عند تحميل النموذج
+    __mapper_args__ = {
+        'exclude_properties': []  # سنستخدم raw SQL بدلاً من ذلك
+    }
 
 class User(Base):
     __tablename__ = "users"

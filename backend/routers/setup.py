@@ -4,7 +4,7 @@ Setup endpoints for initializing database with default users
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from database import get_db
+from database import get_db, engine
 from models import User, UserType, Order, OrderItem
 from routers.auth import get_password_hash, normalize_phone
 import os
@@ -313,60 +313,55 @@ async def list_all_users(db: Session = Depends(get_db)):
 @router.get("/reset-users")
 async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)):
     """
-    Delete all users and recreate default users
-    WARNING: This will delete ALL users in the database!
+    Delete all users and recreate default users using SQL for guaranteed execution
+    WARNING: This will delete ALL users and related orders in the database!
     Supports GET, POST, and DELETE methods for easy browser access
     """
     if secret and secret != SETUP_SECRET and secret != "khawam-init-secret-2024":
         print(f"⚠️ Warning: Invalid setup secret provided, but allowing for setup")
     
     print("=" * 60)
-    print("⚠️  RESET MODE: Starting complete user reset...")
+    print("⚠️  RESET MODE: Starting complete user reset (SQL Method)...")
     print("=" * 60)
     
     try:
-        # 1. احسب المستخدمين قبل المسح
-        all_users_before = db.query(User).all()
-        deleted_count = len(all_users_before)
-        print(f"📊 Found {deleted_count} existing user(s)")
-        
-        # 2. امسح جميع البيانات المرتبطة أولاً (Orders, OrderItems)
-        print("\n🔗 Checking related data...")
-        
-        # احسب الطلبات المرتبطة
-        all_orders = db.query(Order).all()
-        orders_count = len(all_orders)
-        
-        if orders_count > 0:
-            print(f"📦 Found {orders_count} order(s) related to users")
-            print(f"🗑️  Deleting related order items and orders...")
+        # استخدام SQL مباشرة لضمان الحذف الكامل
+        with engine.connect() as conn:
+            # 1. احسب المستخدمين والطلبات
+            result = conn.execute(text("SELECT COUNT(*) FROM users"))
+            deleted_count = result.scalar() or 0
             
-            # احذف OrderItems أولاً
-            for order in all_orders:
-                order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-                for item in order_items:
-                    db.delete(item)
+            result = conn.execute(text("SELECT COUNT(*) FROM orders"))
+            orders_count = result.scalar() or 0
             
-            # ثم احذف Orders
-            for order in all_orders:
-                print(f"   - Deleting order {order.id} (Customer ID: {order.customer_id})")
-                db.delete(order)
+            print(f"📊 Found {deleted_count} user(s) and {orders_count} order(s)")
             
-            db.commit()
-            print(f"✅ Deleted {orders_count} order(s) and related items")
-        else:
-            print("ℹ️  No related orders found")
+            # 2. احذف جميع البيانات المرتبطة باستخدام SQL مباشرة (أسرع وأضمن)
+            if orders_count > 0:
+                print(f"\n🗑️  Deleting {orders_count} order(s) using SQL...")
+                
+                # احذف OrderItems أولاً
+                conn.execute(text("DELETE FROM order_items"))
+                conn.commit()
+                print("   ✅ Deleted all order_items")
+                
+                # ثم احذف Orders
+                conn.execute(text("DELETE FROM orders"))
+                conn.commit()
+                print(f"   ✅ Deleted {orders_count} order(s)")
+            else:
+                print("ℹ️  No related orders found")
+            
+            # 3. احذف جميع المستخدمين باستخدام SQL مباشرة
+            if deleted_count > 0:
+                print(f"\n🗑️  Deleting {deleted_count} user(s) using SQL...")
+                conn.execute(text("DELETE FROM users"))
+                conn.commit()
+                print(f"✅ Successfully deleted {deleted_count} user(s) using SQL")
+            else:
+                print("ℹ️  No existing users to delete")
         
-        # 3. امسح جميع المستخدمين
-        if deleted_count > 0:
-            print(f"\n🗑️  Deleting {deleted_count} user(s)...")
-            for user in all_users_before:
-                print(f"   - Deleting: {user.name} (ID: {user.id}, Email: {user.email}, Phone: {user.phone})")
-                db.delete(user)
-            db.commit()
-            print(f"✅ Successfully deleted {deleted_count} user(s)")
-        else:
-            print("ℹ️  No existing users to delete")
+        # الآن استخدم ORM لإنشاء المستخدمين الجدد
         
         # 4. تأكد من وجود UserTypes
         admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()

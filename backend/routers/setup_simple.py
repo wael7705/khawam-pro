@@ -5,11 +5,96 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db, engine
-from models import User, UserType
 from routers.auth import get_password_hash, normalize_phone
 import os
 
 router = APIRouter()
+
+@router.get("/add-password")
+@router.post("/add-password")
+async def add_password_to_admin(name: str = None, password: str = "khawam-p", db: Session = Depends(get_db)):
+    """
+    إضافة كلمة مرور للمدير الموجود
+    """
+    try:
+        print("=" * 70)
+        print("🔑 إضافة كلمة المرور للمدير")
+        print("=" * 70)
+        
+        conn = engine.connect()
+        
+        try:
+            # البحث عن المدير بالاسم
+            if name:
+                search_name = f"%{name}%"
+                result = conn.execute(text("""
+                    SELECT id, name, phone, email, password_hash 
+                    FROM users 
+                    WHERE name LIKE :name
+                    LIMIT 10
+                """), {'name': search_name}).fetchall()
+            else:
+                # البحث عن جميع المديرين
+                result = conn.execute(text("""
+                    SELECT u.id, u.name, u.phone, u.email, u.password_hash, ut.name_en as user_type
+                    FROM users u
+                    JOIN user_types ut ON u.user_type_id = ut.id
+                    WHERE ut.name_en = 'admin' OR ut.name_ar = 'مدير'
+                    LIMIT 10
+                """)).fetchall()
+            
+            if not result:
+                return {
+                    "success": False,
+                    "message": "لم يتم العثور على مستخدمين"
+                }
+            
+            print(f"\n📋 تم العثور على {len(result)} مستخدم:")
+            for row in result:
+                print(f"   - ID: {row[0]}, Name: {row[1]}, Phone: {row[2]}, Email: {row[3]}")
+            
+            # تحديث كلمة المرور للمستخدمين
+            password_hash = get_password_hash(password)
+            updated_count = 0
+            
+            for row in result:
+                user_id = row[0]
+                try:
+                    conn.execute(text("""
+                        UPDATE users 
+                        SET password_hash = :password_hash
+                        WHERE id = :user_id
+                    """), {
+                        'password_hash': password_hash,
+                        'user_id': user_id
+                    })
+                    conn.commit()
+                    updated_count += 1
+                    print(f"   ✅ تم تحديث كلمة المرور للمستخدم ID: {user_id} ({row[1]})")
+                except Exception as e:
+                    print(f"   ⚠️  خطأ في تحديث المستخدم ID {user_id}: {e}")
+            
+            return {
+                "success": True,
+                "updated_count": updated_count,
+                "password": password,
+                "message": f"تم تحديث كلمة المرور لـ {updated_count} مستخدم"
+            }
+            
+        except Exception as e:
+            conn.rollback()
+            print(f"\n❌ ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        print(f"\n❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 @router.get("/force-reset")
 @router.post("/force-reset")
@@ -223,6 +308,7 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 except Exception as e:
                     trans.rollback()
                     raise
+        
         except Exception as e:
             if 'trans' in locals() and trans:
                 trans.rollback()
@@ -479,4 +565,3 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-

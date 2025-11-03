@@ -80,34 +80,21 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 def normalize_phone(phone: str) -> str:
-    """تطبيع رقم الهاتف (إزالة المسافات والرموز)"""
-    # إزالة جميع الرموز غير الرقمية (بما في ذلك +)
-    phone_clean = re.sub(r'[^\d]', '', phone)
+    """تطبيع رقم الهاتف (مطابق لما في db_rebuild.py)"""
+    if not phone:
+        return ""
+    # إزالة جميع الرموز غير الرقمية
+    phone_clean = ''.join(filter(str.isdigit, phone))
     
-    # إذا كان يبدأ بـ 00، نزيله
-    if phone_clean.startswith('00'):
-        phone_clean = phone_clean[2:]
-    
-    # إذا كان يبدأ بـ 0963 (رقم سوري مع الصفر وكود البلد)
-    if phone_clean.startswith('0963'):
-        # مثال: 0966320114 -> 66320114 (نزيل 0963 ونحتفظ بالباقي)
-        return '+963' + phone_clean[4:]
-    
-    # إذا كان يبدأ بـ 963 (كود سوريا بدون صفر)
-    if phone_clean.startswith('963'):
-        # مثال: 96366320114 -> 66320114 (نزيل 963 ونحتفظ بالباقي)
-        return '+963' + phone_clean[3:]
-    
-    # إذا كان يبدأ بـ 0 (رقم سوري محلي بدون كود البلد)
+    # إذا كان يبدأ بـ 0، استبدله بـ 963
     if phone_clean.startswith('0'):
-        # مثال: 0966320114 -> 66320114 (نزيل الصفر وأول رقم)
-        # الرقم السوري: 0 + رقم المنطقة (1 رقم) + الرقم
-        if len(phone_clean) >= 10:
-            # نزيل الصفر وأول رقم (مثل 09 أو 05)
-            return '+963' + phone_clean[2:]
+        phone_clean = '963' + phone_clean[1:]
+    # إذا لم يبدأ بـ 963، أضفه
+    elif not phone_clean.startswith('963'):
+        phone_clean = '963' + phone_clean
     
-    # إذا لم يبدأ بأي من السابق، نضيف +963 في المقدمة
-    return '+963' + phone_clean
+    # إرجاع بدون + (مطابق لقاعدة البيانات)
+    return phone_clean
 
 def is_valid_email(email: str) -> bool:
     """التحقق من صحة البريد الإلكتروني"""
@@ -210,22 +197,17 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             # 1. الرقم كما أدخله المستخدم
             phone_variants.append(username)
             
-            # 2. الرقم المطبيع
+            # 2. الرقم المطبيع (بدون +)
             phone_variants.append(normalized_phone)
             
-            # 3. الرقم بدون +
-            phone_variants.append(normalized_phone.replace('+', ''))
+            # 3. الرقم مع +
+            phone_variants.append('+' + normalized_phone)
             
-            # 4. إذا كان يبدأ بـ 0، جرب بدون 0
+            # 4. إذا كان يبدأ بـ 0، جرب 963 + الرقم بدون 0
             if username.startswith('0'):
-                phone_variants.append(username[1:])
-                # جرب 963 + الرقم بدون 0
+                # 0966320114 -> 963966320114
                 phone_variants.append('963' + username[1:])
                 phone_variants.append('+963' + username[1:])
-                # جرب بدون 0 وأول رقم (رقم المنطقة)
-                if len(username) >= 10:
-                    phone_variants.append('+963' + username[2:])
-                    phone_variants.append('963' + username[2:])
             
             # 5. إذا كان يبدأ بـ +963، جرب بدون +
             if username.startswith('+963'):

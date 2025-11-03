@@ -14,6 +14,7 @@ router = APIRouter()
 @router.get("/force-reset")
 @router.post("/force-reset")
 async def force_reset_users(keep_customers: bool = True, db: Session = Depends(get_db)):
+    # لا نستخدم db parameter - نستخدم SQL مباشر فقط
     """
     Force reset admins and employees only, keep customers intact
     This solves foreign key constraint issues by deleting related data first
@@ -474,7 +475,6 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         }
         
     except Exception as e:
-        db.rollback()
         print(f"\n❌ ERROR: {e}")
         import traceback
         traceback.print_exc()

@@ -1,24 +1,24 @@
 # حل جذري لإصلاح قاعدة البيانات - PowerShell Script
 # استخدم DATABASE_URL من Railway Variables
 
-Write-Host "=" * 70 -ForegroundColor Cyan
-Write-Host "🔥 حل جذري لإصلاح قاعدة البيانات" -ForegroundColor Cyan
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "حل جذري لإصلاح قاعدة البيانات" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
 # الخطوة 1: الحصول على DATABASE_URL
-Write-Host "1️⃣ نحتاج DATABASE_URL من Railway..." -ForegroundColor Yellow
+Write-Host "1. نحتاج DATABASE_URL من Railway..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "   اذهب إلى Railway Dashboard:" -ForegroundColor White
-Write-Host "   → Postgres Service → Variables tab" -ForegroundColor White
-Write-Host "   → انسخ قيمة DATABASE_URL" -ForegroundColor White
+Write-Host "   -> Postgres Service -> Variables tab" -ForegroundColor White
+Write-Host "   -> انسخ قيمة DATABASE_URL" -ForegroundColor White
 Write-Host ""
 Write-Host "   أو أدخل DATABASE_URL هنا:" -ForegroundColor Yellow
 $DATABASE_URL = Read-Host "   DATABASE_URL"
 
 if ([string]::IsNullOrWhiteSpace($DATABASE_URL)) {
     Write-Host ""
-    Write-Host "❌ خطأ: DATABASE_URL مطلوب!" -ForegroundColor Red
+    Write-Host "خطأ: DATABASE_URL مطلوب!" -ForegroundColor Red
     exit 1
 }
 
@@ -28,7 +28,7 @@ if ($DATABASE_URL -like "postgres://*") {
 }
 
 Write-Host ""
-Write-Host "✅ تم الحصول على DATABASE_URL" -ForegroundColor Green
+Write-Host "تم الحصول على DATABASE_URL" -ForegroundColor Green
 Write-Host ""
 
 # الخطوة 2: إنشاء سكريبت Python مؤقت
@@ -40,7 +40,7 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = "$DATABASE_URL"
 
 print("=" * 70)
-print("🔥 بدء عملية الإصلاح...")
+print("بدء عملية الإصلاح...")
 print("=" * 70)
 
 try:
@@ -49,40 +49,40 @@ try:
     # اختبار الاتصال
     with engine.connect() as test_conn:
         test_conn.execute(text("SELECT 1"))
-    print("✅ تم الاتصال بقاعدة البيانات")
+    print("تم الاتصال بقاعدة البيانات")
     
-    print("\n🗑️  حذف جميع البيانات المرتبطة...")
+    print("\nحذف جميع البيانات المرتبطة...")
     
     with engine.begin() as conn:
         # حذف order_items
-        print("\n1️⃣ حذف order_items...")
+        print("\n1. حذف order_items...")
         conn.execute(text("DELETE FROM order_items"))
-        print("   ✅ تم")
+        print("   تم")
         
         # حذف orders
-        print("\n2️⃣ حذف orders...")
+        print("\n2. حذف orders...")
         result = conn.execute(text("DELETE FROM orders"))
-        print(f"   ✅ تم حذف {result.rowcount} طلب")
+        print(f"   تم حذف {result.rowcount} طلب")
         
         # حذف studio_projects إذا كان موجوداً
-        print("\n3️⃣ حذف studio_projects...")
+        print("\n3. حذف studio_projects...")
         try:
             result = conn.execute(text("DELETE FROM studio_projects"))
-            print(f"   ✅ تم حذف {result.rowcount} مشروع استديو")
+            print(f"   تم حذف {result.rowcount} مشروع استديو")
         except Exception as e:
-            print(f"   ⚠️  لا يوجد جدول studio_projects")
+            print(f"   لا يوجد جدول studio_projects")
         
         # حذف users
-        print("\n4️⃣ حذف users...")
+        print("\n4. حذف users...")
         result = conn.execute(text("DELETE FROM users"))
         users_deleted = result.rowcount
-        print(f"   ✅ تم حذف {users_deleted} مستخدم")
+        print(f"   تم حذف {users_deleted} مستخدم")
         
-        print("\n✅ تم مسح قاعدة البيانات بنجاح!")
+        print("\nتم مسح قاعدة البيانات بنجاح!")
     
     # إنشاء المستخدمين الجدد
     print("\n" + "=" * 70)
-    print("🆕 إنشاء المستخدمين الجدد...")
+    print("إنشاء المستخدمين الجدد...")
     print("=" * 70)
     
     # استيراد
@@ -137,7 +137,7 @@ try:
             db.add(user)
             created += 1
             identifier = phone or email
-            print(f"   ✅ تم إنشاء: {name} ({identifier})")
+            print(f"   تم إنشاء: {name} ({identifier})")
         
         db.commit()
         
@@ -146,20 +146,20 @@ try:
         users_without_password = [u for u in all_users if not u.password_hash]
         
         print("\n" + "=" * 70)
-        print("📊 النتيجة:")
-        print(f"   ✅ تم حذف {users_deleted} مستخدم قديم")
-        print(f"   ✅ تم إنشاء {created} مستخدم جديد")
-        print(f"   📈 العدد الإجمالي: {len(all_users)}")
+        print("النتيجة:")
+        print(f"   تم حذف {users_deleted} مستخدم قديم")
+        print(f"   تم إنشاء {created} مستخدم جديد")
+        print(f"   العدد الإجمالي: {len(all_users)}")
         if len(users_without_password) == 0:
-            print(f"   ✅ جميع المستخدمين لديهم كلمات مرور مشفرة!")
+            print(f"   جميع المستخدمين لديهم كلمات مرور مشفرة!")
         print("=" * 70)
-        print("\n✅ تم إصلاح قاعدة البيانات بنجاح!")
+        print("\nتم إصلاح قاعدة البيانات بنجاح!")
         
     finally:
         db.close()
         
 except Exception as e:
-    print(f"\n❌ خطأ: {e}")
+    print(f"\nخطأ: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
@@ -170,7 +170,7 @@ $tempScript = "temp_fix_db.py"
 $pythonScript | Out-File -FilePath $tempScript -Encoding UTF8
 
 Write-Host ""
-Write-Host "2️⃣ تشغيل سكريبت الإصلاح..." -ForegroundColor Yellow
+Write-Host "2. تشغيل سكريبت الإصلاح..." -ForegroundColor Yellow
 Write-Host ""
 
 # تشغيل السكريبت
@@ -180,9 +180,9 @@ python $tempScript
 Remove-Item $tempScript -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "=" * 70 -ForegroundColor Cyan
-Write-Host "✅ تم الانتهاء!" -ForegroundColor Green
-Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "تم الانتهاء!" -ForegroundColor Green
+Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "الآن يمكنك تسجيل الدخول باستخدام:" -ForegroundColor White
 Write-Host "  - مدير 1: 0966320114 / admin123" -ForegroundColor Cyan
@@ -192,4 +192,3 @@ Write-Host "  - موظف 2: khawam-2@gmail.com / khawam-2" -ForegroundColor Cyan
 Write-Host "  - موظف 3: khawam-3@gmail.com / khawam-3" -ForegroundColor Cyan
 Write-Host "  - عميل: customer@gmail.com / 963214" -ForegroundColor Cyan
 Write-Host ""
-

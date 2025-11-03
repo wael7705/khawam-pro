@@ -309,30 +309,165 @@ async def list_all_users(db: Session = Depends(get_db)):
 
 @router.delete("/reset-users")
 @router.post("/reset-users")
+@router.get("/reset-users")
 async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)):
     """
     Delete all users and recreate default users
     WARNING: This will delete ALL users in the database!
+    Supports GET, POST, and DELETE methods for easy browser access
     """
     if secret and secret != SETUP_SECRET and secret != "khawam-init-secret-2024":
         print(f"⚠️ Warning: Invalid setup secret provided, but allowing for setup")
     
-    print("⚠️ RESET MODE: Deleting all users...")
+    print("=" * 60)
+    print("⚠️  RESET MODE: Starting complete user reset...")
+    print("=" * 60)
     
     try:
-        all_users = db.query(User).all()
-        deleted_count = len(all_users)
-        for user in all_users:
-            db.delete(user)
+        # 1. احسب المستخدمين قبل المسح
+        all_users_before = db.query(User).all()
+        deleted_count = len(all_users_before)
+        print(f"📊 Found {deleted_count} existing user(s)")
+        
+        # 2. امسح جميع المستخدمين
+        if deleted_count > 0:
+            print(f"🗑️  Deleting {deleted_count} user(s)...")
+            for user in all_users_before:
+                print(f"   - Deleting: {user.name} (ID: {user.id}, Email: {user.email}, Phone: {user.phone})")
+                db.delete(user)
+            db.commit()
+            print(f"✅ Successfully deleted {deleted_count} user(s)")
+        else:
+            print("ℹ️  No existing users to delete")
+        
+        # 3. تأكد من وجود UserTypes
+        admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
+        employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
+        customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
+        
+        if not admin_type or not employee_type or not customer_type:
+            print("⚠️  User types not found, creating them...")
+            user_types_data = [
+                {"name_ar": "مدير", "name_en": "admin", "permissions": {"all": True}},
+                {"name_ar": "موظف", "name_en": "employee", "permissions": {"orders": True, "products": True, "services": True}},
+                {"name_ar": "عميل", "name_en": "customer", "permissions": {"orders": True, "view": True}}
+            ]
+            for ut_data in user_types_data:
+                existing = db.query(UserType).filter(UserType.name_ar == ut_data["name_ar"]).first()
+                if not existing:
+                    user_type = UserType(**ut_data)
+                    db.add(user_type)
+            db.commit()
+            # إعادة الاستعلام
+            admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
+            employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
+            customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
+        
+        # 4. أنشئ المستخدمين الجدد
+        print("\n" + "=" * 60)
+        print("🆕 Creating new default users...")
+        print("=" * 60)
+        
+        created_users = []
+        
+        # Admin 1
+        phone1 = normalize_phone("0966320114")
+        password_hash1 = get_password_hash("admin123")
+        user1 = User(
+            name="مدير 1",
+            phone=phone1,
+            password_hash=password_hash1,
+            user_type_id=admin_type.id,
+            is_active=True
+        )
+        db.add(user1)
+        created_users.append(f"مدير 1 ({phone1})")
+        print(f"✅ Created Admin 1: {phone1} / admin123 (Hash: {password_hash1[:20]}...)")
+        
+        # Admin 2
+        phone2 = normalize_phone("+963955773227")
+        password_hash2 = get_password_hash("khawam-p")
+        user2 = User(
+            name="مدير 2",
+            phone=phone2,
+            password_hash=password_hash2,
+            user_type_id=admin_type.id,
+            is_active=True
+        )
+        db.add(user2)
+        created_users.append(f"مدير 2 ({phone2})")
+        print(f"✅ Created Admin 2: {phone2} / khawam-p (Hash: {password_hash2[:20]}...)")
+        
+        # Employees
+        for i in range(1, 4):
+            email = f"khawam-{i}@gmail.com"
+            password_hash = get_password_hash(f"khawam-{i}")
+            user = User(
+                name=f"موظف {i}",
+                email=email,
+                password_hash=password_hash,
+                user_type_id=employee_type.id,
+                is_active=True
+            )
+            db.add(user)
+            created_users.append(f"موظف {i} ({email})")
+            print(f"✅ Created Employee {i}: {email} / khawam-{i} (Hash: {password_hash[:20]}...)")
+        
+        # Customer
+        customer_email = "customer@gmail.com"
+        customer_password_hash = get_password_hash("963214")
+        customer_user = User(
+            name="عميل تجريبي",
+            email=customer_email,
+            password_hash=customer_password_hash,
+            user_type_id=customer_type.id,
+            is_active=True
+        )
+        db.add(customer_user)
+        created_users.append(f"عميل تجريبي ({customer_email})")
+        print(f"✅ Created Customer: {customer_email} / 963214 (Hash: {customer_password_hash[:20]}...)")
+        
+        # 5. احفظ التغييرات
         db.commit()
+        print(f"\n💾 All changes committed to database")
         
-        print(f"✅ Deleted {deleted_count} user(s)")
+        # 6. التحقق من النتيجة
+        print("\n" + "=" * 60)
+        print("🔍 Verifying created users...")
+        print("=" * 60)
         
-        # الآن أنشئ المستخدمين الجدد
-        return await init_users_endpoint(secret=secret, reset=True, db=db)
+        all_users_after = db.query(User).all()
+        users_without_password = [u for u in all_users_after if not u.password_hash]
+        
+        if users_without_password:
+            print(f"⚠️  WARNING: {len(users_without_password)} user(s) without password hash!")
+            for u in users_without_password:
+                print(f"   - {u.name} (ID: {u.id})")
+        else:
+            print(f"✅ All {len(all_users_after)} user(s) have password hashes")
+        
+        result = {
+            "success": True,
+            "deleted_users": deleted_count,
+            "created_users": len(created_users),
+            "created_user_list": created_users,
+            "total_users_after": len(all_users_after),
+            "all_users_have_passwords": len(users_without_password) == 0,
+            "message": f"تم حذف {deleted_count} مستخدم وإنشاء {len(created_users)} مستخدم جديد"
+        }
+        
+        print("\n" + "=" * 60)
+        print(f"✅ RESET COMPLETED SUCCESSFULLY!")
+        print(f"   Deleted: {deleted_count} users")
+        print(f"   Created: {len(created_users)} users")
+        print(f"   Total users now: {len(all_users_after)}")
+        print("=" * 60 + "\n")
+        
+        return result
+        
     except Exception as e:
         db.rollback()
-        print(f"Reset error: {e}")
+        print(f"\n❌ Reset error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في إعادة التعيين: {str(e)}")

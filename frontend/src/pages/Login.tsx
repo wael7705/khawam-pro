@@ -1,15 +1,25 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { authAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
+import { isAuthenticated } from '../lib/auth'
 import { LogIn, Mail, Phone, Lock } from 'lucide-react'
 import './Login.css'
 
 export default function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // If already authenticated, redirect
+  useEffect(() => {
+    if (isAuthenticated()) {
+      const redirect = searchParams.get('redirect') || '/dashboard'
+      navigate(redirect)
+    }
+  }, [navigate, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,17 +40,23 @@ export default function Login() {
       
       showSuccess(`مرحباً ${loginData.user.name}!`)
       
-      // Redirect based on user type
-      const userType = loginData.user.user_type.name_ar
-      if (userType === 'موظف') {
-        // Employee goes directly to orders
-        navigate('/dashboard/orders')
-      } else if (userType === 'مدير') {
-        // Admin goes to dashboard home
-        navigate('/dashboard')
+      // Redirect based on redirect parameter or user type
+      const redirect = searchParams.get('redirect')
+      if (redirect) {
+        navigate(redirect)
       } else {
-        // Customer goes to home
-        navigate('/')
+        // Redirect based on user type
+        const userType = loginData.user.user_type.name_ar
+        if (userType === 'موظف') {
+          // Employee goes directly to orders
+          navigate('/dashboard/orders')
+        } else if (userType === 'مدير') {
+          // Admin goes to dashboard home
+          navigate('/dashboard')
+        } else {
+          // Customer goes to home
+          navigate('/')
+        }
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.detail || 'فشل تسجيل الدخول'

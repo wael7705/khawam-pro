@@ -90,3 +90,4 @@ export const isCustomer = (): boolean => {
   return user?.user_type.name_ar === 'عميل'
 }
 
+

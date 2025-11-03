@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
 import { useState } from 'react'
 import UserMenu from './UserMenu'
+import { isAuthenticated, isAdmin, isEmployee } from '../lib/auth'
 import './Navbar.css'
 
 export default function Navbar() {
@@ -32,8 +33,13 @@ export default function Navbar() {
         </div>
         
         <div className="nav-right">
-          <Link to="/studio" className="btn btn-primary">استيديو</Link>
-          <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
+          {/* Show Studio and Dashboard only for authenticated admin or employee */}
+          {isAuthenticated() && (isAdmin() || isEmployee()) && (
+            <>
+              <Link to="/studio" className="btn btn-primary">استيديو</Link>
+              <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
+            </>
+          )}
           <UserMenu />
           <div className="logo">خوام</div>
         </div>

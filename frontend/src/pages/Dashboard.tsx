@@ -9,7 +9,7 @@ import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
 import CustomersManagement from './Dashboard/CustomersManagement'
 import Studio from './Studio'
-import { isEmployee, isAdmin, getUserData } from '../lib/auth'
+import { isEmployee, isAdmin, getUserData, isAuthenticated } from '../lib/auth'
 import './Dashboard.css'
 
 export default function Dashboard() {
@@ -19,11 +19,17 @@ export default function Dashboard() {
   const [userType, setUserType] = useState<string | null>(null)
 
   useEffect(() => {
+    // Check authentication
+    if (!isAuthenticated()) {
+      navigate('/login?redirect=' + encodeURIComponent(location.pathname))
+      return
+    }
+
     const user = getUserData()
     if (user) {
       setUserType(user.user_type.name_ar)
     }
-  }, [])
+  }, [navigate, location])
 
   // Define tabs based on user type
   const allTabs = [

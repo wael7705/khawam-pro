@@ -208,3 +208,4 @@ async def get_public_payment_info(db: Session = Depends(get_db)):
             "payment_info": None
         }
 
+

@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Upload, Download, X, RotateCw, ZoomIn, ZoomOut, Filter, Sparkles, Type, Palette } from 'lucide-react'
 import { studioAPI } from '../lib/api'
+import { isAuthenticated } from '../lib/auth'
 import './Studio.css'
 
 export default function Studio() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [processedImage, setProcessedImage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -17,6 +21,13 @@ export default function Studio() {
   const [filterType, setFilterType] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login?redirect=' + encodeURIComponent(location.pathname))
+    }
+  }, [navigate, location])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

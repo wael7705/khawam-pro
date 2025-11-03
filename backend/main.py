@@ -47,6 +47,13 @@ try:
 except ImportError as e:
     print(f"⚠️ Warning: Error importing test_db router: {e}")
 
+# إضافة router إصلاح قاعدة البيانات (حل بديل بسيط)
+try:
+    from routers import db_fix
+    app.include_router(db_fix.router, prefix="/api/fix", tags=["Fix"])
+except ImportError as e:
+    print(f"⚠️ Warning: Error importing db_fix router: {e}")
+
 # Mount static files
 if not os.path.exists("uploads"):
     os.makedirs("uploads")

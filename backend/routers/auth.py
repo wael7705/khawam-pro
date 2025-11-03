@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import re
 import os
+import bcrypt
 
 router = APIRouter()
 
@@ -57,7 +58,7 @@ class ChangePasswordRequest(BaseModel):
 
 # Helper functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """التحقق من كلمة المرور"""
+    """التحقق من كلمة المرور - يدعم bcrypt مباشرة و passlib"""
     try:
         # التحقق من أن hashed_password ليس فارغاً أو None
         if not hashed_password:
@@ -67,10 +68,25 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             return False
         # التحقق من أن hashed_password يبدو كـ hash (يبدأ بـ $2b$ أو $2a$)
         if not hashed_password.startswith('$2'):
-            # إذا لم يكن hash، جرب verify مع bcrypt مباشرة أو رجع False
             return False
-        # استخدم passlib للتحقق
-        return pwd_context.verify(plain_password, hashed_password)
+        
+        # جرب bcrypt مباشرة أولاً (للتوافق مع db_rebuild.py)
+        try:
+            password_bytes = plain_password.encode('utf-8')
+            hash_bytes = hashed_password.encode('utf-8')
+            if bcrypt.checkpw(password_bytes, hash_bytes):
+                return True
+        except Exception as bcrypt_error:
+            print(f"⚠️ bcrypt verify failed: {bcrypt_error}")
+        
+        # إذا فشل bcrypt، جرب passlib (للتوافق مع المستخدمين القدامى)
+        try:
+            if pwd_context.verify(plain_password, hashed_password):
+                return True
+        except Exception as passlib_error:
+            print(f"⚠️ passlib verify failed: {passlib_error}")
+        
+        return False
     except Exception as e:
         print(f"⚠️ Error verifying password: {e}")
         return False

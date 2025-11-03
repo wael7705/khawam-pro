@@ -37,27 +37,27 @@ async def _init_pricing_table():
         return
 
     try:
-            # التحقق من وجود الجدول
-            check_table = conn.execute(text("""
-                        SELECT EXISTS (
+        # التحقق من وجود الجدول
+        check_table = conn.execute(text("""
+            SELECT EXISTS (
                 SELECT FROM information_schema.tables
                 WHERE table_schema = 'public'
                 AND table_name = 'pricing_rules'
             )
-            """)).fetchone()
+        """)).fetchone()
 
-            if check_table and check_table[0]:
-                # الجدول موجود - التحقق من الأعمدة
-                check_columns = conn.execute(text("""
-                    SELECT column_name
-                    FROM information_schema.columns
-                    WHERE table_name = 'pricing_rules'
-                """)).fetchall()
+        if check_table and check_table[0]:
+            # الجدول موجود - التحقق من الأعمدة
+            check_columns = conn.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'pricing_rules'
+            """)).fetchall()
 
-                existing_columns = [col[0] for col in check_columns]
+            existing_columns = [col[0] for col in check_columns]
 
-                # إضافة الأعمدة المفقودة
-                columns_to_add = {
+            # إضافة الأعمدة المفقودة
+            columns_to_add = {
                     'name_ar': "ALTER TABLE pricing_rules ADD COLUMN name_ar VARCHAR(200)",
                     'name_en': "ALTER TABLE pricing_rules ADD COLUMN name_en VARCHAR(200)",
                     'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
@@ -73,20 +73,20 @@ async def _init_pricing_table():
                     'updated_at': "ALTER TABLE pricing_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
                 }
 
-                for col_name, alter_sql in columns_to_add.items():
-                    if col_name not in existing_columns:
-                        try:
-                            conn.execute(text(alter_sql))
-                            conn.commit()
-                            print(f"✅ تم إضافة العمود {col_name} إلى pricing_rules")
-                        except Exception as e:
-                            print(f"⚠️ تحذير: فشل إضافة العمود {col_name}: {e}")
-                            conn.rollback()
+            for col_name, alter_sql in columns_to_add.items():
+                if col_name not in existing_columns:
+                    try:
+                        conn.execute(text(alter_sql))
+                        conn.commit()
+                        print(f"✅ تم إضافة العمود {col_name} إلى pricing_rules")
+                    except Exception as e:
+                        print(f"⚠️ تحذير: فشل إضافة العمود {col_name}: {e}")
+                        conn.rollback()
 
-                print("✅ جدول pricing_rules موجود ومحدث")
-            else:
-                # إنشاء الجدول
-                conn.execute(text("""
+            print("✅ جدول pricing_rules موجود ومحدث")
+        else:
+            # إنشاء الجدول
+            conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS pricing_rules (
                         id SERIAL PRIMARY KEY,
                         name_ar VARCHAR(200) NOT NULL,

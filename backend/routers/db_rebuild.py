@@ -50,13 +50,43 @@ async def rebuild_users():
         deleted_count = 0
         added_count = 0
         
-        # خطوة 2: حذف جميع المستخدمين
+        # خطوة 2: حذف البيانات المرتبطة أولاً (لتجنب Foreign Key constraint)
+        deleted_items = {}
+        
+        # حذف studio_projects
+        try:
+            with conn.begin():
+                result = conn.execute(text("DELETE FROM studio_projects"))
+                deleted_items["studio_projects"] = result.rowcount
+        except Exception as e:
+            deleted_items["studio_projects"] = 0
+            print(f"⚠️ خطأ في حذف studio_projects: {e}")
+        
+        # حذف order_items
+        try:
+            with conn.begin():
+                result = conn.execute(text("DELETE FROM order_items"))
+                deleted_items["order_items"] = result.rowcount
+        except Exception as e:
+            deleted_items["order_items"] = 0
+            print(f"⚠️ خطأ في حذف order_items: {e}")
+        
+        # حذف orders
+        try:
+            with conn.begin():
+                result = conn.execute(text("DELETE FROM orders"))
+                deleted_items["orders"] = result.rowcount
+        except Exception as e:
+            deleted_items["orders"] = 0
+            print(f"⚠️ خطأ في حذف orders: {e}")
+        
+        # الآن حذف جميع المستخدمين (بعد حذف البيانات المرتبطة)
         try:
             with conn.begin():
                 result = conn.execute(text("DELETE FROM users"))
                 deleted_count = result.rowcount
         except Exception as e:
-            print(f"⚠️ خطأ في الحذف: {e}")
+            print(f"⚠️ خطأ في حذف users: {e}")
         
         # خطوة 3: إضافة المستخدمين الجدد
         users_to_add = [
@@ -135,7 +165,8 @@ async def rebuild_users():
         return {
             "success": True,
             "message": "تم إعادة بناء المستخدمين بنجاح",
-            "deleted_count": deleted_count,
+            "deleted_items": deleted_items,
+            "deleted_users_count": deleted_count,
             "added_count": added_count,
             "users": added_users
         }

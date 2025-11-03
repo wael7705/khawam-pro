@@ -47,15 +47,31 @@ async def rebuild_users():
         # استخدام connection مع autocommit لتجنب مشاكل transactions
         conn = engine.connect()
         
-        # خطوة 1: الحصول على أنواع المستخدمين
-        admin_type = conn.execute(text("SELECT id FROM user_types LIMIT 1")).fetchone()
-        if not admin_type:
-            conn.close()
-            return {"success": False, "error": "لا يوجد user_types"}
-        admin_type_id = admin_type[0]
-        
-        employee_type = conn.execute(text("SELECT id FROM user_types ORDER BY id LIMIT 1 OFFSET 1")).fetchone()
-        employee_type_id = employee_type[0] if employee_type else admin_type_id
+                # خطوة 1: الحصول على أنواع المستخدمين وتحديثها
+                # تحديث أو إنشاء user_type للمدير
+                conn.execute(text("""
+                    INSERT INTO user_types (id, name_ar) 
+                    VALUES (1, 'مدير')
+                    ON CONFLICT (id) DO UPDATE SET name_ar = 'مدير'
+                """))
+                conn.commit()
+                
+                # تحديث أو إنشاء user_type للموظف
+                conn.execute(text("""
+                    INSERT INTO user_types (id, name_ar) 
+                    VALUES (2, 'موظف')
+                    ON CONFLICT (id) DO UPDATE SET name_ar = 'موظف'
+                """))
+                conn.commit()
+                
+                admin_type = conn.execute(text("SELECT id FROM user_types WHERE id = 1")).fetchone()
+                if not admin_type:
+                    conn.close()
+                    return {"success": False, "error": "لا يوجد user_types"}
+                admin_type_id = 1
+                
+                employee_type = conn.execute(text("SELECT id FROM user_types WHERE id = 2")).fetchone()
+                employee_type_id = 2 if employee_type else admin_type_id
         
         # خطوة 2: حذف البيانات المرتبطة (باستخدام autocommit)
         try:

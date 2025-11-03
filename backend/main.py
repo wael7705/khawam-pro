@@ -37,81 +37,80 @@ async def init_pricing_table_on_startup():
                     return
     
         
-        if not conn:
+                if not conn:
             return
-        
+
         try:
-        
-        # التحقق من وجود الجدول
-        check_table = conn.execute(text("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+            # التحقق من وجود الجدول
+            check_table = conn.execute(text("""
+                        SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public'
                 AND table_name = 'pricing_rules'
             )
-        """)).fetchone()
-        
-        if check_table and check_table[0]:
-            # الجدول موجود - التحقق من الأعمدة
-            check_columns = conn.execute(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'pricing_rules'
-            """)).fetchall()
-            
-            existing_columns = [col[0] for col in check_columns]
-            
-            # إضافة الأعمدة المفقودة
-            columns_to_add = {
-                'name_ar': "ALTER TABLE pricing_rules ADD COLUMN name_ar VARCHAR(200)",
-                'name_en': "ALTER TABLE pricing_rules ADD COLUMN name_en VARCHAR(200)",
-                'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
-                'description_en': "ALTER TABLE pricing_rules ADD COLUMN description_en TEXT",
-                'calculation_type': "ALTER TABLE pricing_rules ADD COLUMN calculation_type VARCHAR(20)",
-                'base_price': "ALTER TABLE pricing_rules ADD COLUMN base_price DECIMAL(10, 4)",
-                'price_multipliers': "ALTER TABLE pricing_rules ADD COLUMN price_multipliers JSONB",
-                'specifications': "ALTER TABLE pricing_rules ADD COLUMN specifications JSONB",
-                'unit': "ALTER TABLE pricing_rules ADD COLUMN unit VARCHAR(50)",
-                'is_active': "ALTER TABLE pricing_rules ADD COLUMN is_active BOOLEAN DEFAULT true",
-                'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",
-                'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",
-                'updated_at': "ALTER TABLE pricing_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
-            }
-            
-            for col_name, alter_sql in columns_to_add.items():
-                if col_name not in existing_columns:
-                    try:
-                        conn.execute(text(alter_sql))
-                        conn.commit()
-                        print(f"✅ تم إضافة العمود {col_name} إلى pricing_rules")
-                    except Exception as e:
-                        print(f"⚠️ تحذير: فشل إضافة العمود {col_name}: {e}")
-                        conn.rollback()
-            
-            print("✅ جدول pricing_rules موجود ومحدث")
-        else:
-            # إنشاء الجدول
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS pricing_rules (
-                    id SERIAL PRIMARY KEY,
-                    name_ar VARCHAR(200) NOT NULL,
-                    name_en VARCHAR(200),
-                    description_ar TEXT,
-                    description_en TEXT,
-                    calculation_type VARCHAR(20) NOT NULL,
-                    base_price DECIMAL(10, 4) NOT NULL,
-                    price_multipliers JSONB,
-                    specifications JSONB,
-                    unit VARCHAR(50),
-                    is_active BOOLEAN DEFAULT true,
-                    display_order INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT NOW(),
-                    updated_at TIMESTAMP DEFAULT NOW()
-                )
-            """))
-            conn.commit()
-            print("✅ تم إنشاء جدول pricing_rules بنجاح")
-            
+            """)).fetchone()
+
+            if check_table and check_table[0]:
+                # الجدول موجود - التحقق من الأعمدة
+                check_columns = conn.execute(text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'pricing_rules'
+                """)).fetchall()
+
+                existing_columns = [col[0] for col in check_columns]
+
+                # إضافة الأعمدة المفقودة
+                columns_to_add = {
+                    'name_ar': "ALTER TABLE pricing_rules ADD COLUMN name_ar VARCHAR(200)",
+                    'name_en': "ALTER TABLE pricing_rules ADD COLUMN name_en VARCHAR(200)",
+                    'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
+                    'description_en': "ALTER TABLE pricing_rules ADD COLUMN description_en TEXT",
+                    'calculation_type': "ALTER TABLE pricing_rules ADD COLUMN calculation_type VARCHAR(20)",        
+                    'base_price': "ALTER TABLE pricing_rules ADD COLUMN base_price DECIMAL(10, 4)",
+                    'price_multipliers': "ALTER TABLE pricing_rules ADD COLUMN price_multipliers JSONB",
+                    'specifications': "ALTER TABLE pricing_rules ADD COLUMN specifications JSONB",
+                    'unit': "ALTER TABLE pricing_rules ADD COLUMN unit VARCHAR(50)",
+                    'is_active': "ALTER TABLE pricing_rules ADD COLUMN is_active BOOLEAN DEFAULT true",
+                    'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",        
+                    'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",        
+                    'updated_at': "ALTER TABLE pricing_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
+                }
+
+                for col_name, alter_sql in columns_to_add.items():
+                    if col_name not in existing_columns:
+                        try:
+                            conn.execute(text(alter_sql))
+                            conn.commit()
+                            print(f"✅ تم إضافة العمود {col_name} إلى pricing_rules")
+                        except Exception as e:
+                            print(f"⚠️ تحذير: فشل إضافة العمود {col_name}: {e}")
+                            conn.rollback()
+
+                print("✅ جدول pricing_rules موجود ومحدث")
+            else:
+                # إنشاء الجدول
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS pricing_rules (
+                        id SERIAL PRIMARY KEY,
+                        name_ar VARCHAR(200) NOT NULL,
+                        name_en VARCHAR(200),
+                        description_ar TEXT,
+                        description_en TEXT,
+                        calculation_type VARCHAR(20) NOT NULL,
+                        base_price DECIMAL(10, 4) NOT NULL,
+                        price_multipliers JSONB,
+                        specifications JSONB,
+                        unit VARCHAR(50),
+                        is_active BOOLEAN DEFAULT true,
+                        display_order INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                conn.commit()
+                print("✅ تم إنشاء جدول pricing_rules بنجاح")
+
         except Exception as e:
             print(f"⚠️ تحذير: خطأ في تهيئة جدول pricing_rules: {str(e)[:200]}")
             if conn:
@@ -146,16 +145,16 @@ app.add_middleware(
 # Import routers - استيراد آمن مع معالجة الأخطاء
 try:
     from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple, pricing, init_pricing
-    app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-    app.include_router(products.router, prefix="/api/products", tags=["Products"])
-    app.include_router(services.router, prefix="/api/services", tags=["Services"])
-    app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
-    app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
-    app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
-    app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-    app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
-    app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
-    app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(products.router, prefix="/api/products", tags=["Products"])
+app.include_router(services.router, prefix="/api/services", tags=["Services"])
+app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
+app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
+app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
+app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
+app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
     app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
 except ImportError as e:

@@ -4,14 +4,20 @@ Router لإعادة بناء المستخدمين - حذف وإضافة (حل ن
 from fastapi import APIRouter
 from database import engine
 from sqlalchemy import text
-from passlib.context import CryptContext
-
-# استخدام نفس إعدادات passlib من auth.py
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 def get_password_hash(password: str) -> str:
-    """تشفير كلمة المرور - نفس دالة auth.py"""
-    return pwd_context.hash(password)
+    """تشفير كلمة المرور باستخدام bcrypt مباشرة"""
+    # تحويل password إلى bytes إذا لم يكن كذلك
+    if isinstance(password, str):
+        password_bytes = password.encode('utf-8')
+    else:
+        password_bytes = password
+    
+    # إنشاء salt وتشفير
+    salt = bcrypt.gensalt()
+    hash_bytes = bcrypt.hashpw(password_bytes, salt)
+    return hash_bytes.decode('utf-8')
 
 def normalize_phone(phone: str) -> str:
     """تطبيع رقم الهاتف"""

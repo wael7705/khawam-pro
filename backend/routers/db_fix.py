@@ -4,9 +4,7 @@ Router بسيط جداً لإصلاح قاعدة البيانات - بدون أ�
 from fastapi import APIRouter
 from database import engine
 from sqlalchemy import text
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 def normalize_phone(phone: str) -> str:
     """تطبيع رقم الهاتف"""
@@ -56,7 +54,9 @@ async def fix_admin():
         
         # خطوة 2: تطبيع الهاتف وكلمة المرور
         phone = normalize_phone("0966320114")
-        password_hash = pwd_context.hash("admin123")
+        # استخدام bcrypt مباشرة
+        salt = bcrypt.gensalt()
+        password_hash = bcrypt.hashpw("admin123".encode('utf-8'), salt).decode('utf-8')
         
         # خطوة 3: حذف القديم
         try:

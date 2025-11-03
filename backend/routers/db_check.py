@@ -18,20 +18,22 @@ async def check_users():
         users = conn.execute(text("""
             SELECT id, name, phone, email, 
                    LENGTH(password_hash) as hash_length,
-                   LEFT(password_hash, 50) as hash_preview
+                   password_hash as full_hash
             FROM users
             ORDER BY id
         """)).fetchall()
         
         result = []
         for u in users:
+            hash_preview = u[5][:50] + "..." if u[5] and len(u[5]) > 50 else u[5]
             result.append({
                 "id": u[0],
                 "name": u[1],
                 "phone": u[2],
                 "email": u[3],
                 "hash_length": u[4],
-                "hash_preview": u[5]
+                "hash_preview": hash_preview,
+                "hash_full": u[5] if u[5] else None
             })
         
         conn.close()

@@ -290,13 +290,12 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"
             )
         
-        # الحصول على نوع المستخدم (بدون الاعتماد على name_ar)
-        user_type = db.query(UserType).filter(UserType.id == user.user_type_id).first()
-        if not user_type:
-            # إذا لم يوجد user_type، استخدم id مباشرة
-            user_type_id = user.user_type_id
-        else:
-            user_type_id = user_type.id
+        # الحصول على نوع المستخدم باستخدام raw SQL لتجنب مشكلة name_ar
+        from sqlalchemy import text
+        user_type_result = db.execute(text("SELECT id FROM user_types WHERE id = :id"), {"id": user.user_type_id}).fetchone()
+        user_type_id = user.user_type_id
+        if user_type_result:
+            user_type_id = user_type_result[0]
         
         # إنشاء token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -314,9 +313,9 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 "email": user.email,
                 "phone": user.phone,
                 "user_type": {
-                    "id": user_type.id if user_type else user_type_id,
-                    "name_ar": getattr(user_type, 'name_ar', None) if user_type else None,
-                    "name_en": getattr(user_type, 'name_en', None) if user_type else None
+                    "id": user_type_id,
+                    "name_ar": None,
+                    "name_en": None
                 },
                 "is_active": user.is_active
             }
@@ -513,9 +512,9 @@ async def update_profile(
                 "email": current_user.email,
                 "phone": current_user.phone,
                 "user_type": {
-                    "id": user_type.id if user_type else user_type_id,
-                    "name_ar": getattr(user_type, 'name_ar', None) if user_type else None,
-                    "name_en": getattr(user_type, 'name_en', None) if user_type else None
+                    "id": user_type_id,
+                    "name_ar": None,
+                    "name_en": None
                 },
                 "is_active": current_user.is_active
             }

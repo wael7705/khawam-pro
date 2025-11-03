@@ -3,8 +3,9 @@ Setup endpoints for initializing database with default users
 """
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database import get_db
-from models import User, UserType
+from models import User, UserType, Order, OrderItem
 from routers.auth import get_password_hash, normalize_phone
 import os
 
@@ -329,9 +330,36 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
         deleted_count = len(all_users_before)
         print(f"📊 Found {deleted_count} existing user(s)")
         
-        # 2. امسح جميع المستخدمين
+        # 2. امسح جميع البيانات المرتبطة أولاً (Orders, OrderItems)
+        print("\n🔗 Checking related data...")
+        
+        # احسب الطلبات المرتبطة
+        all_orders = db.query(Order).all()
+        orders_count = len(all_orders)
+        
+        if orders_count > 0:
+            print(f"📦 Found {orders_count} order(s) related to users")
+            print(f"🗑️  Deleting related order items and orders...")
+            
+            # احذف OrderItems أولاً
+            for order in all_orders:
+                order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+                for item in order_items:
+                    db.delete(item)
+            
+            # ثم احذف Orders
+            for order in all_orders:
+                print(f"   - Deleting order {order.id} (Customer ID: {order.customer_id})")
+                db.delete(order)
+            
+            db.commit()
+            print(f"✅ Deleted {orders_count} order(s) and related items")
+        else:
+            print("ℹ️  No related orders found")
+        
+        # 3. امسح جميع المستخدمين
         if deleted_count > 0:
-            print(f"🗑️  Deleting {deleted_count} user(s)...")
+            print(f"\n🗑️  Deleting {deleted_count} user(s)...")
             for user in all_users_before:
                 print(f"   - Deleting: {user.name} (ID: {user.id}, Email: {user.email}, Phone: {user.phone})")
                 db.delete(user)
@@ -340,7 +368,7 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
         else:
             print("ℹ️  No existing users to delete")
         
-        # 3. تأكد من وجود UserTypes
+        # 4. تأكد من وجود UserTypes
         admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
         employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
         customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
@@ -363,7 +391,7 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
             employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
             customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
         
-        # 4. أنشئ المستخدمين الجدد
+        # 5. أنشئ المستخدمين الجدد
         print("\n" + "=" * 60)
         print("🆕 Creating new default users...")
         print("=" * 60)
@@ -427,11 +455,11 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
         created_users.append(f"عميل تجريبي ({customer_email})")
         print(f"✅ Created Customer: {customer_email} / 963214 (Hash: {customer_password_hash[:20]}...)")
         
-        # 5. احفظ التغييرات
+        # 6. احفظ التغييرات
         db.commit()
         print(f"\n💾 All changes committed to database")
         
-        # 6. التحقق من النتيجة
+        # 7. التحقق من النتيجة
         print("\n" + "=" * 60)
         print("🔍 Verifying created users...")
         print("=" * 60)
@@ -449,17 +477,19 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
         result = {
             "success": True,
             "deleted_users": deleted_count,
+            "deleted_orders": orders_count if 'orders_count' in locals() else 0,
             "created_users": len(created_users),
             "created_user_list": created_users,
             "total_users_after": len(all_users_after),
             "all_users_have_passwords": len(users_without_password) == 0,
-            "message": f"تم حذف {deleted_count} مستخدم وإنشاء {len(created_users)} مستخدم جديد"
+            "message": f"تم حذف {orders_count if 'orders_count' in locals() else 0} طلب و {deleted_count} مستخدم وإنشاء {len(created_users)} مستخدم جديد"
         }
         
         print("\n" + "=" * 60)
         print(f"✅ RESET COMPLETED SUCCESSFULLY!")
-        print(f"   Deleted: {deleted_count} users")
-        print(f"   Created: {len(created_users)} users")
+        print(f"   Deleted orders: {orders_count if 'orders_count' in locals() else 0}")
+        print(f"   Deleted users: {deleted_count}")
+        print(f"   Created users: {len(created_users)}")
         print(f"   Total users now: {len(all_users_after)}")
         print("=" * 60 + "\n")
         

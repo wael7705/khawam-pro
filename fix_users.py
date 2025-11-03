@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models import User, UserType, Base
+from models import User, UserType, Order, OrderItem, Base
 from routers.auth import get_password_hash, normalize_phone
 
 def fix_users():
@@ -26,7 +26,33 @@ def fix_users():
         print("🔄 Starting user database fix...")
         print("=" * 60)
         
-        # 1. Delete all existing users
+        # 1. Delete all related data first (Orders, OrderItems)
+        print("\n🔗 Checking related data...")
+        
+        all_orders = db.query(Order).all()
+        orders_count = len(all_orders)
+        
+        if orders_count > 0:
+            print(f"📦 Found {orders_count} order(s) related to users")
+            print(f"🗑️  Deleting related order items and orders...")
+            
+            # Delete OrderItems first
+            for order in all_orders:
+                order_items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+                for item in order_items:
+                    db.delete(item)
+            
+            # Then delete Orders
+            for order in all_orders:
+                print(f"   - Deleting order {order.id} (Customer ID: {order.customer_id})")
+                db.delete(order)
+            
+            db.commit()
+            print(f"✅ Deleted {orders_count} order(s) and related items")
+        else:
+            print("ℹ️  No related orders found")
+        
+        # 2. Delete all existing users
         all_users = db.query(User).all()
         deleted_count = len(all_users)
         
@@ -40,7 +66,7 @@ def fix_users():
         else:
             print("ℹ️  No existing users to delete")
         
-        # 2. Ensure UserTypes exist
+        # 3. Ensure UserTypes exist
         print("\n📋 Checking user types...")
         admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
         employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
@@ -70,7 +96,7 @@ def fix_users():
         
         print("✅ User types ready")
         
-        # 3. Create default users with password hashes
+        # 4. Create default users with password hashes
         print("\n🆕 Creating default users...")
         
         # Admin 1
@@ -126,16 +152,17 @@ def fix_users():
         db.add(customer_user)
         print(f"✅ Customer: {customer_email} / 963214 (Hash length: {len(customer_password_hash)})")
         
-        # 4. Commit all changes
+        # 5. Commit all changes
         db.commit()
         print("\n💾 All changes committed to database")
         
-        # 5. Verify
+        # 6. Verify
         print("\n🔍 Verifying users...")
         all_users = db.query(User).all()
         users_without_password = [u for u in all_users if not u.password_hash]
         
         print(f"\n📊 Summary:")
+        print(f"   Deleted orders: {orders_count}")
         print(f"   Total users: {len(all_users)}")
         print(f"   Users without password: {len(users_without_password)}")
         

@@ -175,7 +175,7 @@ def require_role(allowed_roles: list[str]):
         if not user_type:
             raise HTTPException(status_code=403, detail="User type not found")
         
-        role_name = user_type.name_ar.lower()
+        role_name = getattr(user_type, 'name_ar', '').lower() if user_type and hasattr(user_type, 'name_ar') else ''
         if role_name not in allowed_roles:
             raise HTTPException(
                 status_code=403,
@@ -290,8 +290,13 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"
             )
         
-        # الحصول على نوع المستخدم
+        # الحصول على نوع المستخدم (بدون الاعتماد على name_ar)
         user_type = db.query(UserType).filter(UserType.id == user.user_type_id).first()
+        if not user_type:
+            # إذا لم يوجد user_type، استخدم id مباشرة
+            user_type_id = user.user_type_id
+        else:
+            user_type_id = user_type.id
         
         # إنشاء token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -309,9 +314,9 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 "email": user.email,
                 "phone": user.phone,
                 "user_type": {
-                    "id": user_type.id,
-                    "name_ar": user_type.name_ar,
-                    "name_en": user_type.name_en
+                    "id": user_type.id if user_type else user_type_id,
+                    "name_ar": getattr(user_type, 'name_ar', None) if user_type else None,
+                    "name_en": getattr(user_type, 'name_en', None) if user_type else None
                 },
                 "is_active": user.is_active
             }
@@ -508,9 +513,9 @@ async def update_profile(
                 "email": current_user.email,
                 "phone": current_user.phone,
                 "user_type": {
-                    "id": user_type.id,
-                    "name_ar": user_type.name_ar,
-                    "name_en": user_type.name_en
+                    "id": user_type.id if user_type else user_type_id,
+                    "name_ar": getattr(user_type, 'name_ar', None) if user_type else None,
+                    "name_en": getattr(user_type, 'name_en', None) if user_type else None
                 },
                 "is_active": current_user.is_active
             }

@@ -15,9 +15,28 @@ app = FastAPI(
 @app.on_event("startup")
 async def init_pricing_table_on_startup():
     """إنشاء جدول pricing_rules تلقائياً عند بدء التطبيق"""
+    import time
     conn = None
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            conn = engine.connect()
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️ محاولة الاتصال بقاعدة البيانات ({attempt + 1}/{max_retries}): {e}")
+                time.sleep(retry_delay)
+            else:
+                print(f"❌ فشل الاتصال بقاعدة البيانات بعد {max_retries} محاولات: {e}")
+                return
+    
+    if not conn:
+        print("⚠️ تحذير: لم يتم الاتصال بقاعدة البيانات، سيتم تجربة إنشاء الجدول لاحقاً")
+        return
+    
     try:
-        conn = engine.connect()
         
         # التحقق من وجود الجدول
         check_table = conn.execute(text("""

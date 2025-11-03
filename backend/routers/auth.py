@@ -311,16 +311,28 @@ async def get_current_user_info(
     db: Session = Depends(get_db)
 ):
     """الحصول على معلومات المستخدم الحالي"""
-    user_type = db.query(UserType).filter(UserType.id == current_user.user_type_id).first()
+    # استخدام raw SQL للحصول على user_type لتجنب مشكلة name_en
+    from sqlalchemy import text
+    user_type_row = db.execute(text("""
+        SELECT id, name_ar 
+        FROM user_types 
+        WHERE id = :id
+    """), {"id": current_user.user_type_id}).fetchone()
+    
+    user_type_id = current_user.user_type_id
+    user_type_name_ar = None
+    if user_type_row:
+        user_type_id, user_type_name_ar = user_type_row
+    
     return {
         "id": current_user.id,
         "name": current_user.name,
         "email": current_user.email,
         "phone": current_user.phone,
         "user_type": {
-            "id": user_type.id,
-            "name_ar": getattr(user_type, 'name_ar', None) if user_type else None,
-            "name_en": None  # name_en غير موجود في قاعدة البيانات
+            "id": user_type_id,
+            "name_ar": user_type_name_ar,
+            "name_en": None  # غير موجود في قاعدة البيانات
         },
         "is_active": current_user.is_active
     }
@@ -367,16 +379,16 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
                     detail="رقم الهاتف مستخدم بالفعل"
                 )
         
-        # الحصول على نوع المستخدم (افتراضي: عميل)
-        user_type = db.query(UserType).filter(UserType.name_ar == register_data.user_type).first()
-        if not user_type:
-            # إذا لم يوجد نوع المستخدم المحدد، استخدم عميل
-            user_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
-            if not user_type:
-                raise HTTPException(
-                    status_code=500,
-                    detail="نوع المستخدم 'عميل' غير موجود في النظام"
-                )
+        # الحصول على نوع المستخدم باستخدام raw SQL
+        from sqlalchemy import text
+        # استخدم أول user_type موجود (افتراضي)
+        user_type_result = db.execute(text("SELECT id, name_ar FROM user_types ORDER BY id LIMIT 1")).fetchone()
+        if not user_type_result:
+            raise HTTPException(
+                status_code=500,
+                detail="لا يوجد أنواع مستخدمين في قاعدة البيانات"
+            )
+        user_type_id, user_type_name_ar = user_type_result
         
         # تشفير كلمة المرور
         password_hash = get_password_hash(register_data.password)
@@ -387,7 +399,7 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
             email=register_data.email.lower() if register_data.email else None,
             phone=normalize_phone(register_data.phone) if register_data.phone else None,
             password_hash=password_hash,
-            user_type_id=user_type.id,
+            user_type_id=user_type_id,
             is_active=True
         )
         
@@ -404,9 +416,9 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
                 "email": new_user.email,
                 "phone": new_user.phone,
                 "user_type": {
-                    "id": user_type.id,
-                    "name_ar": user_type.name_ar,
-                    "name_en": user_type.name_en
+                    "id": user_type_id,
+                    "name_ar": user_type_name_ar,
+                    "name_en": None  # غير موجود في قاعدة البيانات
                 }
             }
         }

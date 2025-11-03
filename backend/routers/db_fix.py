@@ -16,10 +16,23 @@ async def fix_admin():
     try:
         conn = engine.connect()
         
-        # خطوة 1: الحصول على admin_type_id
-        result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin' LIMIT 1")).fetchone()
+        # خطوة 1: الحصول على admin_type_id - بدون الاعتماد على name_en
+        # جرب البحث بدون name_en أولاً
+        result = conn.execute(text("SELECT id FROM user_types LIMIT 1")).fetchone()
+        
+        # إذا لم يوجد، أنشئ واحد
         if not result:
-            result = conn.execute(text("SELECT id FROM user_types LIMIT 1")).fetchone()
+            try:
+                with conn.begin():
+                    # محاولة إنشاء بنوع مختلف حسب ما يدعمه الجدول
+                    try:
+                        conn.execute(text("INSERT INTO user_types (name_ar) VALUES ('مدير')"))
+                    except:
+                        # إذا name_ar غير موجود، جرب بدون أعمدة
+                        conn.execute(text("INSERT INTO user_types DEFAULT VALUES"))
+                result = conn.execute(text("SELECT id FROM user_types ORDER BY id DESC LIMIT 1")).fetchone()
+            except:
+                pass
         
         if not result:
             return {"success": False, "error": "لا يوجد user_types"}

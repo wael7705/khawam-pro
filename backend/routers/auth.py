@@ -66,18 +66,33 @@ def get_password_hash(password: str) -> str:
 
 def normalize_phone(phone: str) -> str:
     """تطبيع رقم الهاتف (إزالة المسافات والرموز)"""
-    # إزالة جميع الرموز غير الرقمية
-    phone = re.sub(r'[^\d+]', '', phone)
-    # إذا كان يبدأ بـ +963 أو 0963 أو 963، نجعله +963
-    if phone.startswith('0963'):
-        phone = '+963' + phone[4:]
-    elif phone.startswith('963'):
-        phone = '+' + phone
-    elif phone.startswith('0'):
-        phone = '+963' + phone[1:]
-    elif not phone.startswith('+'):
-        phone = '+963' + phone
-    return phone
+    # إزالة جميع الرموز غير الرقمية (بما في ذلك +)
+    phone_clean = re.sub(r'[^\d]', '', phone)
+    
+    # إذا كان يبدأ بـ 00، نزيله
+    if phone_clean.startswith('00'):
+        phone_clean = phone_clean[2:]
+    
+    # إذا كان يبدأ بـ 0963 (رقم سوري مع الصفر وكود البلد)
+    if phone_clean.startswith('0963'):
+        # مثال: 0966320114 -> 66320114 (نزيل 0963 ونحتفظ بالباقي)
+        return '+963' + phone_clean[4:]
+    
+    # إذا كان يبدأ بـ 963 (كود سوريا بدون صفر)
+    if phone_clean.startswith('963'):
+        # مثال: 96366320114 -> 66320114 (نزيل 963 ونحتفظ بالباقي)
+        return '+963' + phone_clean[3:]
+    
+    # إذا كان يبدأ بـ 0 (رقم سوري محلي بدون كود البلد)
+    if phone_clean.startswith('0'):
+        # مثال: 0966320114 -> 66320114 (نزيل الصفر وأول رقم)
+        # الرقم السوري: 0 + رقم المنطقة (1 رقم) + الرقم
+        if len(phone_clean) >= 10:
+            # نزيل الصفر وأول رقم (مثل 09 أو 05)
+            return '+963' + phone_clean[2:]
+    
+    # إذا لم يبدأ بأي من السابق، نضيف +963 في المقدمة
+    return '+963' + phone_clean
 
 def is_valid_email(email: str) -> bool:
     """التحقق من صحة البريد الإلكتروني"""

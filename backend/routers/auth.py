@@ -319,8 +319,8 @@ async def get_current_user_info(
         "phone": current_user.phone,
         "user_type": {
             "id": user_type.id,
-            "name_ar": user_type.name_ar,
-            "name_en": user_type.name_en
+            "name_ar": getattr(user_type, 'name_ar', None) if user_type else None,
+            "name_en": None  # name_en غير موجود في قاعدة البيانات
         },
         "is_active": current_user.is_active
     }

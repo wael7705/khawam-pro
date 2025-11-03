@@ -84,11 +84,24 @@ async def add_admin_account():
             
         except Exception as e:
             if 'conn' in locals():
-                conn.close()
-            raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+                try:
+                    conn.close()
+                except:
+                    pass
+            import traceback
+            error_msg = str(e) if str(e) else "خطأ غير معروف"
+            traceback_str = traceback.format_exc()
+            print(f"❌ ERROR in add_admin_account inner: {error_msg}")
+            print(f"Traceback: {traceback_str[:500]}")
+            raise HTTPException(status_code=500, detail=f"خطأ: {error_msg}")
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+        import traceback
+        error_msg = str(e) if str(e) else "خطأ غير معروف"
+        traceback_str = traceback.format_exc()
+        print(f"❌ ERROR in add_admin_account outer: {error_msg}")
+        print(f"Traceback: {traceback_str[:500]}")
+        raise HTTPException(status_code=500, detail=f"خطأ: {error_msg}")
 
 @router.get("/add-password")
 @router.post("/add-password")

@@ -124,11 +124,13 @@ async def rebuild_users():
                     })
                     added_count += 1
                 elif "email" in user:
+                    # إضافة phone فارغ أو رقم وهمي لأن العمود مطلوب
                     conn.execute(text("""
-                        INSERT INTO users (name, email, password_hash, user_type_id, is_active)
-                        VALUES (:name, :email, :hash, :type_id, true)
+                        INSERT INTO users (name, phone, email, password_hash, user_type_id, is_active)
+                        VALUES (:name, :phone, :email, :hash, :type_id, true)
                     """), {
                         "name": user["name"],
+                        "phone": "0000000000",  # رقم وهمي لأن phone مطلوب
                         "email": user["email"],
                         "hash": password_hash,
                         "type_id": user["user_type_id"]

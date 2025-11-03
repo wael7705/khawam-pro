@@ -25,13 +25,21 @@ async def add_admin_account():
             
             if not admin_type_result:
                 # إنشاء نوع المدير إذا لم يكن موجوداً
-                conn.execute(text("""
-                    INSERT INTO user_types (name_en, permissions) 
-                    VALUES ('admin', '{"all": true}'::jsonb)
-                    ON CONFLICT DO NOTHING
-                """))
-                conn.commit()
+                try:
+                    conn.execute(text("""
+                        INSERT INTO user_types (name_en, permissions) 
+                        VALUES ('admin', '{"all": true}'::jsonb)
+                    """))
+                    conn.commit()
+                except:
+                    pass
                 admin_type_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin'")).fetchone()
+                if not admin_type_result:
+                    # محاولة البحث بأي طريقة
+                    admin_type_result = conn.execute(text("SELECT id FROM user_types LIMIT 1")).fetchone()
+            
+            if not admin_type_result:
+                raise Exception("لا يمكن الحصول على أو إنشاء نوع المدير")
             
             admin_type_id = admin_type_result[0]
             
@@ -40,21 +48,30 @@ async def add_admin_account():
             password_hash = get_password_hash("admin123")
             
             # حذف المستخدم إذا كان موجوداً (لتجنب التكرار)
-            conn.execute(text("DELETE FROM users WHERE phone = :phone"), {"phone": phone})
-            conn.commit()
+            trans = conn.begin()
+            try:
+                conn.execute(text("DELETE FROM users WHERE phone = :phone"), {"phone": phone})
+                trans.commit()
+            except:
+                trans.rollback()
             
             # إضافة المستخدم الجديد
-            conn.execute(text("""
-                INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
-                VALUES (:name, :phone, :password_hash, :user_type_id, :is_active)
-            """), {
-                'name': 'مدير 1',
-                'phone': phone,
-                'password_hash': password_hash,
-                'user_type_id': admin_type_id,
-                'is_active': True
-            })
-            conn.commit()
+            trans = conn.begin()
+            try:
+                conn.execute(text("""
+                    INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
+                    VALUES (:name, :phone, :password_hash, :user_type_id, :is_active)
+                """), {
+                    'name': 'مدير 1',
+                    'phone': phone,
+                    'password_hash': password_hash,
+                    'user_type_id': admin_type_id,
+                    'is_active': True
+                })
+                trans.commit()
+            except Exception as e:
+                trans.rollback()
+                raise Exception(f"خطأ في إضافة المستخدم: {str(e)}")
             
             conn.close()
             

@@ -85,9 +85,10 @@ async def root():
     return {"message": "Khawam API is running"}
 
 @app.get("/api/health")
+@app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "ok", "message": "API is running"}
+    return {"status": "ok", "message": "API is running", "database": "connected"}
 
 if __name__ == "__main__":
     import uvicorn

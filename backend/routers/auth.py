@@ -292,10 +292,8 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         
         # الحصول على نوع المستخدم باستخدام raw SQL لتجنب مشكلة name_ar
         from sqlalchemy import text
-        user_type_result = db.execute(text("SELECT id FROM user_types WHERE id = :id"), {"id": user.user_type_id}).fetchone()
+        # استخدم user_type_id مباشرة من user
         user_type_id = user.user_type_id
-        if user_type_result:
-            user_type_id = user_type_result[0]
         
         # إنشاء token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

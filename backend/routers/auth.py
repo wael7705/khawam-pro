@@ -176,6 +176,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         
         # تحديد نوع المعرف (بريد إلكتروني أم رقم هاتف)
         user = None
+        normalized_phone = None
         if is_valid_email(username):
             # البحث بالبريد الإلكتروني
             user = db.query(User).filter(User.email == username.lower()).first()
@@ -183,6 +184,20 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             # البحث برقم الهاتف (مطبيع)
             normalized_phone = normalize_phone(username)
             user = db.query(User).filter(User.phone == normalized_phone).first()
+            
+            # إذا لم يُوجد، جرب البحث بصيغ مختلفة
+            if not user:
+                # جرب البحث بالرقم كما هو
+                user = db.query(User).filter(User.phone == username).first()
+                
+                # جرب البحث بصيغ مختلفة للرقم السوري
+                if not user and username.startswith('0'):
+                    # إذا كان يبدأ بـ 0، جرب بدون الصفر
+                    try_no_zero = username[1:] if len(username) > 1 else username
+                    # جرب +963 + الرقم بدون 0 وأول رقم
+                    if len(try_no_zero) >= 9:
+                        try_without_area = '+963' + try_no_zero[1:]  # إزالة أول رقم (رقم المنطقة)
+                        user = db.query(User).filter(User.phone == try_without_area).first()
         else:
             raise HTTPException(
                 status_code=400,
@@ -190,9 +205,13 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             )
         
         if not user:
+            # إرجاع رسالة خطأ أكثر وضوحاً
+            error_msg = "اسم المستخدم أو كلمة المرور غير صحيحة"
+            if normalized_phone:
+                error_msg += f" (بحث عن: {normalized_phone})"
             raise HTTPException(
                 status_code=401,
-                detail="اسم المستخدم أو كلمة المرور غير صحيحة"
+                detail=error_msg
             )
         
         if not user.is_active:

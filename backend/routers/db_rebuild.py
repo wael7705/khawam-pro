@@ -154,41 +154,89 @@ async def rebuild_users():
                 password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
                 
                 if "phone" in user:
-                    conn.execute(text("""
-                        INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
-                        VALUES (:name, :phone, :hash, :type_id, true)
-                    """), {
-                        "name": user["name"],
-                        "phone": user["phone"],
-                        "hash": password_hash,
-                        "type_id": user["user_type_id"]
-                    })
-                    added_users.append({
-                        "name": user["name"],
-                        "phone": user["phone"],
-                        "password": user["password"]
-                    })
+                    # جرب UPDATE أولاً، إذا فشل استخدم INSERT
+                    try:
+                        result = conn.execute(text("""
+                            UPDATE users 
+                            SET name = :name, password_hash = :hash, user_type_id = :type_id, is_active = true
+                            WHERE phone = :phone
+                        """), {
+                            "name": user["name"],
+                            "phone": user["phone"],
+                            "hash": password_hash,
+                            "type_id": user["user_type_id"]
+                        })
+                        if result.rowcount == 0:
+                            # لم يتم العثور على مستخدم، أضف جديد
+                            raise Exception("User not found, insert new")
+                        added_users.append({
+                            "name": user["name"],
+                            "phone": user["phone"],
+                            "password": user["password"],
+                            "action": "updated"
+                        })
+                    except:
+                        # إذا فشل UPDATE، جرب INSERT
+                        conn.execute(text("""
+                            INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
+                            VALUES (:name, :phone, :hash, :type_id, true)
+                        """), {
+                            "name": user["name"],
+                            "phone": user["phone"],
+                            "hash": password_hash,
+                            "type_id": user["user_type_id"]
+                        })
+                        added_users.append({
+                            "name": user["name"],
+                            "phone": user["phone"],
+                            "password": user["password"],
+                            "action": "inserted"
+                        })
                     added_count += 1
+                    conn.commit()
                 elif "email" in user:
                     # إضافة phone فريد لأن العمود مطلوب
                     fake_phone = f"999{added_count}{added_count}{added_count}"
-                    conn.execute(text("""
-                        INSERT INTO users (name, phone, email, password_hash, user_type_id, is_active)
-                        VALUES (:name, :phone, :email, :hash, :type_id, true)
-                    """), {
-                        "name": user["name"],
-                        "phone": fake_phone,
-                        "email": user["email"],
-                        "hash": password_hash,
-                        "type_id": user["user_type_id"]
-                    })
-                    added_users.append({
-                        "name": user["name"],
-                        "email": user["email"],
-                        "password": user["password"]
-                    })
+                    # جرب UPDATE أولاً
+                    try:
+                        result = conn.execute(text("""
+                            UPDATE users 
+                            SET name = :name, password_hash = :hash, user_type_id = :type_id, is_active = true
+                            WHERE email = :email
+                        """), {
+                            "name": user["name"],
+                            "email": user["email"],
+                            "hash": password_hash,
+                            "type_id": user["user_type_id"]
+                        })
+                        if result.rowcount == 0:
+                            raise Exception("User not found, insert new")
+                        added_users.append({
+                            "name": user["name"],
+                            "email": user["email"],
+                            "password": user["password"],
+                            "action": "updated"
+                        })
+                    except:
+                        # إذا فشل UPDATE، جرب INSERT
+                        conn.execute(text("""
+                            INSERT INTO users (name, phone, email, password_hash, user_type_id, is_active)
+                            VALUES (:name, :phone, :email, :hash, :type_id, true)
+                        """), {
+                            "name": user["name"],
+                            "phone": fake_phone,
+                            "email": user["email"],
+                            "hash": password_hash,
+                            "type_id": user["user_type_id"]
+                        })
+                        added_users.append({
+                            "name": user["name"],
+                            "email": user["email"],
+                            "password": user["password"],
+                            "action": "inserted"
+                        })
                     added_count += 1
-                conn.commit()
+                    conn.commit()
             except Exception as e:
                 conn.rollback()
                 added_users.append({

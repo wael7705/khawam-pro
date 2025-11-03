@@ -4,7 +4,7 @@ Router لإعادة بناء المستخدمين - حذف وإضافة (حل ن
 from fastapi import APIRouter
 from database import engine
 from sqlalchemy import text
-import bcrypt
+from routers.auth import get_password_hash
 
 def normalize_phone(phone: str) -> str:
     """تطبيع رقم الهاتف"""
@@ -151,8 +151,8 @@ async def rebuild_users():
         
         for user in users_to_add:
             try:
-                salt = bcrypt.gensalt()
-                password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
+                # استخدام نفس دالة التشفير من auth.py لضمان التوافق
+                password_hash = get_password_hash(user["password"])
                 
                 if "phone" in user:
                     # جرب UPDATE أولاً، إذا فشل استخدم INSERT

@@ -111,8 +111,8 @@ async def init_users_endpoint(secret: str = None, reset: bool = False, db: Sessi
                     print(f"🔑 Updated password for Admin 1: {phone1}")
                 print(f"ℹ️ Admin 1 already exists: {phone1}")
         
-        # Admin 2
-        phone2 = normalize_phone("+963955773227")
+        # Admin 2 - الرقم من الصورة: 963955773227+
+        phone2 = normalize_phone("963955773227+")
         print(f"📱 Admin 2 - Normalized phone: {phone2}")
         
         if reset:
@@ -182,27 +182,27 @@ async def init_users_endpoint(secret: str = None, reset: bool = False, db: Sessi
         # Customer
         if reset:
             user = User(
-                name="عميل تجريبي",
+                name="عميل",
                 email="customer@gmail.com",
                 password_hash=get_password_hash("963214"),
                 user_type_id=customer_type.id,
                 is_active=True
             )
             db.add(user)
-            created_users.append("عميل تجريبي (customer@gmail.com)")
+            created_users.append("عميل (customer@gmail.com)")
             print(f"✅ Created Customer: customer@gmail.com / 963214")
         else:
             existing = db.query(User).filter(User.email == "customer@gmail.com").first()
             if not existing:
                 user = User(
-                    name="عميل تجريبي",
+                    name="عميل",
                     email="customer@gmail.com",
                     password_hash=get_password_hash("963214"),
                     user_type_id=customer_type.id,
                     is_active=True
                 )
                 db.add(user)
-                created_users.append("عميل تجريبي (customer@gmail.com)")
+                created_users.append("عميل (customer@gmail.com)")
                 print(f"✅ Created Customer: customer@gmail.com / 963214")
             else:
                 if not existing.password_hash:
@@ -407,8 +407,8 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
         created_users.append(f"مدير 1 ({phone1})")
         print(f"✅ Created Admin 1: {phone1} / admin123 (Hash: {password_hash1[:20]}...)")
         
-        # Admin 2
-        phone2 = normalize_phone("+963955773227")
+        # Admin 2 - الرقم من الصورة: 963955773227+
+        phone2 = normalize_phone("963955773227+")
         password_hash2 = get_password_hash("khawam-p")
         user2 = User(
             name="مدير 2",
@@ -440,14 +440,14 @@ async def reset_users_endpoint(secret: str = None, db: Session = Depends(get_db)
         customer_email = "customer@gmail.com"
         customer_password_hash = get_password_hash("963214")
         customer_user = User(
-            name="عميل تجريبي",
+            name="عميل",
             email=customer_email,
             password_hash=customer_password_hash,
             user_type_id=customer_type.id,
             is_active=True
         )
         db.add(customer_user)
-        created_users.append(f"عميل تجريبي ({customer_email})")
+        created_users.append(f"عميل ({customer_email})")
         print(f"✅ Created Customer: {customer_email} / 963214 (Hash: {customer_password_hash[:20]}...)")
         
         # 6. احفظ التغييرات

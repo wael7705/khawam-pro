@@ -27,6 +27,9 @@ async def rebuild_users():
     """
     حذف جميع المستخدمين وإضافة مستخدمين جدد
     """
+    deleted_items = {}
+    deleted_count = 0
+    conn = None
     try:
         # استخدام connection مع autocommit لتجنب مشاكل transactions
         conn = engine.connect()
@@ -40,9 +43,6 @@ async def rebuild_users():
         
         employee_type = conn.execute(text("SELECT id FROM user_types ORDER BY id LIMIT 1 OFFSET 1")).fetchone()
         employee_type_id = employee_type[0] if employee_type else admin_type_id
-        
-        deleted_items = {}
-        deleted_count = 0
         
         # خطوة 2: حذف البيانات المرتبطة (باستخدام autocommit)
         try:
@@ -257,4 +257,9 @@ async def rebuild_users():
         }
         
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+        return {"success": False, "error": str(e), "deleted_items": deleted_items, "deleted_users_count": deleted_count}

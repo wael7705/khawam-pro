@@ -4,9 +4,7 @@ Router لإصلاح تسجيل الدخول - تحديث كلمة المرور �
 from fastapi import APIRouter, Form
 from database import engine
 from sqlalchemy import text
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 def normalize_phone(phone: str) -> str:
     """تطبيع رقم الهاتف"""
@@ -72,11 +70,13 @@ async def fix_password(phone: str = None, email: str = None, password: str = Non
         
         user_id, user_name, user_phone, user_email, old_hash = user
         
-        # إنشاء hash جديد
-        new_hash = pwd_context.hash(password)
+        # إنشاء hash جديد باستخدام bcrypt مباشرة
+        password_bytes = password.encode('utf-8')
+        salt = bcrypt.gensalt()
+        new_hash = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
         
         # التحقق من أن hash يعمل
-        test_verify = pwd_context.verify(password, new_hash)
+        test_verify = bcrypt.checkpw(password_bytes, new_hash.encode('utf-8'))
         
         # تحديث hash في قاعدة البيانات
         if phone:
@@ -177,11 +177,13 @@ async def test_login(phone: str = None, email: str = None, password: str = None)
             conn.close()
             return {"error": "الحساب غير نشط"}
         
-        # التحقق من كلمة المرور
+        # التحقق من كلمة المرور باستخدام bcrypt مباشرة
         verify_result = False
         verify_error = None
         try:
-            verify_result = pwd_context.verify(password, password_hash)
+            password_bytes = password.encode('utf-8')
+            hash_bytes = password_hash.encode('utf-8')
+            verify_result = bcrypt.checkpw(password_bytes, hash_bytes)
         except Exception as e:
             verify_error = str(e)
         

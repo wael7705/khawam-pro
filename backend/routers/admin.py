@@ -1688,8 +1688,8 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         from datetime import datetime, timedelta
         
         # التحقق من وجود الأعمدة المطلوبة أولاً
+        # Get total products
         try:
-            # Get total products
             total_products = db.query(Product).filter(Product.is_visible == True).count()
         except Exception as e:
             print(f"Error getting products: {e}")

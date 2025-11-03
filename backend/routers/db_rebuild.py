@@ -4,7 +4,14 @@ Router لإعادة بناء المستخدمين - حذف وإضافة (حل ن
 from fastapi import APIRouter
 from database import engine
 from sqlalchemy import text
-from routers.auth import get_password_hash
+from passlib.context import CryptContext
+
+# استخدام نفس إعدادات passlib من auth.py
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def get_password_hash(password: str) -> str:
+    """تشفير كلمة المرور - نفس دالة auth.py"""
+    return pwd_context.hash(password)
 
 def normalize_phone(phone: str) -> str:
     """تطبيع رقم الهاتف"""

@@ -20,38 +20,50 @@ async def update_user_types_final():
         conn.commit()
         
         # تحديث أو إنشاء user_type id=2
-        # التحقق من وجود العمود type_name أولاً
-        try:
-            conn.execute(text("""
-                UPDATE user_types 
-                SET name_ar = 'موظف' 
-                WHERE id = 2
-            """))
-            if conn.execute(text("SELECT COUNT(*) FROM user_types WHERE id = 2")).scalar() == 0:
-                # إذا لم يوجد، أنشئه مع جميع الأعمدة المطلوبة
+        # التحقق من وجود السجل أولاً
+        existing = conn.execute(text("SELECT id FROM user_types WHERE id = 2")).fetchone()
+        
+        if existing:
+            # تحديث السجل الموجود
+            try:
+                # جرب مع type_name
+                conn.execute(text("""
+                    UPDATE user_types 
+                    SET name_ar = 'موظف', type_name = 'موظف' 
+                    WHERE id = 2
+                """))
+                conn.commit()
+            except Exception as e:
+                # إذا فشل، جرب بدون type_name
+                try:
+                    conn.execute(text("""
+                        UPDATE user_types 
+                        SET name_ar = 'موظف' 
+                        WHERE id = 2
+                    """))
+                    conn.commit()
+                except:
+                    pass
+        else:
+            # إنشاء سجل جديد
+            try:
+                # جرب مع type_name
                 conn.execute(text("""
                     INSERT INTO user_types (id, name_ar, type_name) 
                     VALUES (2, 'موظف', 'موظف')
-                    ON CONFLICT (id) DO UPDATE SET name_ar = 'موظف', type_name = 'موظف'
                 """))
-            conn.commit()
-        except Exception as e:
-            # إذا فشل بسبب type_name، جرب بدونها
-            try:
-                conn.execute(text("""
-                    UPDATE user_types 
-                    SET name_ar = 'موظف' 
-                    WHERE id = 2
-                """))
-                if conn.execute(text("SELECT COUNT(*) FROM user_types WHERE id = 2")).scalar() == 0:
+                conn.commit()
+            except Exception as e:
+                # إذا فشل، جرب بدون type_name
+                try:
                     conn.execute(text("""
                         INSERT INTO user_types (id, name_ar) 
                         VALUES (2, 'موظف')
-                        ON CONFLICT (id) DO UPDATE SET name_ar = 'موظف'
                     """))
-                conn.commit()
-            except:
-                pass
+                    conn.commit()
+                except Exception as e2:
+                    print(f"Error creating user_type 2: {e2}")
+                    pass
         
         # التحقق
         result = conn.execute(text("SELECT id, name_ar FROM user_types ORDER BY id")).fetchall()

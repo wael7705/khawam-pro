@@ -42,6 +42,7 @@ async def rebuild_users():
         employee_type_id = employee_type[0] if employee_type else admin_type_id
         
         deleted_items = {}
+        deleted_count = 0
         
         # خطوة 2: حذف البيانات المرتبطة (باستخدام autocommit)
         try:

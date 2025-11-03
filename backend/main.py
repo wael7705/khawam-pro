@@ -15,20 +15,28 @@ app = FastAPI(
 @app.on_event("startup")
 async def init_pricing_table_on_startup():
     """إنشاء جدول pricing_rules تلقائياً عند بدء التطبيق"""
-    import asyncio
-    
-    async def _init_table():
-        conn = None
-        try:
-            conn = engine.connect()
-        except Exception as e:
-            print(f"⚠️ تحذير: فشل الاتصال بقاعدة البيانات: {str(e)[:100]}")
-            return
-        
-        if conn is None:
-            return
+    try:
+        import asyncio
+        asyncio.create_task(_init_pricing_table())
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to initialize pricing table: {str(e)[:100]}")
 
-        try:
+async def _init_pricing_table():
+    """Create pricing_rules table"""
+    import time
+    time.sleep(2)  # Wait a bit for database to be ready
+    
+    conn = None
+    try:
+        conn = engine.connect()
+    except Exception as e:
+        print(f"⚠️ Warning: Database connection failed: {str(e)[:100]}")
+        return
+    
+    if conn is None:
+        return
+
+    try:
             # التحقق من وجود الجدول
             check_table = conn.execute(text("""
                         SELECT EXISTS (

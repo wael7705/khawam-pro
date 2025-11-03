@@ -30,85 +30,89 @@ async def rebuild_users():
     """
     حذف جميع المستخدمين وإضافة مستخدمين جدد
     """
-    conn = None
     try:
-        conn = engine.connect()
-        
         # خطوة 1: الحصول على أنواع المستخدمين
-        admin_type = conn.execute(text("SELECT id FROM user_types LIMIT 1")).fetchone()
+        conn1 = engine.connect()
+        admin_type = conn1.execute(text("SELECT id FROM user_types LIMIT 1")).fetchone()
         if not admin_type:
+            conn1.close()
             return {"success": False, "error": "لا يوجد user_types"}
         admin_type_id = admin_type[0]
         
-        # البحث عن employee type
-        employee_type = conn.execute(text("SELECT id FROM user_types ORDER BY id LIMIT 1 OFFSET 1")).fetchone()
+        employee_type = conn1.execute(text("SELECT id FROM user_types ORDER BY id LIMIT 1 OFFSET 1")).fetchone()
         if not employee_type:
-            employee_type_id = admin_type_id  # استخدام نفس ID إذا لم يوجد
+            employee_type_id = admin_type_id
         else:
             employee_type_id = employee_type[0]
+        conn1.close()
         
-        deleted_count = 0
-        added_count = 0
-        
-        # خطوة 2: حذف البيانات المرتبطة أولاً (لتجنب Foreign Key constraint)
         deleted_items = {}
+        deleted_count = 0
         
+        # خطوة 2: حذف البيانات المرتبطة - استخدام connections منفصلة
         # حذف studio_projects
         try:
-            trans = conn.begin()
-            result = conn.execute(text("DELETE FROM studio_projects"))
+            conn2 = engine.connect()
+            trans = conn2.begin()
+            result = conn2.execute(text("DELETE FROM studio_projects"))
             trans.commit()
             deleted_items["studio_projects"] = result.rowcount
+            conn2.close()
         except Exception as e:
             try:
-                trans.rollback()
+                conn2.close()
             except:
                 pass
             deleted_items["studio_projects"] = 0
-            print(f"⚠️ خطأ في حذف studio_projects: {e}")
         
         # حذف order_items
         try:
-            trans = conn.begin()
-            result = conn.execute(text("DELETE FROM order_items"))
+            conn3 = engine.connect()
+            trans = conn3.begin()
+            result = conn3.execute(text("DELETE FROM order_items"))
             trans.commit()
             deleted_items["order_items"] = result.rowcount
+            conn3.close()
         except Exception as e:
             try:
-                trans.rollback()
+                conn3.close()
             except:
                 pass
             deleted_items["order_items"] = 0
-            print(f"⚠️ خطأ في حذف order_items: {e}")
         
         # حذف orders
         try:
-            trans = conn.begin()
-            result = conn.execute(text("DELETE FROM orders"))
+            conn4 = engine.connect()
+            trans = conn4.begin()
+            result = conn4.execute(text("DELETE FROM orders"))
             trans.commit()
             deleted_items["orders"] = result.rowcount
+            conn4.close()
         except Exception as e:
             try:
-                trans.rollback()
+                conn4.close()
             except:
                 pass
             deleted_items["orders"] = 0
-            print(f"⚠️ خطأ في حذف orders: {e}")
         
-        # الآن حذف جميع المستخدمين (بعد حذف البيانات المرتبطة)
+        # حذف users
         try:
-            trans = conn.begin()
-            result = conn.execute(text("DELETE FROM users"))
+            conn5 = engine.connect()
+            trans = conn5.begin()
+            result = conn5.execute(text("DELETE FROM users"))
             trans.commit()
             deleted_count = result.rowcount
+            conn5.close()
         except Exception as e:
             try:
-                trans.rollback()
+                conn5.close()
             except:
                 pass
-            print(f"⚠️ خطأ في حذف users: {e}")
         
-        # خطوة 3: إضافة المستخدمين الجدد
+        # خطوة 3: إضافة المستخدمين الجدد - استخدام connection منفصل
+        conn6 = engine.connect()
+        trans = conn6.begin()
+        
         users_to_add = [
             {
                 "name": "وائل ناصر",
@@ -131,76 +135,67 @@ async def rebuild_users():
         ]
         
         added_users = []
+        added_count = 0
         
-        # استخدام transaction واحد لكل الإضافات
-        trans = conn.begin()
         try:
             for user in users_to_add:
-                try:
-                    # إنشاء hash كلمة المرور
-                    salt = bcrypt.gensalt()
-                    password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
-                    
-                    if "phone" in user:
-                        conn.execute(text("""
-                            INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
-                            VALUES (:name, :phone, :hash, :type_id, true)
-                        """), {
-                            "name": user["name"],
-                            "phone": user["phone"],
-                            "hash": password_hash,
-                            "type_id": user["user_type_id"]
-                        })
-                        added_users.append({
-                            "name": user["name"],
-                            "phone": user["phone"],
-                            "password": user["password"]
-                        })
-                        added_count += 1
-                    elif "email" in user:
-                        conn.execute(text("""
-                            INSERT INTO users (name, email, password_hash, user_type_id, is_active)
-                            VALUES (:name, :email, :hash, :type_id, true)
-                        """), {
-                            "name": user["name"],
-                            "email": user["email"],
-                            "hash": password_hash,
-                            "type_id": user["user_type_id"]
-                        })
-                        added_users.append({
-                            "name": user["name"],
-                            "email": user["email"],
-                            "password": user["password"]
-                        })
-                        added_count += 1
-                except Exception as e:
-                    error_msg = str(e)
-                    print(f"⚠️ خطأ في إضافة {user.get('name', 'unknown')}: {error_msg}")
-                    added_users.append({
-                        "name": user.get("name", "unknown"),
-                        "error": error_msg
+                # إنشاء hash كلمة المرور
+                salt = bcrypt.gensalt()
+                password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
+                
+                if "phone" in user:
+                    conn6.execute(text("""
+                        INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
+                        VALUES (:name, :phone, :hash, :type_id, true)
+                    """), {
+                        "name": user["name"],
+                        "phone": user["phone"],
+                        "hash": password_hash,
+                        "type_id": user["user_type_id"]
                     })
+                    added_users.append({
+                        "name": user["name"],
+                        "phone": user["phone"],
+                        "password": user["password"]
+                    })
+                elif "email" in user:
+                    conn6.execute(text("""
+                        INSERT INTO users (name, email, password_hash, user_type_id, is_active)
+                        VALUES (:name, :email, :hash, :type_id, true)
+                    """), {
+                        "name": user["name"],
+                        "email": user["email"],
+                        "hash": password_hash,
+                        "type_id": user["user_type_id"]
+                    })
+                    added_users.append({
+                        "name": user["name"],
+                        "email": user["email"],
+                        "password": user["password"]
+                    })
+                added_count += 1
+            
             trans.commit()
+            conn6.close()
+            
+            return {
+                "success": True,
+                "message": "تم إعادة بناء المستخدمين بنجاح",
+                "deleted_items": deleted_items,
+                "deleted_users_count": deleted_count,
+                "added_count": added_count,
+                "users": added_users
+            }
+            
         except Exception as e:
             trans.rollback()
-            raise
-        
-        conn.close()
-        
-        return {
-            "success": True,
-            "message": "تم إعادة بناء المستخدمين بنجاح",
-            "deleted_items": deleted_items,
-            "deleted_users_count": deleted_count,
-            "added_count": added_count,
-            "users": added_users
-        }
-        
+            conn6.close()
+            return {
+                "success": False,
+                "error": str(e),
+                "deleted_items": deleted_items,
+                "deleted_users_count": deleted_count
+            }
+            
     except Exception as e:
-        if conn:
-            try:
-                conn.close()
-            except:
-                pass
         return {"success": False, "error": str(e)}
-

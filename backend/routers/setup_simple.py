@@ -34,14 +34,23 @@ async def add_password_to_admin(name: str = None, password: str = "khawam-p", db
                     LIMIT 10
                 """), {'name': search_name}).fetchall()
             else:
-                # البحث عن جميع المديرين
-                result = conn.execute(text("""
-                    SELECT u.id, u.name, u.phone, u.email, u.password_hash, ut.name_en as user_type
-                    FROM users u
-                    JOIN user_types ut ON u.user_type_id = ut.id
-                    WHERE ut.name_en = 'admin' OR ut.name_ar = 'مدير'
-                    LIMIT 10
-                """)).fetchall()
+                # البحث عن جميع المديرين - استخدام SQL آمن
+                try:
+                    result = conn.execute(text("""
+                        SELECT u.id, u.name, u.phone, u.email, u.password_hash
+                        FROM users u
+                        JOIN user_types ut ON u.user_type_id = ut.id
+                        WHERE ut.name_en = 'admin'
+                        LIMIT 10
+                    """)).fetchall()
+                except:
+                    # إذا فشل JOIN، جرب طريقة أخرى
+                    result = conn.execute(text("""
+                        SELECT id, name, phone, email, password_hash
+                        FROM users 
+                        WHERE name LIKE '%خوام%' OR name LIKE '%أياد%'
+                        LIMIT 10
+                    """)).fetchall()
             
             if not result:
                 return {
@@ -82,7 +91,6 @@ async def add_password_to_admin(name: str = None, password: str = "khawam-p", db
             }
             
         except Exception as e:
-            conn.rollback()
             print(f"\n❌ ERROR: {e}")
             import traceback
             traceback.print_exc()

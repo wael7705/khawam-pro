@@ -93,6 +93,12 @@
   opacity: 0.7;
 }
 
+.user-type {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
 .menu-item {
   display: flex;
   align-items: center;
@@ -128,6 +134,16 @@
 .menu-item.primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.menu-item.secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 8px;
+}
+
+.menu-item.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .menu-divider {

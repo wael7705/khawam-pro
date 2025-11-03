@@ -254,3 +254,220 @@ async def get_current_user_info(
 async def logout():
     """تسجيل الخروج (على العميل حذف الـ token من التخزين المحلي)"""
     return {"message": "تم تسجيل الخروج بنجاح"}
+
+@router.post("/register")
+async def register(register_data: RegisterRequest, db: Session = Depends(get_db)):
+    """تسجيل حساب جديد"""
+    try:
+        # التحقق من أن إما البريد الإلكتروني أو الهاتف موجود
+        if not register_data.email and not register_data.phone:
+            raise HTTPException(
+                status_code=400,
+                detail="يجب إدخال البريد الإلكتروني أو رقم الهاتف"
+            )
+        
+        # التحقق من صحة البيانات
+        if register_data.email and not is_valid_email(register_data.email):
+            raise HTTPException(
+                status_code=400,
+                detail="البريد الإلكتروني غير صحيح"
+            )
+        
+        # التحقق من عدم وجود مستخدم بنفس البريد الإلكتروني
+        if register_data.email:
+            existing = db.query(User).filter(User.email == register_data.email.lower()).first()
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail="البريد الإلكتروني مستخدم بالفعل"
+                )
+        
+        # التحقق من عدم وجود مستخدم بنفس رقم الهاتف
+        if register_data.phone:
+            normalized_phone = normalize_phone(register_data.phone)
+            existing = db.query(User).filter(User.phone == normalized_phone).first()
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail="رقم الهاتف مستخدم بالفعل"
+                )
+        
+        # الحصول على نوع المستخدم (افتراضي: عميل)
+        user_type = db.query(UserType).filter(UserType.name_ar == register_data.user_type).first()
+        if not user_type:
+            # إذا لم يوجد نوع المستخدم المحدد، استخدم عميل
+            user_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
+            if not user_type:
+                raise HTTPException(
+                    status_code=500,
+                    detail="نوع المستخدم 'عميل' غير موجود في النظام"
+                )
+        
+        # تشفير كلمة المرور
+        password_hash = get_password_hash(register_data.password)
+        
+        # إنشاء المستخدم الجديد
+        new_user = User(
+            name=register_data.name,
+            email=register_data.email.lower() if register_data.email else None,
+            phone=normalize_phone(register_data.phone) if register_data.phone else None,
+            password_hash=password_hash,
+            user_type_id=user_type.id,
+            is_active=True
+        )
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        return {
+            "success": True,
+            "message": "تم إنشاء الحساب بنجاح",
+            "user": {
+                "id": new_user.id,
+                "name": new_user.name,
+                "email": new_user.email,
+                "phone": new_user.phone,
+                "user_type": {
+                    "id": user_type.id,
+                    "name_ar": user_type.name_ar,
+                    "name_en": user_type.name_en
+                }
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Registration error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"خطأ في إنشاء الحساب: {str(e)}"
+        )
+
+@router.put("/profile")
+async def update_profile(
+    profile_data: UpdateProfileRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """تحديث معلومات الحساب"""
+    try:
+        update_data = profile_data.dict(exclude_unset=True)
+        
+        # التحقق من البريد الإلكتروني إذا كان موجوداً
+        if "email" in update_data and update_data["email"]:
+            if not is_valid_email(update_data["email"]):
+                raise HTTPException(
+                    status_code=400,
+                    detail="البريد الإلكتروني غير صحيح"
+                )
+            
+            # التحقق من عدم استخدام البريد من قبل مستخدم آخر
+            existing = db.query(User).filter(
+                User.email == update_data["email"].lower(),
+                User.id != current_user.id
+            ).first()
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail="البريد الإلكتروني مستخدم بالفعل من قبل مستخدم آخر"
+                )
+            update_data["email"] = update_data["email"].lower()
+        
+        # التحقق من رقم الهاتف إذا كان موجوداً
+        if "phone" in update_data and update_data["phone"]:
+            normalized_phone = normalize_phone(update_data["phone"])
+            # التحقق من عدم استخدام الرقم من قبل مستخدم آخر
+            existing = db.query(User).filter(
+                User.phone == normalized_phone,
+                User.id != current_user.id
+            ).first()
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail="رقم الهاتف مستخدم بالفعل من قبل مستخدم آخر"
+                )
+            update_data["phone"] = normalized_phone
+        
+        # تحديث البيانات
+        for key, value in update_data.items():
+            setattr(current_user, key, value)
+        
+        db.commit()
+        db.refresh(current_user)
+        
+        # الحصول على نوع المستخدم
+        user_type = db.query(UserType).filter(UserType.id == current_user.user_type_id).first()
+        
+        return {
+            "success": True,
+            "message": "تم تحديث معلومات الحساب بنجاح",
+            "user": {
+                "id": current_user.id,
+                "name": current_user.name,
+                "email": current_user.email,
+                "phone": current_user.phone,
+                "user_type": {
+                    "id": user_type.id,
+                    "name_ar": user_type.name_ar,
+                    "name_en": user_type.name_en
+                },
+                "is_active": current_user.is_active
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Profile update error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"خطأ في تحديث الحساب: {str(e)}"
+        )
+
+@router.put("/change-password")
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """تغيير كلمة المرور"""
+    try:
+        # التحقق من كلمة المرور الحالية
+        if not verify_password(password_data.current_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=400,
+                detail="كلمة المرور الحالية غير صحيحة"
+            )
+        
+        # التحقق من أن كلمة المرور الجديدة مختلفة
+        if verify_password(password_data.new_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=400,
+                detail="كلمة المرور الجديدة يجب أن تكون مختلفة عن الحالية"
+            )
+        
+        # تحديث كلمة المرور
+        current_user.password_hash = get_password_hash(password_data.new_password)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "تم تغيير كلمة المرور بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Password change error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"خطأ في تغيير كلمة المرور: {str(e)}"
+        )

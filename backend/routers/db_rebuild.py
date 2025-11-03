@@ -68,30 +68,53 @@ async def rebuild_users():
             conn.rollback()
             deleted_items["orders"] = 0
         
-        # حذف users - استخدام ON CASCADE أو حذف يدوي للبيانات المرتبطة أولاً
-        # حذف كل ما يرتبط بالمستخدمين
+        # حذف users المحددين أولاً (لتجنب duplicate)
+        phones_to_delete = [normalize_phone("0966320114"), normalize_phone("+963955773227")]
+        for phone in phones_to_delete:
+            try:
+                conn.execute(text("DELETE FROM users WHERE phone = :phone"), {"phone": phone})
+                conn.commit()
+            except:
+                conn.rollback()
+        
+        # حذف جميع studio_projects و orders و order_items
         try:
-            # حذف studio_projects المرتبطة بالمستخدمين
-            conn.execute(text("DELETE FROM studio_projects WHERE user_id IS NOT NULL"))
+            conn.execute(text("DELETE FROM studio_projects"))
             conn.commit()
         except:
             conn.rollback()
         
         try:
-            # حذف orders المرتبطة بالمستخدمين
-            conn.execute(text("DELETE FROM orders WHERE customer_id IS NOT NULL"))
+            conn.execute(text("DELETE FROM order_items"))
             conn.commit()
         except:
             conn.rollback()
         
-        # الآن حذف users
+        try:
+            conn.execute(text("DELETE FROM orders"))
+            conn.commit()
+        except:
+            conn.rollback()
+        
+        # الآن حذف جميع users
         try:
             result = conn.execute(text("DELETE FROM users"))
             conn.commit()
             deleted_count = result.rowcount
         except Exception as e:
             conn.rollback()
-            deleted_count = 0
+            # إذا فشل، جرب حذف واحد واحد
+            try:
+                all_users = conn.execute(text("SELECT id FROM users")).fetchall()
+                for user_id in [u[0] for u in all_users]:
+                    try:
+                        conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+                        conn.commit()
+                        deleted_count += 1
+                    except:
+                        conn.rollback()
+            except:
+                pass
         
         # خطوة 3: إضافة المستخدمين الجدد
         users_to_add = [
@@ -140,13 +163,14 @@ async def rebuild_users():
                     })
                     added_count += 1
                 elif "email" in user:
-                    # إضافة phone فارغ أو رقم وهمي لأن العمود مطلوب
+                    # إضافة phone فريد لأن العمود مطلوب
+                    fake_phone = f"999{added_count}{added_count}{added_count}"
                     conn.execute(text("""
                         INSERT INTO users (name, phone, email, password_hash, user_type_id, is_active)
                         VALUES (:name, :phone, :email, :hash, :type_id, true)
                     """), {
                         "name": user["name"],
-                        "phone": "0000000000",  # رقم وهمي لأن phone مطلوب
+                        "phone": fake_phone,
                         "email": user["email"],
                         "hash": password_hash,
                         "type_id": user["user_type_id"]

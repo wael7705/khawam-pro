@@ -74,7 +74,10 @@ export const studioAPI = {
 // Auth API
 export const authAPI = {
   login: (username: string, password: string) => api.post('/auth/login', { username, password }),
+  register: (data: any) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
+  updateProfile: (data: any) => api.put('/auth/profile', data),
+  changePassword: (data: { current_password: string; new_password: string }) => api.put('/auth/change-password', data),
   logout: () => api.post('/auth/logout'),
 }
 

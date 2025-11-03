@@ -39,6 +39,22 @@ class UserResponse(BaseModel):
     user_type: dict
     is_active: bool
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    password: str
+    user_type: str = "عميل"  # Default to customer
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 # Helper functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """التحقق من كلمة المرور"""

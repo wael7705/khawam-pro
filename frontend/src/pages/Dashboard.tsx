@@ -9,6 +9,7 @@ import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
 import CustomersManagement from './Dashboard/CustomersManagement'
 import Studio from './Studio'
+import ProfileSettings from './ProfileSettings'
 import { isEmployee, isAdmin, getUserData, isAuthenticated } from '../lib/auth'
 import './Dashboard.css'
 
@@ -153,6 +154,7 @@ export default function Dashboard() {
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}
             {isAdmin() && <Route path="/works" element={<WorksManagement />} />}
             <Route path="/studio" element={<Studio />} />
+            <Route path="/profile" element={<ProfileSettings />} />
             <Route path="*" element={<Navigate to={isEmployee() ? "/dashboard/orders" : "/dashboard"} replace />} />
           </Routes>
         </main>

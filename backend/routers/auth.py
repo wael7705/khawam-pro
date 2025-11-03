@@ -193,8 +193,12 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         user = None
         normalized_phone = None
         if is_valid_email(username):
-            # البحث بالبريد الإلكتروني
+            # البحث بالبريد الإلكتروني - جرب مع lower وبدون
             user = db.query(User).filter(User.email == username.lower()).first()
+            if not user:
+                # جرب البحث بدون lower أيضاً
+                user = db.query(User).filter(User.email == username).first()
+            print(f"🔍 Searching for email: {username}, found: {user.id if user else 'None'}")
         elif is_valid_phone(username):
             # البحث برقم الهاتف (مطبيع)
             normalized_phone = normalize_phone(username)
@@ -238,7 +242,23 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             )
         
         # التحقق من كلمة المرور
-        if not verify_password(password, user.password_hash):
+        print(f"🔍 Verifying password for user {user.id}")
+        print(f"   Password hash exists: {bool(user.password_hash)}")
+        print(f"   Hash starts with $2b: {user.password_hash.startswith('$2b') if user.password_hash else False}")
+        print(f"   Hash length: {len(user.password_hash) if user.password_hash else 0}")
+        
+        try:
+            verify_result = verify_password(password, user.password_hash)
+            print(f"   Verify result: {verify_result}")
+            if not verify_result:
+                raise HTTPException(
+                    status_code=401,
+                    detail="اسم المستخدم أو كلمة المرور غير صحيحة"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"⚠️ Error in password verification: {e}")
             raise HTTPException(
                 status_code=401,
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"

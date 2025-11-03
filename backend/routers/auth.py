@@ -200,23 +200,51 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 user = db.query(User).filter(User.email == username).first()
             print(f"🔍 Searching for email: {username}, found: {user.id if user else 'None'}")
         elif is_valid_phone(username):
-            # البحث برقم الهاتف (مطبيع)
+            # البحث برقم الهاتف - جرب جميع الأشكال الممكنة
             normalized_phone = normalize_phone(username)
-            user = db.query(User).filter(User.phone == normalized_phone).first()
+            print(f"🔍 Searching for phone: {username}, normalized: {normalized_phone}")
             
-            # إذا لم يُوجد، جرب البحث بصيغ مختلفة
+            # إنشاء قائمة بجميع الأشكال الممكنة للرقم
+            phone_variants = []
+            
+            # 1. الرقم كما أدخله المستخدم
+            phone_variants.append(username)
+            
+            # 2. الرقم المطبيع
+            phone_variants.append(normalized_phone)
+            
+            # 3. الرقم بدون +
+            phone_variants.append(normalized_phone.replace('+', ''))
+            
+            # 4. إذا كان يبدأ بـ 0، جرب بدون 0
+            if username.startswith('0'):
+                phone_variants.append(username[1:])
+                # جرب 963 + الرقم بدون 0
+                phone_variants.append('963' + username[1:])
+                phone_variants.append('+963' + username[1:])
+                # جرب بدون 0 وأول رقم (رقم المنطقة)
+                if len(username) >= 10:
+                    phone_variants.append('+963' + username[2:])
+                    phone_variants.append('963' + username[2:])
+            
+            # 5. إذا كان يبدأ بـ +963، جرب بدون +
+            if username.startswith('+963'):
+                phone_variants.append(username[1:])
+            
+            # 6. إذا كان يبدأ بـ 963، جرب مع +
+            if username.startswith('963') and not username.startswith('+'):
+                phone_variants.append('+' + username)
+            
+            # البحث في جميع الأشكال
+            for variant in phone_variants:
+                if variant:
+                    user = db.query(User).filter(User.phone == variant).first()
+                    if user:
+                        print(f"✅ Found user with phone variant: {variant}")
+                        break
+            
             if not user:
-                # جرب البحث بالرقم كما هو
-                user = db.query(User).filter(User.phone == username).first()
-                
-                # جرب البحث بصيغ مختلفة للرقم السوري
-                if not user and username.startswith('0'):
-                    # إذا كان يبدأ بـ 0، جرب بدون الصفر
-                    try_no_zero = username[1:] if len(username) > 1 else username
-                    # جرب +963 + الرقم بدون 0 وأول رقم
-                    if len(try_no_zero) >= 9:
-                        try_without_area = '+963' + try_no_zero[1:]  # إزالة أول رقم (رقم المنطقة)
-                        user = db.query(User).filter(User.phone == try_without_area).first()
+                print(f"❌ User not found. Tried variants: {phone_variants}")
         else:
             raise HTTPException(
                 status_code=400,

@@ -209,6 +209,8 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             error_msg = "اسم المستخدم أو كلمة المرور غير صحيحة"
             if normalized_phone:
                 error_msg += f" (بحث عن: {normalized_phone})"
+            # إضافة رسالة توضيحية إذا كان المستخدم غير موجود
+            print(f"❌ Login failed: username={username}, normalized_phone={normalized_phone}")
             raise HTTPException(
                 status_code=401,
                 detail=error_msg

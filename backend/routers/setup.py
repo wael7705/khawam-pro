@@ -14,10 +14,12 @@ router = APIRouter()
 SETUP_SECRET = os.getenv("SETUP_SECRET", "khawam-init-secret-2024")
 
 @router.post("/init-users")
+@router.get("/init-users")
 async def init_users_endpoint(secret: str = None, db: Session = Depends(get_db)):
     """
     Initialize default users in database
     Can be called without secret for initial setup (change in production)
+    Supports both GET and POST methods for easy browser access
     """
     # Allow without secret for initial setup for easier testing
     if secret and secret != SETUP_SECRET and secret != "khawam-init-secret-2024":

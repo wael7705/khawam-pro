@@ -55,37 +55,57 @@ async def rebuild_users():
         
         # حذف studio_projects
         try:
-            with conn.begin():
-                result = conn.execute(text("DELETE FROM studio_projects"))
-                deleted_items["studio_projects"] = result.rowcount
+            trans = conn.begin()
+            result = conn.execute(text("DELETE FROM studio_projects"))
+            trans.commit()
+            deleted_items["studio_projects"] = result.rowcount
         except Exception as e:
+            try:
+                trans.rollback()
+            except:
+                pass
             deleted_items["studio_projects"] = 0
             print(f"⚠️ خطأ في حذف studio_projects: {e}")
         
         # حذف order_items
         try:
-            with conn.begin():
-                result = conn.execute(text("DELETE FROM order_items"))
-                deleted_items["order_items"] = result.rowcount
+            trans = conn.begin()
+            result = conn.execute(text("DELETE FROM order_items"))
+            trans.commit()
+            deleted_items["order_items"] = result.rowcount
         except Exception as e:
+            try:
+                trans.rollback()
+            except:
+                pass
             deleted_items["order_items"] = 0
             print(f"⚠️ خطأ في حذف order_items: {e}")
         
         # حذف orders
         try:
-            with conn.begin():
-                result = conn.execute(text("DELETE FROM orders"))
-                deleted_items["orders"] = result.rowcount
+            trans = conn.begin()
+            result = conn.execute(text("DELETE FROM orders"))
+            trans.commit()
+            deleted_items["orders"] = result.rowcount
         except Exception as e:
+            try:
+                trans.rollback()
+            except:
+                pass
             deleted_items["orders"] = 0
             print(f"⚠️ خطأ في حذف orders: {e}")
         
         # الآن حذف جميع المستخدمين (بعد حذف البيانات المرتبطة)
         try:
-            with conn.begin():
-                result = conn.execute(text("DELETE FROM users"))
-                deleted_count = result.rowcount
+            trans = conn.begin()
+            result = conn.execute(text("DELETE FROM users"))
+            trans.commit()
+            deleted_count = result.rowcount
         except Exception as e:
+            try:
+                trans.rollback()
+            except:
+                pass
             print(f"⚠️ خطأ في حذف users: {e}")
         
         # خطوة 3: إضافة المستخدمين الجدد

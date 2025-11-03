@@ -88,8 +88,8 @@ async def rebuild_users():
                 salt = bcrypt.gensalt()
                 password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
                 
-                with conn.begin():
-                    if "phone" in user:
+                if "phone" in user:
+                    with conn.begin():
                         conn.execute(text("""
                             INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
                             VALUES (:name, :phone, :hash, :type_id, true)
@@ -99,12 +99,14 @@ async def rebuild_users():
                             "hash": password_hash,
                             "type_id": user["user_type_id"]
                         })
-                        added_users.append({
-                            "name": user["name"],
-                            "phone": user["phone"],
-                            "password": user["password"]
-                        })
-                    elif "email" in user:
+                    added_users.append({
+                        "name": user["name"],
+                        "phone": user["phone"],
+                        "password": user["password"]
+                    })
+                    added_count += 1
+                elif "email" in user:
+                    with conn.begin():
                         conn.execute(text("""
                             INSERT INTO users (name, email, password_hash, user_type_id, is_active)
                             VALUES (:name, :email, :hash, :type_id, true)
@@ -114,14 +116,19 @@ async def rebuild_users():
                             "hash": password_hash,
                             "type_id": user["user_type_id"]
                         })
-                        added_users.append({
-                            "name": user["name"],
-                            "email": user["email"],
-                            "password": user["password"]
-                        })
-                added_count += 1
+                    added_users.append({
+                        "name": user["name"],
+                        "email": user["email"],
+                        "password": user["password"]
+                    })
+                    added_count += 1
             except Exception as e:
-                print(f"⚠️ خطأ في إضافة {user['name']}: {e}")
+                error_msg = str(e)
+                print(f"⚠️ خطأ في إضافة {user.get('name', 'unknown')}: {error_msg}")
+                added_users.append({
+                    "name": user.get("name", "unknown"),
+                    "error": error_msg
+                })
         
         conn.close()
         

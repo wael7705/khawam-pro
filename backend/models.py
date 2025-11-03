@@ -120,9 +120,9 @@ class Order(Base):
     status = Column(String(20), default="pending")  # pending, accepted, preparing, shipping, awaiting_pickup, completed, cancelled, rejected
     total_amount = Column(DECIMAL(12, 2), nullable=False)  # المبلغ الأصلي
     final_amount = Column(DECIMAL(12, 2), nullable=False)  # المبلغ النهائي بعد الخصومات
-    # نظام التقسيط
-    paid_amount = Column(DECIMAL(12, 2), default=0)  # المبلغ المدفوع
-    remaining_amount = Column(DECIMAL(12, 2), default=0)  # المبلغ المتبقي
+    # نظام التقسيط - قد لا تكون موجودة في قاعدة البيانات
+    paid_amount = Column(DECIMAL(12, 2), default=0, nullable=True)  # المبلغ المدفوع
+    remaining_amount = Column(DECIMAL(12, 2), default=0, nullable=True)  # المبلغ المتبقي
     payment_method = Column(String(50), default="sham_cash")  # طريقة الدفع
     payment_status = Column(String(20), default="pending")  # pending, partial, paid, refunded
     delivery_type = Column(String(20), default="self")  # self or delivery

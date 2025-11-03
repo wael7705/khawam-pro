@@ -1684,33 +1684,57 @@ async def upload_image_by_url(url: str = Form(...)):
 async def get_dashboard_stats(db: Session = Depends(get_db)):
     """Get dashboard statistics"""
     try:
-        from sqlalchemy import func
+        from sqlalchemy import func, text
         from datetime import datetime, timedelta
         
-        # Get total products
-        total_products = db.query(Product).filter(Product.is_visible == True).count()
+        # التحقق من وجود الأعمدة المطلوبة أولاً
+        try:
+            # Get total products
+            total_products = db.query(Product).filter(Product.is_visible == True).count()
+        except Exception as e:
+            print(f"Error getting products: {e}")
+            total_products = 0
         
-        # Get active orders (not completed, cancelled, or rejected)
-        active_orders = db.query(Order).filter(
-            Order.status.notin_(['completed', 'cancelled', 'rejected'])
-        ).count()
+        # Get active orders using raw SQL لتجنب مشاكل الأعمدة المفقودة
+        try:
+            active_orders_result = db.execute(text("""
+                SELECT COUNT(*) 
+                FROM orders 
+                WHERE status NOT IN ('completed', 'cancelled', 'rejected')
+            """)).scalar()
+            active_orders = active_orders_result or 0
+        except Exception as e:
+            print(f"Error getting active orders: {e}")
+            active_orders = 0
         
-        # Get total revenue (sum of final_amount for completed orders)
-        total_revenue_result = db.query(func.sum(Order.final_amount)).filter(
-            Order.status == 'completed'
-        ).scalar()
-        total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
+        # Get total revenue using raw SQL
+        try:
+            total_revenue_result = db.execute(text("""
+                SELECT COALESCE(SUM(final_amount), 0) 
+                FROM orders 
+                WHERE status = 'completed'
+            """)).scalar()
+            total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
+        except Exception as e:
+            print(f"Error getting total revenue: {e}")
+            total_revenue = 0.0
         
         # Low stock (placeholder - implement based on your inventory system)
         low_stock = 0
         
-        # Get this month's revenue
+        # Get this month's revenue using raw SQL
         start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        this_month_revenue = db.query(func.sum(Order.final_amount)).filter(
-            Order.status == 'completed',
-            Order.created_at >= start_of_month
-        ).scalar()
-        this_month_revenue = float(this_month_revenue) if this_month_revenue else 0.0
+        try:
+            this_month_revenue_result = db.execute(text("""
+                SELECT COALESCE(SUM(final_amount), 0) 
+                FROM orders 
+                WHERE status = 'completed' 
+                AND created_at >= :start_date
+            """), {"start_date": start_of_month}).scalar()
+            this_month_revenue = float(this_month_revenue_result) if this_month_revenue_result else 0.0
+        except Exception as e:
+            print(f"Error getting this month revenue: {e}")
+            this_month_revenue = 0.0
         
         # Get last month's revenue for comparison
         if start_of_month.month == 1:
@@ -1719,30 +1743,55 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
             last_month_start = datetime(start_of_month.year, start_of_month.month - 1, 1)
         
         last_month_end = start_of_month - timedelta(days=1)
-        last_month_revenue = db.query(func.sum(Order.final_amount)).filter(
-            Order.status == 'completed',
-            Order.created_at >= last_month_start,
-            Order.created_at < start_of_month
-        ).scalar()
-        last_month_revenue = float(last_month_revenue) if last_month_revenue else 0.0
+        try:
+            last_month_revenue_result = db.execute(text("""
+                SELECT COALESCE(SUM(final_amount), 0) 
+                FROM orders 
+                WHERE status = 'completed' 
+                AND created_at >= :last_month_start 
+                AND created_at < :start_of_month
+            """), {
+                "last_month_start": last_month_start,
+                "start_of_month": start_of_month
+            }).scalar()
+            last_month_revenue = float(last_month_revenue_result) if last_month_revenue_result else 0.0
+        except Exception as e:
+            print(f"Error getting last month revenue: {e}")
+            last_month_revenue = 0.0
         
         # Calculate revenue trend
         revenue_trend = 0.0
         if last_month_revenue > 0:
             revenue_trend = ((this_month_revenue - last_month_revenue) / last_month_revenue) * 100
         
-        # Get active orders trend
-        this_month_active = db.query(func.count(Order.id)).filter(
-            Order.created_at >= start_of_month,
-            Order.status.notin_(['completed', 'cancelled', 'rejected'])
-        ).scalar()
-        last_month_active = db.query(func.count(Order.id)).filter(
-            Order.created_at >= last_month_start,
-            Order.created_at < start_of_month,
-            Order.status.notin_(['completed', 'cancelled', 'rejected'])
-        ).scalar()
-        this_month_active = this_month_active or 0
-        last_month_active = last_month_active or 0
+        # Get active orders trend using raw SQL
+        try:
+            this_month_active_result = db.execute(text("""
+                SELECT COUNT(*) 
+                FROM orders 
+                WHERE created_at >= :start_date 
+                AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """), {"start_date": start_of_month}).scalar()
+            this_month_active = this_month_active_result or 0
+        except Exception as e:
+            print(f"Error getting this month active: {e}")
+            this_month_active = 0
+        
+        try:
+            last_month_active_result = db.execute(text("""
+                SELECT COUNT(*) 
+                FROM orders 
+                WHERE created_at >= :last_month_start 
+                AND created_at < :start_of_month
+                AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """), {
+                "last_month_start": last_month_start,
+                "start_of_month": start_of_month
+            }).scalar()
+            last_month_active = last_month_active_result or 0
+        except Exception as e:
+            print(f"Error getting last month active: {e}")
+            last_month_active = 0
         
         orders_trend = 0.0
         if last_month_active > 0:

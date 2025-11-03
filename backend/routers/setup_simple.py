@@ -33,27 +33,83 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         conn = engine.connect()
         
         try:
-            # Step 1: Get admin and employee type IDs
-            admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
-            employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
+            # Step 1: Get admin and employee type IDs using SQL directly
+            # استخدام SQL مباشر لتجنب مشاكل ORM مع البنية المختلفة
+            admin_result = None
+            employee_result = None
             
-            if not admin_type or not employee_type:
-                # Create user types first if they don't exist
-                if not admin_type:
-                    admin_type = UserType(name_ar="مدير", name_en="admin", permissions={"all": True})
-                    db.add(admin_type)
-                if not employee_type:
-                    employee_type = UserType(name_ar="موظف", name_en="employee", permissions={"orders": True, "products": True, "services": True})
-                    db.add(employee_type)
-                db.commit()
-                admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
-                employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
+            # محاولة البحث بـ name_ar أولاً
+            try:
+                admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'مدير'")).fetchone()
+                employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'موظف'")).fetchone()
+            except:
+                # إذا فشل، حاول name_en
+                try:
+                    admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin'")).fetchone()
+                    employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'employee'")).fetchone()
+                except:
+                    pass
             
-            # Get IDs of users to delete (admins and employees only)
-            users_to_delete = db.query(User).filter(
-                User.user_type_id.in_([admin_type.id, employee_type.id])
-            ).all()
-            user_ids_to_delete = [u.id for u in users_to_delete]
+            # إنشاء أنواع المستخدمين إذا لم تكن موجودة
+            if not admin_result:
+                try:
+                    # محاولة إضافة name_ar للجدول إذا لم يكن موجوداً
+                    try:
+                        conn.execute(text("ALTER TABLE user_types ADD COLUMN IF NOT EXISTS name_ar VARCHAR(50)"))
+                        conn.commit()
+                    except:
+                        pass
+                    
+                    # إنشاء نوع المدير
+                    conn.execute(text("""
+                        INSERT INTO user_types (name_en, permissions) 
+                        VALUES ('admin', '{"all": true}'::jsonb)
+                        ON CONFLICT DO NOTHING
+                    """))
+                    conn.commit()
+                    admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin'")).fetchone()
+                    if admin_result:
+                        # تحديث name_ar إذا كان الجدول يدعمه
+                        try:
+                            conn.execute(text("UPDATE user_types SET name_ar = 'مدير' WHERE id = :id"), {'id': admin_result[0]})
+                            conn.commit()
+                        except:
+                            pass
+                except Exception as e:
+                    print(f"   ⚠️  خطأ في إنشاء نوع المدير: {e}")
+            
+            if not employee_result:
+                try:
+                    conn.execute(text("""
+                        INSERT INTO user_types (name_en, permissions) 
+                        VALUES ('employee', '{"orders": true, "products": true, "services": true}'::jsonb)
+                        ON CONFLICT DO NOTHING
+                    """))
+                    conn.commit()
+                    employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'employee'")).fetchone()
+                    if employee_result:
+                        try:
+                            conn.execute(text("UPDATE user_types SET name_ar = 'موظف' WHERE id = :id"), {'id': employee_result[0]})
+                            conn.commit()
+                        except:
+                            pass
+                except Exception as e:
+                    print(f"   ⚠️  خطأ في إنشاء نوع الموظف: {e}")
+            
+            if not admin_result or not employee_result:
+                raise Exception("لا يمكن الحصول على أو إنشاء أنواع المستخدمين")
+            
+            admin_id = admin_result[0]
+            employee_id = employee_result[0]
+            
+            print(f"   ✅ Admin ID: {admin_id}, Employee ID: {employee_id}")
+            
+            # Get IDs of users to delete (admins and employees only) using SQL
+            users_result = conn.execute(text("""
+                SELECT id FROM users 
+                WHERE user_type_id IN (:admin_id, :employee_id)
+            """), {'admin_id': admin_id, 'employee_id': employee_id}).fetchall()
+            user_ids_to_delete = [row[0] for row in users_result]
             
             if not user_ids_to_delete:
                 print("ℹ️  No admins or employees found to delete")
@@ -170,107 +226,216 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
             if 'trans' in locals() and trans:
                 trans.rollback()
             raise
-        finally:
-            conn.close()
         
         print("\n" + "=" * 70)
         print("✅ Database cleared successfully!")
         print("=" * 70)
         
-        # Step 7: Create user types if needed
+        # Step 7: Create user types if needed (using SQL directly)
         print("\n6️⃣ Ensuring user types exist...")
-        admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
-        if not admin_type:
-            admin_type = UserType(name_ar="مدير", name_en="admin", permissions={"all": True})
-            db.add(admin_type)
+        
+        # استخدام SQL مباشر للتحقق من وجود الجدول والأعمدة
+        try:
+            # التحقق من وجود الجدول
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'user_types'
+                )
+            """)).scalar()
             
-        employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
-        if not employee_type:
-            employee_type = UserType(name_ar="موظف", name_en="employee", permissions={"orders": True, "products": True, "services": True})
-            db.add(employee_type)
+            if not result:
+                # إنشاء جدول user_types
+                print("   ⚠️  جدول user_types غير موجود، جاري إنشائه...")
+                conn.execute(text("""
+                    CREATE TABLE user_types (
+                        id SERIAL PRIMARY KEY,
+                        name_ar VARCHAR(50) NOT NULL,
+                        name_en VARCHAR(50),
+                        permissions JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.commit()
             
-        customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
-        if not customer_type:
-            customer_type = UserType(name_ar="عميل", name_en="customer", permissions={"orders": True, "view": True})
-            db.add(customer_type)
+            # التحقق من وجود name_ar
+            try:
+                conn.execute(text("SELECT name_ar FROM user_types LIMIT 1"))
+            except:
+                # إضافة العمود إذا لم يكن موجوداً
+                print("   ⚠️  عمود name_ar غير موجود، جاري إضافته...")
+                try:
+                    conn.execute(text("ALTER TABLE user_types ADD COLUMN name_ar VARCHAR(50)"))
+                    conn.commit()
+                except:
+                    pass
+            
+            # الحصول على أو إنشاء أنواع المستخدمين باستخدام SQL
+            admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'مدير'")).fetchone()
+            if not admin_result:
+                conn.execute(text("""
+                    INSERT INTO user_types (name_ar, name_en, permissions) 
+                    VALUES ('مدير', 'admin', '{"all": true}'::jsonb)
+                """))
+                conn.commit()
+                admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'مدير'")).fetchone()
+            
+            employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'موظف'")).fetchone()
+            if not employee_result:
+                conn.execute(text("""
+                    INSERT INTO user_types (name_ar, name_en, permissions) 
+                    VALUES ('موظف', 'employee', '{"orders": true, "products": true, "services": true}'::jsonb)
+                """))
+                conn.commit()
+                employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'موظف'")).fetchone()
+            
+            customer_result = conn.execute(text("SELECT id FROM user_types WHERE name_ar = 'عميل'")).fetchone()
+            if not customer_result:
+                conn.execute(text("""
+                    INSERT INTO user_types (name_ar, name_en, permissions) 
+                    VALUES ('عميل', 'customer', '{"orders": true, "view": true}'::jsonb)
+                """))
+                conn.commit()
+            
+            admin_id = admin_result[0]
+            employee_id = employee_result[0]
+            
+            print(f"   ✅ User types ready - Admin ID: {admin_id}, Employee ID: {employee_id}")
+            
+        except Exception as e:
+            print(f"   ⚠️  خطأ في التحقق من user_types: {e}")
+            # محاولة استخدام SQL مباشر كبديل
+            try:
+                # محاولة إنشاء أنواع المستخدمين باستخدام SQL فقط
+                admin_result = None
+                employee_result = None
+                
+                # محاولة البحث بـ name_en إذا كان name_ar غير موجود
+                try:
+                    admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin'")).fetchone()
+                    employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'employee'")).fetchone()
+                except:
+                    pass
+                
+                if not admin_result:
+                    conn.execute(text("""
+                        INSERT INTO user_types (name_en, permissions) 
+                        VALUES ('admin', '{"all": true}'::jsonb)
+                        ON CONFLICT DO NOTHING
+                    """))
+                    conn.commit()
+                    admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin'")).fetchone()
+                
+                if not employee_result:
+                    conn.execute(text("""
+                        INSERT INTO user_types (name_en, permissions) 
+                        VALUES ('employee', '{"orders": true, "products": true, "services": true}'::jsonb)
+                        ON CONFLICT DO NOTHING
+                    """))
+                    conn.commit()
+                    employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'employee'")).fetchone()
+                
+                if admin_result and employee_result:
+                    admin_id = admin_result[0]
+                    employee_id = employee_result[0]
+                    print(f"   ✅ User types ready (SQL fallback) - Admin ID: {admin_id}, Employee ID: {employee_id}")
+                else:
+                    raise Exception("لا يمكن الحصول على أو إنشاء أنواع المستخدمين")
+            except Exception as e2:
+                print(f"   ❌ خطأ في إنشاء أنواع المستخدمين: {e2}")
+                raise
         
-        db.commit()
-        
-        # Refresh
-        admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
-        employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
-        customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
-        print("   ✅ User types ready")
-        
-        # Step 8: Create default users (admins and employees)
+        # Step 8: Create default users (admins and employees) using SQL
         print("\n7️⃣ Creating default admin and employee users...")
         created_users = []
         
+        # الحصول على IDs من قاعدة البيانات مرة أخرى
+        admin_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'admin' OR name_ar = 'مدير'")).fetchone()
+        employee_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'employee' OR name_ar = 'موظف'")).fetchone()
+        customer_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'customer' OR name_ar = 'عميل'")).fetchone()
+        
+        if not admin_result or not employee_result:
+            raise Exception("لا يمكن الحصول على أنواع المستخدمين")
+        
+        admin_id = admin_result[0]
+        employee_id = employee_result[0]
+        customer_id = customer_result[0] if customer_result else None
+        
         # Admin 1
         phone1 = normalize_phone("0966320114")
-        user1 = User(
-            name="مدير 1",
-            phone=phone1,
-            password_hash=get_password_hash("admin123"),
-            user_type_id=admin_type.id,
-            is_active=True
-        )
-        db.add(user1)
-        created_users.append(f"مدير 1 ({phone1})")
-        print(f"   ✅ Admin 1: {phone1} / admin123")
+        password_hash1 = get_password_hash("admin123")
+        try:
+            # حذف إذا كان موجوداً
+            conn.execute(text("DELETE FROM users WHERE phone = :phone"), {"phone": phone1})
+            conn.execute(text("""
+                INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
+                VALUES (:name, :phone, :password_hash, :user_type_id, :is_active)
+            """), {
+                'name': 'مدير 1',
+                'phone': phone1,
+                'password_hash': password_hash1,
+                'user_type_id': admin_id,
+                'is_active': True
+            })
+            conn.commit()
+            created_users.append(f"مدير 1 ({phone1})")
+            print(f"   ✅ Admin 1: {phone1} / admin123")
+        except Exception as e:
+            print(f"   ⚠️  خطأ في إنشاء مدير 1: {e}")
         
-        # Admin 2 - الرقم من الصورة: 963955773227+ (سيتم تطبيعه تلقائياً)
+        # Admin 2
         phone2 = normalize_phone("963955773227+")
-        user2 = User(
-            name="مدير 2",
-            phone=phone2,
-            password_hash=get_password_hash("khawam-p"),
-            user_type_id=admin_type.id,
-            is_active=True
-        )
-        db.add(user2)
-        created_users.append(f"مدير 2 ({phone2})")
-        print(f"   ✅ Admin 2: {phone2} / khawam-p")
+        password_hash2 = get_password_hash("khawam-p")
+        try:
+            conn.execute(text("DELETE FROM users WHERE phone = :phone"), {"phone": phone2})
+            conn.execute(text("""
+                INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
+                VALUES (:name, :phone, :password_hash, :user_type_id, :is_active)
+            """), {
+                'name': 'مدير 2',
+                'phone': phone2,
+                'password_hash': password_hash2,
+                'user_type_id': admin_id,
+                'is_active': True
+            })
+            conn.commit()
+            created_users.append(f"مدير 2 ({phone2})")
+            print(f"   ✅ Admin 2: {phone2} / khawam-p")
+        except Exception as e:
+            print(f"   ⚠️  خطأ في إنشاء مدير 2: {e}")
         
         # Employees
         for i in range(1, 4):
             email = f"khawam-{i}@gmail.com"
-            user = User(
-                name=f"موظف {i}",
-                email=email,
-                password_hash=get_password_hash(f"khawam-{i}"),
-                user_type_id=employee_type.id,
-                is_active=True
-            )
-            db.add(user)
-            created_users.append(f"موظف {i} ({email})")
-            print(f"   ✅ Employee {i}: {email} / khawam-{i}")
-        
-        # Customer
-        customer_user = User(
-            name="عميل",
-            email="customer@gmail.com",
-            password_hash=get_password_hash("963214"),
-            user_type_id=customer_type.id,
-            is_active=True
-        )
-        db.add(customer_user)
-        created_users.append("عميل (customer@gmail.com)")
-        print(f"   ✅ Customer: customer@gmail.com / 963214")
-        
-        # Commit users
-        db.commit()
+            password_hash = get_password_hash(f"khawam-{i}")
+            try:
+                conn.execute(text("DELETE FROM users WHERE email = :email"), {"email": email})
+                conn.execute(text("""
+                    INSERT INTO users (name, email, password_hash, user_type_id, is_active)
+                    VALUES (:name, :email, :password_hash, :user_type_id, :is_active)
+                """), {
+                    'name': f'موظف {i}',
+                    'email': email,
+                    'password_hash': password_hash,
+                    'user_type_id': employee_id,
+                    'is_active': True
+                })
+                conn.commit()
+                created_users.append(f"موظف {i} ({email})")
+                print(f"   ✅ Employee {i}: {email} / khawam-{i}")
+            except Exception as e:
+                print(f"   ⚠️  خطأ في إنشاء موظف {i}: {e}")
         print(f"\n💾 All {len(created_users)} users created successfully!")
         
-        # Verify
-        all_users = db.query(User).all()
-        users_without_password = [u for u in all_users if not u.password_hash]
+        # Verify using SQL
+        all_users_count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        users_without_password = conn.execute(text("SELECT COUNT(*) FROM users WHERE password_hash IS NULL OR password_hash = ''")).scalar()
         
         # Get customer count
-        customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
+        customer_result = conn.execute(text("SELECT id FROM user_types WHERE name_en = 'customer' OR name_ar = 'عميل'")).fetchone()
         customers_count = 0
-        if customer_type:
-            customers_count = db.query(User).filter(User.user_type_id == customer_type.id).count()
+        if customer_result:
+            customers_count = conn.execute(text("SELECT COUNT(*) FROM users WHERE user_type_id = :id"), {'id': customer_result[0]}).scalar()
         
         print("\n" + "=" * 70)
         print("📊 FINAL STATUS:")
@@ -281,8 +446,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         print(f"   Deleted admin/employee users: {users_deleted}")
         print(f"   Customers preserved: {customers_count}")
         print(f"   Created new users: {len(created_users)}")
-        print(f"   Total users now: {len(all_users)}")
-        print(f"   Users without password: {len(users_without_password)}")
+        print(f"   Total users now: {all_users_count}")
+        print(f"   Users without password: {users_without_password}")
         
         if users_without_password:
             print("\n⚠️  WARNING: Some users don't have passwords!")
@@ -290,6 +455,9 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
             print("\n✅ SUCCESS: All new users have password hashes!")
         
         print("=" * 70 + "\n")
+        
+        finally:
+            conn.close()
         
         return {
             "success": True,
@@ -300,8 +468,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
             "customers_preserved": customers_count,
             "created_users": len(created_users),
             "created_user_list": created_users,
-            "total_users_now": len(all_users),
-            "all_users_have_passwords": len(users_without_password) == 0,
+            "total_users_now": all_users_count,
+            "all_users_have_passwords": users_without_password == 0,
             "message": f"تم حذف {studio_deleted} مشروع استيديو و {orders_deleted} طلب و {users_deleted} مستخدم (مدير/موظف) وإنشاء {len(created_users)} مستخدم جديد. تم الاحتفاظ بـ {customers_count} عميل."
         }
         

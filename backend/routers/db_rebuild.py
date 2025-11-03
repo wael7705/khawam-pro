@@ -112,14 +112,16 @@ async def rebuild_users():
         
         added_users = []
         
-        for user in users_to_add:
-            try:
-                # إنشاء hash كلمة المرور
-                salt = bcrypt.gensalt()
-                password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
-                
-                if "phone" in user:
-                    with conn.begin():
+        # استخدام transaction واحد لكل الإضافات
+        trans = conn.begin()
+        try:
+            for user in users_to_add:
+                try:
+                    # إنشاء hash كلمة المرور
+                    salt = bcrypt.gensalt()
+                    password_hash = bcrypt.hashpw(user["password"].encode('utf-8'), salt).decode('utf-8')
+                    
+                    if "phone" in user:
                         conn.execute(text("""
                             INSERT INTO users (name, phone, password_hash, user_type_id, is_active)
                             VALUES (:name, :phone, :hash, :type_id, true)
@@ -129,14 +131,13 @@ async def rebuild_users():
                             "hash": password_hash,
                             "type_id": user["user_type_id"]
                         })
-                    added_users.append({
-                        "name": user["name"],
-                        "phone": user["phone"],
-                        "password": user["password"]
-                    })
-                    added_count += 1
-                elif "email" in user:
-                    with conn.begin():
+                        added_users.append({
+                            "name": user["name"],
+                            "phone": user["phone"],
+                            "password": user["password"]
+                        })
+                        added_count += 1
+                    elif "email" in user:
                         conn.execute(text("""
                             INSERT INTO users (name, email, password_hash, user_type_id, is_active)
                             VALUES (:name, :email, :hash, :type_id, true)
@@ -146,19 +147,23 @@ async def rebuild_users():
                             "hash": password_hash,
                             "type_id": user["user_type_id"]
                         })
+                        added_users.append({
+                            "name": user["name"],
+                            "email": user["email"],
+                            "password": user["password"]
+                        })
+                        added_count += 1
+                except Exception as e:
+                    error_msg = str(e)
+                    print(f"⚠️ خطأ في إضافة {user.get('name', 'unknown')}: {error_msg}")
                     added_users.append({
-                        "name": user["name"],
-                        "email": user["email"],
-                        "password": user["password"]
+                        "name": user.get("name", "unknown"),
+                        "error": error_msg
                     })
-                    added_count += 1
-            except Exception as e:
-                error_msg = str(e)
-                print(f"⚠️ خطأ في إضافة {user.get('name', 'unknown')}: {error_msg}")
-                added_users.append({
-                    "name": user.get("name", "unknown"),
-                    "error": error_msg
-                })
+            trans.commit()
+        except Exception as e:
+            trans.rollback()
+            raise
         
         conn.close()
         

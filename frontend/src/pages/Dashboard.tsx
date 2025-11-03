@@ -46,11 +46,11 @@ export default function Dashboard() {
   // Filter tabs based on user type
   const tabs = allTabs.filter(tab => {
     if (isEmployee()) {
-      // Employee only sees orders and studio
-      return tab.id === 'orders' || tab.id === 'studio'
+      // Employee sees: home (الرئيسية), orders (الطلبات), and studio (الاستديو)
+      return tab.id === 'home' || tab.id === 'orders' || tab.id === 'studio'
     }
     if (isAdmin()) {
-      // Admin sees all tabs
+      // Admin sees all tabs (including dashboard home and studio)
       return true
     }
     // Default: show all tabs

@@ -271,6 +271,17 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"
             )
         
+        # الحصول على name_ar من user_types
+        user_type_row = db.execute(text("""
+            SELECT id, name_ar 
+            FROM user_types 
+            WHERE id = :id
+        """), {"id": user_type_id}).fetchone()
+        
+        user_type_name_ar = None
+        if user_type_row:
+            _, user_type_name_ar = user_type_row
+        
         # إنشاء token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
@@ -288,7 +299,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 "phone": user_phone,
                 "user_type": {
                     "id": user_type_id,
-                    "name_ar": None,
+                    "name_ar": user_type_name_ar,  # الآن سيتم إرجاع القيمة الصحيحة
                     "name_en": None
                 },
                 "is_active": is_active

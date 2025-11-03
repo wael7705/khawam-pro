@@ -33,12 +33,13 @@ export default function Navbar() {
         </div>
         
         <div className="nav-right">
-          {/* Show Studio and Dashboard only for authenticated admin or employee */}
+          {/* Show Studio for admin and employee */}
           {isAuthenticated() && (isAdmin() || isEmployee()) && (
-            <>
-              <Link to="/studio" className="btn btn-primary">استيديو</Link>
-              <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
-            </>
+            <Link to="/studio" className="btn btn-primary">استيديو</Link>
+          )}
+          {/* Show Dashboard only for admin */}
+          {isAuthenticated() && isAdmin() && (
+            <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
           )}
           <UserMenu />
           <div className="logo">خوام</div>

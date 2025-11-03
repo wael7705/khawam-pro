@@ -24,19 +24,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import routers
-from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple
+# Import routers - استيراد آمن مع معالجة الأخطاء
+try:
+    from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple
+    app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+    app.include_router(products.router, prefix="/api/products", tags=["Products"])
+    app.include_router(services.router, prefix="/api/services", tags=["Services"])
+    app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
+    app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
+    app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
+    app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+    app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
+    app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
+    app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
+except ImportError as e:
+    print(f"⚠️ Warning: Error importing main routers: {e}")
 
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(products.router, prefix="/api/products", tags=["Products"])
-app.include_router(services.router, prefix="/api/services", tags=["Services"])
-app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
-app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
-app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
-app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
-app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
+# إضافة router اختبار قاعدة البيانات
+try:
+    from routers import test_db
+    app.include_router(test_db.router, prefix="/api", tags=["Test"])
+except ImportError as e:
+    print(f"⚠️ Warning: Error importing test_db router: {e}")
 
 # Mount static files
 if not os.path.exists("uploads"):

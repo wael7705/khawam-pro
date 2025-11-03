@@ -193,113 +193,77 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         username = login_data.username.strip()
         password = login_data.password
         
+        # استخدام raw SQL لتجنب مشكلة UserType ORM
+        from sqlalchemy import text
+        
         # تحديد نوع المعرف (بريد إلكتروني أم رقم هاتف)
-        user = None
+        user_row = None
         normalized_phone = None
+        
         if is_valid_email(username):
-            # البحث بالبريد الإلكتروني - جرب مع lower وبدون
-            user = db.query(User).filter(User.email == username.lower()).first()
-            if not user:
-                # جرب البحث بدون lower أيضاً
-                user = db.query(User).filter(User.email == username).first()
-            print(f"🔍 Searching for email: {username}, found: {user.id if user else 'None'}")
+            # البحث بالبريد الإلكتروني
+            user_row = db.execute(text("""
+                SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                FROM users
+                WHERE email = :email1 OR email = :email2
+            """), {
+                "email1": username.lower(),
+                "email2": username
+            }).fetchone()
         elif is_valid_phone(username):
             # البحث برقم الهاتف - جرب جميع الأشكال الممكنة
             normalized_phone = normalize_phone(username)
-            print(f"🔍 Searching for phone: {username}, normalized: {normalized_phone}")
+            phone_variants = [username, normalized_phone, '+' + normalized_phone]
             
-            # إنشاء قائمة بجميع الأشكال الممكنة للرقم
-            phone_variants = []
-            
-            # 1. الرقم كما أدخله المستخدم
-            phone_variants.append(username)
-            
-            # 2. الرقم المطبيع (بدون +)
-            phone_variants.append(normalized_phone)
-            
-            # 3. الرقم مع +
-            phone_variants.append('+' + normalized_phone)
-            
-            # 4. إذا كان يبدأ بـ 0، جرب 963 + الرقم بدون 0
             if username.startswith('0'):
-                # 0966320114 -> 963966320114
-                phone_variants.append('963' + username[1:])
-                phone_variants.append('+963' + username[1:])
-            
-            # 5. إذا كان يبدأ بـ +963، جرب بدون +
+                phone_variants.extend(['963' + username[1:], '+963' + username[1:]])
             if username.startswith('+963'):
                 phone_variants.append(username[1:])
-            
-            # 6. إذا كان يبدأ بـ 963، جرب مع +
             if username.startswith('963') and not username.startswith('+'):
                 phone_variants.append('+' + username)
             
             # البحث في جميع الأشكال
             for variant in phone_variants:
                 if variant:
-                    user = db.query(User).filter(User.phone == variant).first()
-                    if user:
-                        print(f"✅ Found user with phone variant: {variant}")
+                    user_row = db.execute(text("""
+                        SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                        FROM users
+                        WHERE phone = :phone
+                    """), {"phone": variant}).fetchone()
+                    if user_row:
                         break
-            
-            if not user:
-                print(f"❌ User not found. Tried variants: {phone_variants}")
         else:
             raise HTTPException(
                 status_code=400,
                 detail="الرجاء إدخال رقم هاتف صحيح أو بريد إلكتروني صحيح"
             )
         
-        if not user:
-            # إرجاع رسالة خطأ أكثر وضوحاً
-            error_msg = "اسم المستخدم أو كلمة المرور غير صحيحة"
-            if normalized_phone:
-                error_msg += f" (بحث عن: {normalized_phone})"
-            # إضافة رسالة توضيحية إذا كان المستخدم غير موجود
-            print(f"❌ Login failed: username={username}, normalized_phone={normalized_phone}")
+        if not user_row:
             raise HTTPException(
                 status_code=401,
-                detail=error_msg
+                detail="اسم المستخدم أو كلمة المرور غير صحيحة"
             )
         
-        if not user.is_active:
+        user_id, user_name, user_email, user_phone, password_hash, user_type_id, is_active = user_row
+        
+        if not is_active:
             raise HTTPException(
                 status_code=403,
                 detail="الحساب غير نشط"
             )
         
         # التحقق من كلمة المرور
-        print(f"🔍 Verifying password for user {user.id}")
-        print(f"   Password hash exists: {bool(user.password_hash)}")
-        print(f"   Hash starts with $2b: {user.password_hash.startswith('$2b') if user.password_hash else False}")
-        print(f"   Hash length: {len(user.password_hash) if user.password_hash else 0}")
-        
-        try:
-            verify_result = verify_password(password, user.password_hash)
-            print(f"   Verify result: {verify_result}")
-            if not verify_result:
-                raise HTTPException(
-                    status_code=401,
-                    detail="اسم المستخدم أو كلمة المرور غير صحيحة"
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            print(f"⚠️ Error in password verification: {e}")
+        verify_result = verify_password(password, password_hash)
+        if not verify_result:
             raise HTTPException(
                 status_code=401,
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"
             )
         
-        # الحصول على نوع المستخدم باستخدام raw SQL لتجنب مشكلة name_ar
-        from sqlalchemy import text
-        # استخدم user_type_id مباشرة من user
-        user_type_id = user.user_type_id
-        
         # إنشاء token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.id},
+            data={"sub": user_id},
             expires_delta=access_token_expires
         )
         
@@ -307,16 +271,16 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             "access_token": access_token,
             "token_type": "bearer",
             "user": {
-                "id": user.id,
-                "name": user.name,
-                "email": user.email,
-                "phone": user.phone,
+                "id": user_id,
+                "name": user_name,
+                "email": user_email,
+                "phone": user_phone,
                 "user_type": {
                     "id": user_type_id,
                     "name_ar": None,
                     "name_en": None
                 },
-                "is_active": user.is_active
+                "is_active": is_active
             }
         }
     except HTTPException:

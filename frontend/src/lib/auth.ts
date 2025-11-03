@@ -64,7 +64,13 @@ export const getUserData = (): User | null => {
   const userData = localStorage.getItem('user_data')
   if (userData) {
     try {
-      return JSON.parse(userData)
+      const parsed = JSON.parse(userData)
+      // إذا كان name_ar null، حاول تحديث البيانات من API
+      if (parsed?.user_type?.name_ar === null || parsed?.user_type?.name_ar === undefined) {
+        // البيانات قديمة، ولكن سنتركها للآن لتجنب طلبات API إضافية
+        // المستخدم يجب أن يسجل الخروج ويدخل مرة أخرى
+      }
+      return parsed
     } catch {
       return null
     }

@@ -1,12 +1,26 @@
 import { Link } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import UserMenu from './UserMenu'
-import { isAuthenticated, isAdmin, isEmployee } from '../lib/auth'
+import { isAuthenticated, isAdmin, isEmployee, getUserData } from '../lib/auth'
 import './Navbar.css'
 
 export default function Navbar() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [showStudio, setShowStudio] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
+
+  useEffect(() => {
+    // تحديث حالة الأزرار عند تغيير بيانات المستخدم
+    if (isAuthenticated()) {
+      const user = getUserData()
+      if (user) {
+        const userType = user.user_type?.name_ar
+        setShowStudio(userType === 'مدير' || userType === 'موظف')
+        setShowDashboard(userType === 'مدير')
+      }
+    }
+  }, [])
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -34,11 +48,11 @@ export default function Navbar() {
         
         <div className="nav-right">
           {/* Show Studio for admin and employee */}
-          {isAuthenticated() && (isAdmin() || isEmployee()) && (
+          {isAuthenticated() && showStudio && (
             <Link to="/studio" className="btn btn-primary">استيديو</Link>
           )}
           {/* Show Dashboard only for admin */}
-          {isAuthenticated() && isAdmin() && (
+          {isAuthenticated() && showDashboard && (
             <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
           )}
           <UserMenu />

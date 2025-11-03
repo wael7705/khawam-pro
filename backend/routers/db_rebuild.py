@@ -68,8 +68,15 @@ async def rebuild_users():
             conn.rollback()
             deleted_items["orders"] = 0
         
-        # حذف users المحددين أولاً (لتجنب duplicate)
-        phones_to_delete = [normalize_phone("0966320114"), normalize_phone("+963955773227")]
+        # حذف users المحددين أولاً (لتجنب duplicate) - جرب عدة أشكال من الأرقام
+        phones_to_delete = [
+            normalize_phone("0966320114"),
+            normalize_phone("+963955773227"),
+            "963966320114",  # الرقم الذي يظهر في الخطأ
+            "963955773227",  # الرقم الذي يظهر في الخطأ
+            "0966320114",
+            "+963955773227"
+        ]
         for phone in phones_to_delete:
             try:
                 conn.execute(text("DELETE FROM users WHERE phone = :phone"), {"phone": phone})

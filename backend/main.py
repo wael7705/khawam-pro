@@ -16,27 +16,16 @@ app = FastAPI(
 async def init_pricing_table_on_startup():
     """إنشاء جدول pricing_rules تلقائياً عند بدء التطبيق"""
     import asyncio
-    import time
     
-    # تشغيل الكود بشكل غير متزامن حتى لا يمنع التطبيق من البدء
     async def _init_table():
         conn = None
-        max_retries = 2
-        retry_delay = 3
+        try:
+            conn = engine.connect()
+        except Exception as e:
+            print(f"⚠️ تحذير: فشل الاتصال بقاعدة البيانات: {str(e)[:100]}")
+            return
         
-        for attempt in range(max_retries):
-            try:
-                conn = engine.connect()
-                break
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    print(f"⚠️ محاولة الاتصال بقاعدة البيانات ({attempt + 1}/{max_retries}): {str(e)[:100]}")
-                    await asyncio.sleep(retry_delay)
-                else:
-                    print(f"⚠️ تحذير: فشل الاتصال بقاعدة البيانات - سيتم تجربة إنشاء الجدول لاحقاً")
-                    return
-        
-        if not conn:
+        if conn is None:
             return
 
         try:

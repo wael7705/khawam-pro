@@ -49,10 +49,11 @@ except ImportError as e:
 
 # إضافة router إصلاح قاعدة البيانات (حل بديل بسيط)
 try:
-    from routers import db_fix, db_check, db_rebuild
+    from routers import db_fix, db_check, db_rebuild, test_password
     app.include_router(db_fix.router, prefix="/api/fix", tags=["Fix"])
     app.include_router(db_check.router, prefix="/api/fix", tags=["Fix"])
     app.include_router(db_rebuild.router, prefix="/api/fix", tags=["Fix"])
+    app.include_router(test_password.router, prefix="/api/fix", tags=["Fix"])
 except ImportError as e:
     print(f"⚠️ Warning: Error importing db_fix router: {e}")
 

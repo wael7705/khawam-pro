@@ -28,35 +28,40 @@ async def force_reset_users(db: Session = Depends(get_db)):
         users_deleted = 0
         studio_deleted = 0
         
+        # استخدام commits منفصلة لتجنب transaction errors
         # Step 1: Delete all order_items
         print("\n1️⃣ Deleting order_items...")
-        with engine.begin() as conn:
+        with engine.connect() as conn:
             conn.execute(text("DELETE FROM order_items"))
+            conn.commit()
         print("   ✅ Done")
         
         # Step 2: Delete all orders
         print("\n2️⃣ Deleting orders...")
-        with engine.begin() as conn:
+        with engine.connect() as conn:
             result = conn.execute(text("DELETE FROM orders"))
             orders_deleted = result.rowcount
+            conn.commit()
         print(f"   ✅ Deleted {orders_deleted} orders")
         
-        # Step 3: Delete studio_projects (if table exists) - معاملة منفصلة
+        # Step 3: Delete studio_projects (if table exists)
         print("\n3️⃣ Deleting studio_projects...")
+        studio_deleted = 0
         try:
-            with engine.begin() as conn:
+            with engine.connect() as conn:
                 result = conn.execute(text("DELETE FROM studio_projects"))
                 studio_deleted = result.rowcount
+                conn.commit()
             print(f"   ✅ Deleted {studio_deleted} studio projects")
         except Exception as e:
             print(f"   ⚠️  No studio_projects table or already empty")
-            studio_deleted = 0
         
-        # Step 4: Delete all users - معاملة منفصلة
+        # Step 4: Delete all users
         print("\n4️⃣ Deleting users...")
-        with engine.begin() as conn:
+        with engine.connect() as conn:
             result = conn.execute(text("DELETE FROM users"))
             users_deleted = result.rowcount
+            conn.commit()
         print(f"   ✅ Deleted {users_deleted} users")
         
         print("\n" + "=" * 70)

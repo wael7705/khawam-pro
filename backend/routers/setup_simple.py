@@ -12,45 +12,31 @@ router = APIRouter()
 
 @router.get("/add-password")
 @router.post("/add-password")
-async def add_password_to_admin(name: str = None, password: str = "khawam-p", db: Session = Depends(get_db)):
+async def add_password_to_admin(name: str = None, password: str = "khawam-p"):
     """
-    إضافة كلمة مرور للمدير الموجود
+    إضافة كلمة مرور للمدير الموجود - حل بسيط جداً
     """
     try:
-        print("=" * 70)
-        print("🔑 إضافة كلمة المرور للمدير")
-        print("=" * 70)
-        
         conn = engine.connect()
         
         try:
-            # البحث عن المدير بالاسم
+            # البحث البسيط عن المستخدمين - بدون JOIN
             if name:
                 search_name = f"%{name}%"
                 result = conn.execute(text("""
-                    SELECT id, name, phone, email, password_hash 
+                    SELECT id, name, phone, email 
                     FROM users 
                     WHERE name LIKE :name
                     LIMIT 10
                 """), {'name': search_name}).fetchall()
             else:
-                # البحث عن جميع المديرين - استخدام SQL آمن
-                try:
-                    result = conn.execute(text("""
-                        SELECT u.id, u.name, u.phone, u.email, u.password_hash
-                        FROM users u
-                        JOIN user_types ut ON u.user_type_id = ut.id
-                        WHERE ut.name_en = 'admin'
-                        LIMIT 10
-                    """)).fetchall()
-                except:
-                    # إذا فشل JOIN، جرب طريقة أخرى
-                    result = conn.execute(text("""
-                        SELECT id, name, phone, email, password_hash
-                        FROM users 
-                        WHERE name LIKE '%خوام%' OR name LIKE '%أياد%'
-                        LIMIT 10
-                    """)).fetchall()
+                # البحث عن أي مستخدم يحتوي على "خوام" أو "أياد" في الاسم
+                result = conn.execute(text("""
+                    SELECT id, name, phone, email
+                    FROM users 
+                    WHERE name LIKE '%خوام%' OR name LIKE '%أياد%' OR name LIKE '%Khawam%' OR name LIKE '%ayad%'
+                    LIMIT 10
+                """)).fetchall()
             
             if not result:
                 return {
@@ -58,17 +44,14 @@ async def add_password_to_admin(name: str = None, password: str = "khawam-p", db
                     "message": "لم يتم العثور على مستخدمين"
                 }
             
-            print(f"\n📋 تم العثور على {len(result)} مستخدم:")
-            for row in result:
-                print(f"   - ID: {row[0]}, Name: {row[1]}, Phone: {row[2]}, Email: {row[3]}")
-            
-            # تحديث كلمة المرور للمستخدمين
+            # تحديث كلمة المرور
             password_hash = get_password_hash(password)
             updated_count = 0
             
             for row in result:
                 user_id = row[0]
                 try:
+                    trans = conn.begin()
                     conn.execute(text("""
                         UPDATE users 
                         SET password_hash = :password_hash
@@ -77,31 +60,28 @@ async def add_password_to_admin(name: str = None, password: str = "khawam-p", db
                         'password_hash': password_hash,
                         'user_id': user_id
                     })
-                    conn.commit()
+                    trans.commit()
                     updated_count += 1
-                    print(f"   ✅ تم تحديث كلمة المرور للمستخدم ID: {user_id} ({row[1]})")
                 except Exception as e:
-                    print(f"   ⚠️  خطأ في تحديث المستخدم ID {user_id}: {e}")
+                    if 'trans' in locals():
+                        trans.rollback()
+            
+            conn.close()
             
             return {
                 "success": True,
                 "updated_count": updated_count,
                 "password": password,
-                "message": f"تم تحديث كلمة المرور لـ {updated_count} مستخدم"
+                "users": [{"id": row[0], "name": row[1]} for row in result],
+                "message": f"تم تحديث كلمة المرور لـ {updated_count} مستخدم - كلمة المرور: {password}"
             }
             
         except Exception as e:
-            print(f"\n❌ ERROR: {e}")
-            import traceback
-            traceback.print_exc()
+            if 'conn' in locals():
+                conn.close()
             raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-        finally:
-            conn.close()
             
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 @router.get("/force-reset")

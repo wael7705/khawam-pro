@@ -197,7 +197,7 @@ def require_role(allowed_roles: list[str]):
     return role_checker
 
 # Endpoints
-@router.post("/login", response_model=Token)
+@router.post("/login")  # تمت إزالة response_model مؤقتاً لتجنب مشكلة serialization
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """تسجيل الدخول باستخدام الهاتف/البريد الإلكتروني وكلمة المرور"""
     try:

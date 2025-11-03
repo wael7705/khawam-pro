@@ -35,8 +35,18 @@ async def force_reset_users(db: Session = Depends(get_db)):
             orders_deleted = result.rowcount
             print(f"   ✅ Deleted {orders_deleted} orders")
             
-            # Step 3: Delete all users
-            print("\n3️⃣ Deleting users...")
+            # Step 3: Delete studio_projects (if table exists)
+            print("\n3️⃣ Deleting studio_projects...")
+            try:
+                result = conn.execute(text("DELETE FROM studio_projects"))
+                studio_deleted = result.rowcount
+                print(f"   ✅ Deleted {studio_deleted} studio projects")
+            except Exception as e:
+                print(f"   ⚠️  No studio_projects table or already empty: {e}")
+                studio_deleted = 0
+            
+            # Step 4: Delete all users
+            print("\n4️⃣ Deleting users...")
             result = conn.execute(text("DELETE FROM users"))
             users_deleted = result.rowcount
             print(f"   ✅ Deleted {users_deleted} users")

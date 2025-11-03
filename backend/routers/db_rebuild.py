@@ -68,7 +68,23 @@ async def rebuild_users():
             conn.rollback()
             deleted_items["orders"] = 0
         
-        # حذف users
+        # حذف users - استخدام ON CASCADE أو حذف يدوي للبيانات المرتبطة أولاً
+        # حذف كل ما يرتبط بالمستخدمين
+        try:
+            # حذف studio_projects المرتبطة بالمستخدمين
+            conn.execute(text("DELETE FROM studio_projects WHERE user_id IS NOT NULL"))
+            conn.commit()
+        except:
+            conn.rollback()
+        
+        try:
+            # حذف orders المرتبطة بالمستخدمين
+            conn.execute(text("DELETE FROM orders WHERE customer_id IS NOT NULL"))
+            conn.commit()
+        except:
+            conn.rollback()
+        
+        # الآن حذف users
         try:
             result = conn.execute(text("DELETE FROM users"))
             conn.commit()

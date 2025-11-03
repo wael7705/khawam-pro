@@ -1,37 +1,37 @@
-# حل جذري لإصلاح قاعدة البيانات - PowerShell Script
-# استخدم DATABASE_URL من Railway Variables
+# Fix Database - PowerShell Script
+# Use DATABASE_URL from Railway Variables
 
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "حل جذري لإصلاح قاعدة البيانات" -ForegroundColor Cyan
+Write-Host "Database Fix Script" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# الخطوة 1: الحصول على DATABASE_URL
-Write-Host "1. نحتاج DATABASE_URL من Railway..." -ForegroundColor Yellow
+# Step 1: Get DATABASE_URL
+Write-Host "1. We need DATABASE_URL from Railway..." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "   اذهب إلى Railway Dashboard:" -ForegroundColor White
+Write-Host "   Go to Railway Dashboard:" -ForegroundColor White
 Write-Host "   -> Postgres Service -> Variables tab" -ForegroundColor White
-Write-Host "   -> انسخ قيمة DATABASE_URL" -ForegroundColor White
+Write-Host "   -> Copy DATABASE_URL value" -ForegroundColor White
 Write-Host ""
-Write-Host "   أو أدخل DATABASE_URL هنا:" -ForegroundColor Yellow
+Write-Host "   Or enter DATABASE_URL here:" -ForegroundColor Yellow
 $DATABASE_URL = Read-Host "   DATABASE_URL"
 
 if ([string]::IsNullOrWhiteSpace($DATABASE_URL)) {
     Write-Host ""
-    Write-Host "خطأ: DATABASE_URL مطلوب!" -ForegroundColor Red
+    Write-Host "Error: DATABASE_URL is required!" -ForegroundColor Red
     exit 1
 }
 
-# إصلاح postgres:// إلى postgresql://
+# Fix postgres:// to postgresql://
 if ($DATABASE_URL -like "postgres://*") {
     $DATABASE_URL = $DATABASE_URL -replace "postgres://", "postgresql://"
 }
 
 Write-Host ""
-Write-Host "تم الحصول على DATABASE_URL" -ForegroundColor Green
+Write-Host "Got DATABASE_URL" -ForegroundColor Green
 Write-Host ""
 
-# الخطوة 2: إنشاء سكريبت Python مؤقت
+# Step 2: Create temporary Python script
 $pythonScript = @"
 import sys
 import os
@@ -40,52 +40,61 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = "$DATABASE_URL"
 
 print("=" * 70)
-print("بدء عملية الإصلاح...")
+print("Starting database fix...")
 print("=" * 70)
 
 try:
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
     
-    # اختبار الاتصال
+    # Test connection
     with engine.connect() as test_conn:
         test_conn.execute(text("SELECT 1"))
-    print("تم الاتصال بقاعدة البيانات")
+    print("Connected to database")
     
-    print("\nحذف جميع البيانات المرتبطة...")
+    print("\nDeleting all related data...")
     
-    with engine.begin() as conn:
-        # حذف order_items
-        print("\n1. حذف order_items...")
+    # Delete in separate transactions
+    with engine.connect() as conn:
+        # Delete order_items
+        print("\n1. Deleting order_items...")
         conn.execute(text("DELETE FROM order_items"))
-        print("   تم")
+        conn.commit()
+        print("   Done")
         
-        # حذف orders
-        print("\n2. حذف orders...")
+        # Delete orders
+        print("\n2. Deleting orders...")
         result = conn.execute(text("DELETE FROM orders"))
-        print(f"   تم حذف {result.rowcount} طلب")
+        orders_deleted = result.rowcount
+        conn.commit()
+        print(f"   Deleted {orders_deleted} orders")
         
-        # حذف studio_projects إذا كان موجوداً
-        print("\n3. حذف studio_projects...")
+        # Delete studio_projects if exists
+        print("\n3. Deleting studio_projects...")
         try:
             result = conn.execute(text("DELETE FROM studio_projects"))
-            print(f"   تم حذف {result.rowcount} مشروع استديو")
+            studio_deleted = result.rowcount
+            conn.commit()
+            print(f"   Deleted {studio_deleted} studio projects")
         except Exception as e:
-            print(f"   لا يوجد جدول studio_projects")
+            conn.rollback()
+            print(f"   No studio_projects table")
+            studio_deleted = 0
         
-        # حذف users
-        print("\n4. حذف users...")
+        # Delete users
+        print("\n4. Deleting users...")
         result = conn.execute(text("DELETE FROM users"))
         users_deleted = result.rowcount
-        print(f"   تم حذف {users_deleted} مستخدم")
+        conn.commit()
+        print(f"   Deleted {users_deleted} users")
         
-        print("\nتم مسح قاعدة البيانات بنجاح!")
+        print("\nDatabase cleared successfully!")
     
-    # إنشاء المستخدمين الجدد
+    # Create new users
     print("\n" + "=" * 70)
-    print("إنشاء المستخدمين الجدد...")
+    print("Creating new users...")
     print("=" * 70)
     
-    # استيراد
+    # Import
     sys.path.insert(0, 'backend')
     from models import User, UserType
     from routers.auth import get_password_hash, normalize_phone
@@ -95,7 +104,7 @@ try:
     db = SessionLocal()
     
     try:
-        # إنشاء UserTypes
+        # Create UserTypes
         admin_type = db.query(UserType).filter(UserType.name_ar == "مدير").first()
         if not admin_type:
             admin_type = UserType(name_ar="مدير", name_en="admin", permissions={"all": True})
@@ -114,7 +123,7 @@ try:
         employee_type = db.query(UserType).filter(UserType.name_ar == "موظف").first()
         customer_type = db.query(UserType).filter(UserType.name_ar == "عميل").first()
         
-        # إنشاء المستخدمين
+        # Create users
         users_to_create = [
             ("مدير 1", normalize_phone("0966320114"), None, "admin123", admin_type.id),
             ("مدير 2", normalize_phone("+963955773227"), None, "khawam-p", admin_type.id),
@@ -137,58 +146,64 @@ try:
             db.add(user)
             created += 1
             identifier = phone or email
-            print(f"   تم إنشاء: {name} ({identifier})")
+            print(f"   Created: {name} ({identifier})")
         
         db.commit()
         
-        # التحقق
+        # Verify
         all_users = db.query(User).all()
         users_without_password = [u for u in all_users if not u.password_hash]
         
         print("\n" + "=" * 70)
-        print("النتيجة:")
-        print(f"   تم حذف {users_deleted} مستخدم قديم")
-        print(f"   تم إنشاء {created} مستخدم جديد")
-        print(f"   العدد الإجمالي: {len(all_users)}")
+        print("Result:")
+        print(f"   Deleted {users_deleted} old users")
+        print(f"   Created {created} new users")
+        print(f"   Total: {len(all_users)} users")
         if len(users_without_password) == 0:
-            print(f"   جميع المستخدمين لديهم كلمات مرور مشفرة!")
+            print(f"   All users have password hashes!")
         print("=" * 70)
-        print("\nتم إصلاح قاعدة البيانات بنجاح!")
+        print("\nDatabase fixed successfully!")
         
     finally:
         db.close()
         
 except Exception as e:
-    print(f"\nخطأ: {e}")
+    print(f"\nError: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
 "@
 
-# حفظ السكريبت المؤقت
+# Save temporary script
 $tempScript = "temp_fix_db.py"
 $pythonScript | Out-File -FilePath $tempScript -Encoding UTF8
 
 Write-Host ""
-Write-Host "2. تشغيل سكريبت الإصلاح..." -ForegroundColor Yellow
+Write-Host "2. Running fix script..." -ForegroundColor Yellow
 Write-Host ""
 
-# تشغيل السكريبت
+# Run script
 python $tempScript
+$exitCode = $LASTEXITCODE
 
-# حذف السكريبت المؤقت
+# Delete temporary script
 Remove-Item $tempScript -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "تم الانتهاء!" -ForegroundColor Green
+if ($exitCode -eq 0) {
+    Write-Host "Done!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "You can now login with:" -ForegroundColor White
+    Write-Host "  - Admin 1: 0966320114 / admin123" -ForegroundColor Cyan
+    Write-Host "  - Admin 2: +963955773227 / khawam-p" -ForegroundColor Cyan
+    Write-Host "  - Employee 1: khawam-1@gmail.com / khawam-1" -ForegroundColor Cyan
+    Write-Host "  - Employee 2: khawam-2@gmail.com / khawam-2" -ForegroundColor Cyan
+    Write-Host "  - Employee 3: khawam-3@gmail.com / khawam-3" -ForegroundColor Cyan
+    Write-Host "  - Customer: customer@gmail.com / 963214" -ForegroundColor Cyan
+} else {
+    Write-Host "Error occurred!" -ForegroundColor Red
+    Write-Host "Check the error message above." -ForegroundColor Yellow
+}
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "الآن يمكنك تسجيل الدخول باستخدام:" -ForegroundColor White
-Write-Host "  - مدير 1: 0966320114 / admin123" -ForegroundColor Cyan
-Write-Host "  - مدير 2: +963955773227 / khawam-p" -ForegroundColor Cyan
-Write-Host "  - موظف 1: khawam-1@gmail.com / khawam-1" -ForegroundColor Cyan
-Write-Host "  - موظف 2: khawam-2@gmail.com / khawam-2" -ForegroundColor Cyan
-Write-Host "  - موظف 3: khawam-3@gmail.com / khawam-3" -ForegroundColor Cyan
-Write-Host "  - عميل: customer@gmail.com / 963214" -ForegroundColor Cyan
 Write-Host ""

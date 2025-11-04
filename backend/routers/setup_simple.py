@@ -565,7 +565,3 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         "all_users_have_passwords": users_without_password == 0,
         "message": f"تم حذف {studio_deleted} مشروع استيديو و {orders_deleted} طلب و {users_deleted} مستخدم (مدير/موظف) وإنشاء {len(created_users)} مستخدم جديد. تم الاحتفاظ بـ {customers_count} عميل."
     }
-        print(f"\n❌ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")

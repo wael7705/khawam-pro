@@ -196,6 +196,86 @@ async def create_order(
             "created_at": order_result[14].isoformat() if order_result[14] else None
         }
         
+        # Check and fix order_items table columns and types
+        try:
+            inspector = inspect(db.bind)
+            order_items_columns = [col['name'] for col in inspector.get_columns('order_items')]
+            
+            # Add specifications column if missing
+            if 'specifications' not in order_items_columns:
+                try:
+                    db.execute(text("ALTER TABLE order_items ADD COLUMN specifications jsonb"))
+                    db.commit()
+                    print("✅ Added specifications column as JSONB")
+                except Exception as e:
+                    print(f"Warning: Could not add specifications column: {e}")
+                    db.rollback()
+            
+            # Add design_files column if missing
+            if 'design_files' not in order_items_columns:
+                try:
+                    db.execute(text("ALTER TABLE order_items ADD COLUMN design_files jsonb"))
+                    db.commit()
+                    print("✅ Added design_files column as JSONB")
+                except Exception as e:
+                    print(f"Warning: Could not add design_files column: {e}")
+                    db.rollback()
+            
+            # Check and fix column types
+            specs_col_info = None
+            design_files_col_info = None
+            for col in inspector.get_columns('order_items'):
+                if col['name'] == 'specifications':
+                    specs_col_info = col
+                if col['name'] == 'design_files':
+                    design_files_col_info = col
+            
+            # Fix specifications column if it's not JSONB
+            if specs_col_info:
+                col_type = str(specs_col_info['type']).upper()
+                if 'JSONB' not in col_type and 'JSON' not in col_type:
+                    try:
+                        # Try to convert to JSONB
+                        if 'TEXT' in col_type or 'VARCHAR' in col_type:
+                            db.execute(text("ALTER TABLE order_items ALTER COLUMN specifications TYPE jsonb USING specifications::jsonb"))
+                        else:
+                            db.execute(text("ALTER TABLE order_items ALTER COLUMN specifications TYPE jsonb"))
+                        db.commit()
+                        print("✅ Fixed specifications column type to JSONB")
+                    except Exception as e:
+                        print(f"Warning: Could not change specifications column type: {e}")
+                        db.rollback()
+            
+            # Fix design_files column if it's text[] instead of jsonb
+            if design_files_col_info:
+                col_type = str(design_files_col_info['type']).upper()
+                if 'TEXT[]' in col_type or 'ARRAY' in col_type:
+                    try:
+                        # Convert text[] to jsonb
+                        db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE jsonb USING to_jsonb(design_files::text[])"))
+                        db.commit()
+                        print("✅ Fixed design_files column type from text[] to JSONB")
+                    except Exception as e:
+                        print(f"Warning: Could not change design_files column type from array: {e}")
+                        db.rollback()
+                elif 'JSONB' not in col_type and 'JSON' not in col_type:
+                    try:
+                        # Try to convert other types to JSONB
+                        if 'TEXT' in col_type or 'VARCHAR' in col_type:
+                            db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE jsonb USING design_files::jsonb"))
+                        else:
+                            db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE jsonb"))
+                        db.commit()
+                        print("✅ Fixed design_files column type to JSONB")
+                    except Exception as e:
+                        print(f"Warning: Could not change design_files column type: {e}")
+                        db.rollback()
+        except Exception as e:
+            print(f"Warning: Error checking/fixing order_items columns: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue anyway
+        
         # Create order items using raw SQL
         for item_data in order_data.items:
             # Prepare specifications JSON

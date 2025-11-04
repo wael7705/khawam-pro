@@ -169,17 +169,7 @@ function FeaturedWorksSection() {
     } catch (error: any) {
       // Silently fail - don't show error for featured works
       console.error('Error loading featured works:', error)
-      setWorks([]) catch (error) {
-      console.error('Error loading featured works:', error)
-      setWorks([
-        {
-          id: 1,
-          title_ar: 'بوستر احترافي',
-          category_ar: 'البوسترات',
-          image_url: '',
-        },
-        {
-          id: 2,
+      setWorks([])
           title_ar: 'بانر إعلاني',
           category_ar: 'البانرات',
           image_url: '',

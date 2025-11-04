@@ -129,6 +129,7 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
         latitude,
         longitude,
         street,
+        address: street || `${neighborhood} ${building}`.trim() || 'تم تحديد الموقع',
         neighborhood,
         building,
         floor: floor || undefined,

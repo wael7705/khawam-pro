@@ -1010,6 +1010,35 @@ async def get_all_orders(db: Session = Depends(get_db)):
         # Return empty list on error instead of crashing
         return []
 
+def _safe_get_specifications(item):
+    """Safely get specifications from order item"""
+    try:
+        specs = getattr(item, 'specifications', None)
+        if specs is None:
+            return {}
+        
+        # If it's already a dict, return as is
+        if isinstance(specs, dict):
+            return specs
+        
+        # If it's a string (JSON string), parse it
+        if isinstance(specs, str):
+            import json
+            try:
+                parsed = json.loads(specs)
+                return parsed if isinstance(parsed, dict) else {}
+            except:
+                return {}
+        
+        # Try to convert to dict
+        try:
+            return dict(specs) if specs else {}
+        except:
+            return {}
+    except Exception as e:
+        print(f"Warning: Error getting specifications: {e}")
+        return {}
+
 def _safe_get_design_files(item):
     """Safely get design_files from order item, handling both array and jsonb types"""
     try:
@@ -1019,28 +1048,37 @@ def _safe_get_design_files(item):
         
         # If it's already a list (array type), return as is
         if isinstance(design_files, list):
-            return design_files
+            # Filter out None values
+            return [f for f in design_files if f is not None]
         
         # If it's a string (JSON string), parse it
         if isinstance(design_files, str):
             import json
             try:
                 parsed = json.loads(design_files)
-                return parsed if isinstance(parsed, list) else []
+                if isinstance(parsed, list):
+                    return [f for f in parsed if f is not None]
+                elif isinstance(parsed, dict):
+                    # If it's a dict, extract values
+                    return [f for f in parsed.values() if f is not None]
+                return []
             except:
                 return []
         
         # If it's a dict (JSONB), convert to list
         if isinstance(design_files, dict):
-            return list(design_files.values()) if design_files else []
+            return [f for f in design_files.values() if f is not None]
         
-        # Try to convert to list
+        # Try to convert to list (for ARRAY type from PostgreSQL)
         try:
-            return list(design_files) if design_files else []
+            result = list(design_files) if design_files else []
+            return [f for f in result if f is not None]
         except:
             return []
     except Exception as e:
         print(f"Warning: Error getting design_files: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 @router.get("/orders/{order_id}")
@@ -1141,13 +1179,13 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "items": [
                     {
                         "id": item.id,
-                        "product_name": item.product_name,
-                        "quantity": item.quantity,
-                        "unit_price": float(item.unit_price) if item.unit_price else 0,
-                        "total_price": float(item.total_price) if item.total_price else 0,
-                        "specifications": item.specifications if item.specifications else {},
+                        "product_name": getattr(item, 'product_name', '') or '',
+                        "quantity": getattr(item, 'quantity', 0) or 0,
+                        "unit_price": float(getattr(item, 'unit_price', 0) or 0),
+                        "total_price": float(getattr(item, 'total_price', 0) or 0),
+                        "specifications": _safe_get_specifications(item),
                         "design_files": _safe_get_design_files(item),
-                        "status": item.status
+                        "status": getattr(item, 'status', 'pending') or 'pending'
                     }
                     for item in items
                 ]

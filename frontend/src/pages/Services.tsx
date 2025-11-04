@@ -93,6 +93,7 @@ export default function Services() {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           serviceName={selectedService.name_ar}
+          serviceId={selectedService.id}
         />
       )}
     </div>

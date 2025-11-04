@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ordersAPI, pricingAPI } from '../lib/api'
+import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import './OrderModal.css'
@@ -10,11 +10,14 @@ interface OrderModalProps {
   isOpen: boolean
   onClose: () => void
   serviceName: string
+  serviceId?: number
 }
 
-export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalProps) {
+export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: OrderModalProps) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
+  const [workflowSteps, setWorkflowSteps] = useState<any[]>([])
+  const [loadingWorkflow, setLoadingWorkflow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [image, setImage] = useState<File | null>(null)
   const [length, setLength] = useState('')
@@ -43,6 +46,783 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Helper function to render step content based on step_type
+  const renderStepContent = (currentStep: number) => {
+    if (workflowSteps.length === 0) {
+      // Fallback to default steps
+      return renderDefaultStep(currentStep)
+    }
+
+    const workflowStep = workflowSteps.find(s => s.step_number === currentStep)
+    if (!workflowStep) return null
+
+    const stepConfig = workflowStep.step_config || {}
+    const stepType = workflowStep.step_type
+
+    switch (stepType) {
+      case 'quantity':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>الكمية {stepConfig.required ? <span className="required">*</span> : ''}</label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="form-input"
+                required={stepConfig.required}
+              />
+            </div>
+          </div>
+        )
+
+      case 'files':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>رفع الملفات {stepConfig.required ? '' : <span className="optional">(اختياري)</span>}</label>
+              <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={stepConfig.accept || "image/*"}
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  multiple={stepConfig.multiple || false}
+                />
+                {image ? (
+                  <div className="uploaded-file">
+                    <img src={URL.createObjectURL(image)} alt="Preview" />
+                    <p>{image.name}</p>
+                  </div>
+                ) : (
+                  <div className="upload-placeholder">
+                    <p>اضغط لرفع {stepConfig.multiple ? 'الملفات' : 'الصورة'}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+
+      case 'dimensions':
+        const fields = stepConfig.fields || ['length', 'width', 'height']
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            {fields.includes('length') && (
+              <div className="form-group">
+                <label>الطول {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <input
+                  type="number"
+                  value={length}
+                  onChange={(e) => setLength(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                  required={stepConfig.required}
+                />
+              </div>
+            )}
+            {fields.includes('width') && (
+              <div className="form-group">
+                <label>العرض {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <input
+                  type="number"
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                  required={stepConfig.required}
+                />
+              </div>
+            )}
+            {fields.includes('height') && (
+              <div className="form-group">
+                <label>الارتفاع {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <input
+                  type="number"
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                  required={stepConfig.required}
+                />
+              </div>
+            )}
+            <div className="form-group">
+              <label>وحدة القياس</label>
+              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
+                <option value="cm">سم (cm)</option>
+                <option value="mm">ملم (mm)</option>
+                <option value="in">إنش (in)</option>
+                <option value="m">متر (m)</option>
+              </select>
+            </div>
+          </div>
+        )
+
+      case 'colors':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <ColorPicker
+              selectedColors={selectedColors}
+              onColorsChange={setSelectedColors}
+              maxColors={stepConfig.maxColors || 6}
+            />
+          </div>
+        )
+
+      case 'pages':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>عدد الصفحات {stepConfig.required ? <span className="required">*</span> : ''}</label>
+              <input
+                type="number"
+                min="1"
+                value={numberOfPages}
+                onChange={(e) => {
+                  const pages = parseInt(e.target.value) || 1
+                  setNumberOfPages(pages)
+                  setQuantity(pages)
+                }}
+                className="form-input"
+                placeholder="1"
+                required={stepConfig.required}
+              />
+            </div>
+            {(serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) && (
+              <>
+                <div className="form-group">
+                  <label>نوع الطباعة</label>
+                  <div className="delivery-options">
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printColor"
+                        value="bw"
+                        checked={printColor === 'bw'}
+                        onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                      />
+                      <span>أبيض وأسود</span>
+                    </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printColor"
+                        value="color"
+                        checked={printColor === 'color'}
+                        onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                      />
+                      <span>ملون</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>الطباعة</label>
+                  <div className="delivery-options">
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="single"
+                        checked={printSides === 'single'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجه واحد</span>
+                    </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="double"
+                        checked={printSides === 'double'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجهين</span>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )
+
+      case 'print_options':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>نوع الطباعة</label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printColor"
+                    value="bw"
+                    checked={printColor === 'bw'}
+                    onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                  />
+                  <span>أبيض وأسود</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printColor"
+                    value="color"
+                    checked={printColor === 'color'}
+                    onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                  />
+                  <span>ملون</span>
+                </label>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>الطباعة</label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printSides"
+                    value="single"
+                    checked={printSides === 'single'}
+                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                  />
+                  <span>وجه واحد</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printSides"
+                    value="double"
+                    checked={printSides === 'double'}
+                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                  />
+                  <span>وجهين</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 'customer_info':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>اسم العميل {stepConfig.required ? <span className="required">*</span> : ''}</label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="form-input"
+                required={stepConfig.required}
+              />
+            </div>
+            <div className="form-group">
+              <label>رقم واتساب {stepConfig.required ? <span className="required">*</span> : ''}</label>
+              <input
+                type="tel"
+                value={customerWhatsApp}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9+]/g, '')
+                  setCustomerWhatsApp(value)
+                }}
+                className="form-input"
+                placeholder="963xxxxxxxxx"
+                required={stepConfig.required}
+              />
+            </div>
+            <div className="form-group">
+              <label>اسم المتجر {stepConfig.required ? '' : <span className="optional">(اختياري)</span>}</label>
+              <input
+                type="text"
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+                className="form-input"
+              />
+            </div>
+          </div>
+        )
+
+      case 'delivery':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>نوع التوصيل</label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="self"
+                    checked={deliveryType === 'self'}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+                  />
+                  <span>استلام ذاتي</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="delivery"
+                    checked={deliveryType === 'delivery'}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+                  />
+                  <span>توصيل</span>
+                </label>
+              </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="delivery-address-info" style={{ marginTop: '10px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+                  <p><strong>العنوان:</strong> {deliveryAddress.street || 'لم يتم تحديد العنوان'}</p>
+                  {addressConfirmed && (
+                    <p style={{ color: 'green', fontSize: '0.9rem', marginTop: '5px' }}>✓ تم تأكيد العنوان</p>
+                  )}
+                </div>
+              )}
+              {deliveryType === 'delivery' && !addressConfirmed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('orderFormState', JSON.stringify({
+                      step,
+                      quantity,
+                      length,
+                      width,
+                      height,
+                      unit,
+                      selectedColors,
+                      workType,
+                      notes,
+                      customerName,
+                      customerWhatsApp,
+                      shopName,
+                      deliveryType,
+                      printColor,
+                      printSides,
+                      numberOfPages
+                    }))
+                    localStorage.setItem('shouldReopenOrderModal', 'true')
+                    localStorage.setItem('orderModalService', serviceName)
+                    navigate('/location-picker')
+                  }}
+                  className="btn btn-secondary"
+                  style={{ marginTop: '10px' }}
+                >
+                  اختر موقع التوصيل
+                </button>
+              )}
+            </div>
+          </div>
+        )
+
+      default:
+        return renderDefaultStep(currentStep)
+    }
+  }
+
+  const renderDefaultStep = (currentStep: number) => {
+    // Default step rendering (fallback)
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="modal-body">
+            <h3>المرحلة 1: الكمية والصورة</h3>
+            <div className="form-group">
+              <label>الكمية</label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value))}
+                className="form-input"
+              />
+            </div>
+            <div className="form-group">
+              <label>رفع الصورة <span className="optional">(اختياري)</span></label>
+              <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                {image ? (
+                  <div className="uploaded-file">
+                    <img src={URL.createObjectURL(image)} alt="Preview" />
+                    <p>{image.name}</p>
+                  </div>
+                ) : (
+                  <div className="upload-placeholder">
+                    <p>اضغط لرفع الصورة</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      case 2:
+        return (
+          <div className="modal-body">
+            <h3>المرحلة 2: الأبعاد</h3>
+            <div className="form-group">
+              <label>الطول <span className="optional">(اختياري)</span></label>
+              <input
+                type="number"
+                value={length}
+                onChange={(e) => setLength(e.target.value)}
+                className="form-input"
+                placeholder="0"
+              />
+            </div>
+            <div className="form-group">
+              <label>العرض <span className="optional">(اختياري)</span></label>
+              <input
+                type="number"
+                value={width}
+                onChange={(e) => setWidth(e.target.value)}
+                className="form-input"
+                placeholder="0"
+              />
+            </div>
+            <div className="form-group">
+              <label>الارتفاع <span className="optional">(اختياري)</span></label>
+              <input
+                type="number"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="form-input"
+                placeholder="0"
+              />
+            </div>
+            <div className="form-group">
+              <label>وحدة القياس</label>
+              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
+                <option value="cm">سم (cm)</option>
+                <option value="mm">ملم (mm)</option>
+                <option value="in">إنش (in)</option>
+                <option value="m">متر (m)</option>
+              </select>
+            </div>
+            {(serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) && (
+              <>
+                <div className="form-group">
+                  <label>عدد الصفحات <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={numberOfPages}
+                    onChange={(e) => {
+                      const pages = parseInt(e.target.value) || 1
+                      setNumberOfPages(pages)
+                      setQuantity(pages)
+                    }}
+                    className="form-input"
+                    placeholder="1"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>نوع الطباعة</label>
+                  <div className="delivery-options">
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printColor"
+                        value="bw"
+                        checked={printColor === 'bw'}
+                        onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                      />
+                      <span>أبيض وأسود</span>
+                    </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printColor"
+                        value="color"
+                        checked={printColor === 'color'}
+                        onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                      />
+                      <span>ملون</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>الطباعة</label>
+                  <div className="delivery-options">
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="single"
+                        checked={printSides === 'single'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجه واحد</span>
+                    </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="double"
+                        checked={printSides === 'double'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجهين</span>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      case 3:
+        return (
+          <div className="modal-body">
+            <h3>المرحلة 3: اختيار الألوان</h3>
+            <ColorPicker
+              selectedColors={selectedColors}
+              onColorsChange={setSelectedColors}
+              maxColors={6}
+            />
+          </div>
+        )
+      case 4:
+        return (
+          <div className="modal-body">
+            <h3>المرحلة 4: نوع العمل</h3>
+            <div className="form-group">
+              <label>نوع العمل / الغرض <span className="optional">(اختياري)</span></label>
+              <textarea
+                value={workType}
+                onChange={(e) => setWorkType(e.target.value)}
+                className="form-input"
+                rows={4}
+                placeholder="اذكر سبب حاجتك لهذه الخدمة..."
+              />
+            </div>
+            <div className="form-group">
+              <label>ملاحظات إضافية <span className="optional">(اختياري)</span></label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="form-input"
+                rows={4}
+                placeholder="أي ملاحظات إضافية..."
+              />
+            </div>
+          </div>
+        )
+      case 5:
+        return (
+          <div className="modal-body">
+            <h3>المرحلة 5: معلومات الطلب</h3>
+            <div className="form-group">
+              <label>اسم العميل</label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="form-input"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>رقم واتساب <span className="required">*</span></label>
+              <input
+                type="tel"
+                value={customerWhatsApp}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9+]/g, '')
+                  setCustomerWhatsApp(value)
+                }}
+                className="form-input"
+                placeholder="963xxxxxxxxx"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>اسم المتجر <span className="optional">(اختياري)</span></label>
+              <input
+                type="text"
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+                className="form-input"
+              />
+            </div>
+            <div className="form-group">
+              <label>نوع التوصيل</label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="self"
+                    checked={deliveryType === 'self'}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+                  />
+                  <span>استلام ذاتي</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="delivery"
+                    checked={deliveryType === 'delivery'}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+                  />
+                  <span>توصيل</span>
+                </label>
+              </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="delivery-address-info" style={{ marginTop: '10px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+                  <p><strong>العنوان:</strong> {deliveryAddress.street || 'لم يتم تحديد العنوان'}</p>
+                  {addressConfirmed && (
+                    <p style={{ color: 'green', fontSize: '0.9rem', marginTop: '5px' }}>✓ تم تأكيد العنوان</p>
+                  )}
+                </div>
+              )}
+              {deliveryType === 'delivery' && !addressConfirmed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('orderFormState', JSON.stringify({
+                      step,
+                      quantity,
+                      length,
+                      width,
+                      height,
+                      unit,
+                      selectedColors,
+                      workType,
+                      notes,
+                      customerName,
+                      customerWhatsApp,
+                      shopName,
+                      deliveryType,
+                      printColor,
+                      printSides,
+                      numberOfPages
+                    }))
+                    localStorage.setItem('shouldReopenOrderModal', 'true')
+                    localStorage.setItem('orderModalService', serviceName)
+                    navigate('/location-picker')
+                  }}
+                  className="btn btn-secondary"
+                  style={{ marginTop: '10px' }}
+                >
+                  اختر موقع التوصيل
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+  const [image, setImage] = useState<File | null>(null)
+  const [length, setLength] = useState('')
+  const [width, setWidth] = useState('')
+  const [height, setHeight] = useState('')
+  const [unit, setUnit] = useState('cm')
+  const [selectedColors, setSelectedColors] = useState<string[]>([])
+  const [workType, setWorkType] = useState('')
+  const [notes, setNotes] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerWhatsApp, setCustomerWhatsApp] = useState('')
+  const [shopName, setShopName] = useState('')
+  const [deliveryType, setDeliveryType] = useState('self')
+  const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
+  const [addressConfirmed, setAddressConfirmed] = useState(false)
+  const [totalPrice, setTotalPrice] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const hasRestoredState = useRef(false)
+  
+  // Pricing system states
+  const [pricingRule, setPricingRule] = useState<any>(null)
+  const [calculationType, setCalculationType] = useState<'piece' | 'area' | 'page'>('piece')
+  const [printColor, setPrintColor] = useState<'bw' | 'color'>('bw')
+  const [printSides, setPrintSides] = useState<'single' | 'double'>('single')
+  const [numberOfPages, setNumberOfPages] = useState<number>(1)
+  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Load workflow steps when modal opens and serviceId is available
+  useEffect(() => {
+    const loadWorkflow = async () => {
+      if (isOpen && serviceId) {
+        try {
+          setLoadingWorkflow(true)
+          const response = await workflowsAPI.getServiceWorkflow(serviceId)
+          if (response.data.success && response.data.workflows.length > 0) {
+            setWorkflowSteps(response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number))
+            // Reset to first step
+            setStep(1)
+          } else {
+            // Fallback to default steps if no workflow defined
+            setWorkflowSteps([])
+          }
+        } catch (error) {
+          console.error('Error loading workflow:', error)
+          // Fallback to default steps
+          setWorkflowSteps([])
+        } finally {
+          setLoadingWorkflow(false)
+        }
+      } else if (isOpen && !serviceId) {
+        // Try to get serviceId from serviceName
+        try {
+          const services = await servicesAPI.getAll()
+          const service = services.data.find((s: any) => s.name_ar === serviceName)
+          if (service) {
+            const response = await workflowsAPI.getServiceWorkflow(service.id)
+            if (response.data.success && response.data.workflows.length > 0) {
+              setWorkflowSteps(response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number))
+              setStep(1)
+            } else {
+              setWorkflowSteps([])
+            }
+          } else {
+            setWorkflowSteps([])
+          }
+        } catch (error) {
+          console.error('Error loading service or workflow:', error)
+          setWorkflowSteps([])
+        }
+      }
+    }
+    loadWorkflow()
+  }, [isOpen, serviceId, serviceName])
 
   // Load saved form state and delivery address from localStorage when modal opens
   // Use useLayoutEffect to restore state synchronously before render
@@ -428,59 +1208,34 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
 
         {/* Progress Bar */}
         <div className="progress-bar">
-          {[1, 2, 3, 4, 5].map((s) => (
-            <div
-              key={s}
-              className={`progress-step ${s <= step ? 'active' : ''}`}
-              onClick={() => step > s && setStep(s)}
-            >
-              {s}
-            </div>
-          ))}
+          {(workflowSteps.length > 0 ? workflowSteps : [1, 2, 3, 4, 5]).map((s, index) => {
+            const stepNum = workflowSteps.length > 0 ? s.step_number : s
+            const stepName = workflowSteps.length > 0 ? s.step_name_ar : `مرحلة ${s}`
+            return (
+              <div
+                key={stepNum}
+                className={`progress-step ${stepNum <= step ? 'active' : ''}`}
+                onClick={() => step > stepNum && setStep(stepNum)}
+                title={stepName}
+              >
+                {workflowSteps.length > 0 ? stepNum : s}
+              </div>
+            )
+          })}
         </div>
 
-        {/* Step 1: الكمية والصورة */}
-        {step === 1 && (
+        {/* Loading workflow */}
+        {loadingWorkflow && (
           <div className="modal-body">
-            <h3>المرحلة 1: الكمية والصورة</h3>
-            
-            <div className="form-group">
-              <label>الكمية</label>
-              <input
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value))}
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>رفع الصورة <span className="optional">(اختياري)</span></label>
-              <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                {image ? (
-                  <div className="uploaded-file">
-                    <img src={URL.createObjectURL(image)} alt="Preview" />
-                    <p>{image.name}</p>
-                  </div>
-                ) : (
-                  <div className="upload-placeholder">
-                    <p>اضغط لرفع الصورة</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <div className="loading">جاري تحميل مراحل الطلب...</div>
           </div>
         )}
 
-        {/* Step 2: الأبعاد */}
+        {/* Render dynamic steps */}
+        {!loadingWorkflow && renderStepContent(step)}
+
+        {/* Old static steps - removed, using renderStepContent instead */}
+        {/* 
         {step === 2 && (
           <div className="modal-body">
             <h3>المرحلة 2: الأبعاد</h3>

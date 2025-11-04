@@ -231,4 +231,13 @@ export const pricingHierarchicalAPI = {
   }) => api.post('/pricing-hierarchical/calculate-price', data),
 }
 
+// Service Workflows API
+export const workflowsAPI = {
+  getServiceWorkflow: (serviceId: number) => api.get(`/workflows/service/${serviceId}/workflow`),
+  getWorkflow: (workflowId: number) => api.get(`/workflows/workflow/${workflowId}`),
+  createWorkflow: (data: any) => api.post('/workflows/workflow', data),
+  updateWorkflow: (workflowId: number, data: any) => api.put(`/workflows/workflow/${workflowId}`, data),
+  deleteWorkflow: (workflowId: number) => api.delete(`/workflows/workflow/${workflowId}`),
+}
+
 export default api

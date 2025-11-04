@@ -163,6 +163,36 @@ async def _init_pricing_table():
             """))
             conn.commit()
             print("Created pricing_configs table successfully")
+        
+        # 3. service_workflows
+        check_workflows = conn.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'service_workflows'
+            )
+        """)).fetchone()
+        
+        if not (check_workflows and check_workflows[0]):
+            conn.execute(text("""
+                CREATE TABLE service_workflows (
+                    id SERIAL PRIMARY KEY,
+                    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+                    step_number INTEGER NOT NULL,
+                    step_name_ar VARCHAR(200) NOT NULL,
+                    step_name_en VARCHAR(200),
+                    step_description_ar TEXT,
+                    step_description_en TEXT,
+                    step_type VARCHAR(50) NOT NULL,
+                    step_config JSONB,
+                    display_order INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT true,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+            print("Created service_workflows table successfully")
 
     except Exception as e:
         print(f"Warning: Error initializing pricing tables: {str(e)[:200]}")
@@ -195,16 +225,16 @@ app.add_middleware(
 # Import routers - استيراد آمن مع معالجة الأخطاء
 try:
     from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple, pricing, init_pricing
-    app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-    app.include_router(products.router, prefix="/api/products", tags=["Products"])
-    app.include_router(services.router, prefix="/api/services", tags=["Services"])
-    app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
-    app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
-    app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
-    app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-    app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
-    app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
-    app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(products.router, prefix="/api/products", tags=["Products"])
+app.include_router(services.router, prefix="/api/services", tags=["Services"])
+app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
+app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
+app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
+app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
+app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
     app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
 except ImportError as e:

@@ -486,8 +486,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 'is_active': True
             })
             conn.commit()
-        created_users.append(f"مدير 2 ({phone2})")
-        print(f"   ✅ Admin 2: {phone2} / khawam-p")
+            created_users.append(f"مدير 2 ({phone2})")
+            print(f"   ✅ Admin 2: {phone2} / khawam-p")
         except Exception as e:
             print(f"   ⚠️  خطأ في إنشاء مدير 2: {e}")
         
@@ -508,8 +508,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                     'is_active': True
                 })
                 conn.commit()
-            created_users.append(f"موظف {i} ({email})")
-            print(f"   ✅ Employee {i}: {email} / khawam-{i}")
+                created_users.append(f"موظف {i} ({email})")
+                print(f"   ✅ Employee {i}: {email} / khawam-{i}")
             except Exception as e:
                 print(f"   ⚠️  خطأ في إنشاء موظف {i}: {e}")
         print(f"\n💾 All {len(created_users)} users created successfully!")

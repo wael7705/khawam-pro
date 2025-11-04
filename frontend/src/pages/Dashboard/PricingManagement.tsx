@@ -219,62 +219,8 @@ export default function PricingManagement() {
       {loading ? (
         <div className="loading">جاري التحميل...</div>
       ) : (
-        <div className="pricing-rules-grid">
-          {rules.map(rule => (
-            <div key={rule.id} className={`pricing-rule-card ${!rule.is_active ? 'inactive' : ''}`}>
-              <div className="rule-header">
-                <div>
-                  <h3>{rule.name_ar}</h3>
-                  {rule.name_en && <p className="rule-english">{rule.name_en}</p>}
-                  <span className="rule-type-badge">{getCalculationTypeLabel(rule.calculation_type)}</span>
-                </div>
-                <button
-                  className="toggle-btn"
-                  onClick={() => toggleActive(rule)}
-                  title={rule.is_active ? 'تعطيل' : 'تفعيل'}
-                >
-                  {rule.is_active ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-                </button>
-              </div>
-
-              {rule.description_ar && (
-                <p className="rule-description">{rule.description_ar}</p>
-              )}
-
-              <div className="rule-details">
-                <div className="detail-item">
-                  <span className="detail-label">السعر الأساسي:</span>
-                  <span className="detail-value">{rule.base_price.toLocaleString()} ل.س</span>
-                </div>
-                {rule.unit && (
-                  <div className="detail-item">
-                    <span className="detail-label">الوحدة:</span>
-                    <span className="detail-value">{rule.unit}</span>
-                  </div>
-                )}
-                {rule.price_multipliers && (
-                  <div className="detail-item">
-                    <span className="detail-label">معاملات:</span>
-                    <span className="detail-value">
-                      {rule.price_multipliers.color && 'لون '}
-                      {rule.price_multipliers.sides && 'وجهين '}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="rule-actions">
-                <button className="icon-btn" onClick={() => handleEdit(rule)}>
-                  <Edit size={18} />
-                </button>
-                <button className="icon-btn delete" onClick={() => handleDelete(rule.id)}>
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {rules.length === 0 && (
+        <>
+          {rules.length === 0 ? (
             <div className="empty-state">
               <p>لا توجد قواعد أسعار حتى الآن</p>
               <button className="btn btn-primary" onClick={() => { resetForm(); setIsAdding(true) }}>
@@ -282,8 +228,80 @@ export default function PricingManagement() {
                 إضافة قاعدة سعر جديدة
               </button>
             </div>
+          ) : (
+            <div className="pricing-table-container">
+              <table className="pricing-table">
+                <thead>
+                  <tr>
+                    <th>اسم قاعدة السعر</th>
+                    <th>نوع الحساب</th>
+                    <th>السعر الأساسي</th>
+                    <th>الوحدة</th>
+                    <th>المعاملات</th>
+                    <th>الوصف</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rules.map(rule => (
+                    <tr key={rule.id} className={!rule.is_active ? 'inactive' : ''}>
+                      <td>
+                        <div className="rule-name-cell">
+                          <strong>{rule.name_ar}</strong>
+                          {rule.name_en && <span className="rule-english">{rule.name_en}</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="rule-type-badge">{getCalculationTypeLabel(rule.calculation_type)}</span>
+                      </td>
+                      <td>
+                        <strong className="price-value">{rule.base_price.toLocaleString()} ل.س</strong>
+                      </td>
+                      <td>{rule.unit || '-'}</td>
+                      <td>
+                        <div className="multipliers-cell">
+                          {rule.price_multipliers?.color && (
+                            <span className="multiplier-tag">لون</span>
+                          )}
+                          {rule.price_multipliers?.sides && (
+                            <span className="multiplier-tag">وجهين</span>
+                          )}
+                          {!rule.price_multipliers && <span className="text-muted">-</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="description-cell">
+                          {rule.description_ar || '-'}
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          className="toggle-btn-table"
+                          onClick={() => toggleActive(rule)}
+                          title={rule.is_active ? 'تعطيل' : 'تفعيل'}
+                        >
+                          {rule.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                          <span className="status-text">{rule.is_active ? 'نشط' : 'معطل'}</span>
+                        </button>
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button className="icon-btn" onClick={() => handleEdit(rule)} title="تعديل">
+                            <Edit size={16} />
+                          </button>
+                          <button className="icon-btn delete" onClick={() => handleDelete(rule.id)} title="حذف">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Add/Edit Modal */}

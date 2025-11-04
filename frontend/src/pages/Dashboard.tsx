@@ -123,13 +123,11 @@ export default function Dashboard() {
 
           {!sidebarCollapsed && (
             <div className="sidebar-footer">
-              {/* Show "Go to Website" button for employees */}
-              {isEmployee() && (
-                <Link to="/" className="go-to-website-btn">
-                  <HomeIcon size={18} />
-                  <span>الانتقال إلى الموقع</span>
-                </Link>
-              )}
+              {/* Show "Go to Website" button for all users */}
+              <Link to="/" className="go-to-website-btn">
+                <HomeIcon size={18} />
+                <span>العودة إلى الصفحة الرئيسية</span>
+              </Link>
               {isAdmin() && (
                 <button className="language-btn">
                   <span>EN</span>
@@ -139,10 +137,10 @@ export default function Dashboard() {
             </div>
           )}
           
-          {/* Collapsed sidebar: show home button for employees */}
-          {sidebarCollapsed && isEmployee() && (
+          {/* Collapsed sidebar: show home button for all users */}
+          {sidebarCollapsed && (
             <div className="sidebar-collapsed-footer">
-              <Link to="/" className="go-to-website-btn-collapsed" title="الانتقال إلى الموقع">
+              <Link to="/" className="go-to-website-btn-collapsed" title="العودة إلى الصفحة الرئيسية">
                 <HomeIcon size={20} />
               </Link>
             </div>

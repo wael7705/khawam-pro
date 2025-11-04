@@ -202,13 +202,13 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 users_deleted = 0
             else:
                 print(f"\n📋 Found {len(user_ids_to_delete)} admin/employee users to delete: {user_ids_to_delete}")
-            
+                
                 # Step 2: Delete studio_projects for these users
                 print("\n1️⃣ Deleting studio_projects for admins/employees...")
-            studio_deleted = 0
+                studio_deleted = 0
                 trans = None
-            try:
-                trans = conn.begin()
+                try:
+                    trans = conn.begin()
                     if user_ids_to_delete:
                         # Delete studio_projects one by one to avoid SQL parameter issues
                         for uid in user_ids_to_delete:
@@ -217,40 +217,40 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                                 {"uid": uid}
                             )
                             studio_deleted += result.rowcount
-                trans.commit()
-                print(f"   ✅ Deleted {studio_deleted} studio projects")
-            except Exception as e:
-                if trans:
-                    trans.rollback()
-                        # Try deleting all if specific deletion fails
-                        try:
-                            trans = conn.begin()
-                            result = conn.execute(text("DELETE FROM studio_projects"))
-                            studio_deleted = result.rowcount
-                            trans.commit()
-                            print(f"   ✅ Deleted all {studio_deleted} studio projects (fallback)")
-                        except Exception as e2:
-                            print(f"   ⚠️  No studio_projects table or already empty: {e2}")
-                    
-                    # Step 3: Get orders for these users
-                    print("\n2️⃣ Getting orders for admins/employees...")
-                    order_ids = []
-                    trans = conn.begin()
-                    try:
-                        # Get orders one by one for each user
-                        for uid in user_ids_to_delete:
-                            result = conn.execute(
-                                text("SELECT id FROM orders WHERE customer_id = :uid"),
-                                {"uid": uid}
-                            )
-                            for row in result:
-                                order_ids.append(row[0])
-                        trans.commit()
-                    except Exception as e:
+                    trans.commit()
+                    print(f"   ✅ Deleted {studio_deleted} studio projects")
+                except Exception as e:
+                    if trans:
                         trans.rollback()
-                        print(f"   ⚠️  Error getting orders: {e}")
-                    print(f"   📋 Found {len(order_ids)} orders to delete")
-            
+                    # Try deleting all if specific deletion fails
+                    try:
+                        trans = conn.begin()
+                        result = conn.execute(text("DELETE FROM studio_projects"))
+                        studio_deleted = result.rowcount
+                        trans.commit()
+                        print(f"   ✅ Deleted all {studio_deleted} studio projects (fallback)")
+                    except Exception as e2:
+                        print(f"   ⚠️  No studio_projects table or already empty: {e2}")
+                
+                # Step 3: Get orders for these users
+                print("\n2️⃣ Getting orders for admins/employees...")
+                order_ids = []
+                trans = conn.begin()
+                try:
+                    # Get orders one by one for each user
+                    for uid in user_ids_to_delete:
+                        result = conn.execute(
+                            text("SELECT id FROM orders WHERE customer_id = :uid"),
+                            {"uid": uid}
+                        )
+                        for row in result:
+                            order_ids.append(row[0])
+                    trans.commit()
+                except Exception as e:
+                    trans.rollback()
+                    print(f"   ⚠️  Error getting orders: {e}")
+                print(f"   📋 Found {len(order_ids)} orders to delete")
+                
                 # Step 4: Delete order_items for these orders
                 if order_ids:
                     print("\n3️⃣ Deleting order_items...")
@@ -295,7 +295,7 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 
                 # Step 6: Delete admins and employees (not customers)
                 print("\n5️⃣ Deleting admin/employee users...")
-            trans = conn.begin()
+                trans = conn.begin()
                 try:
                     for uid in user_ids_to_delete:
                         conn.execute(
@@ -303,7 +303,7 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                             {"uid": uid}
                         )
                     users_deleted = len(user_ids_to_delete)
-            trans.commit()
+                    trans.commit()
                     print(f"   ✅ Deleted {users_deleted} admin/employee users")
                 except Exception as e:
                     trans.rollback()

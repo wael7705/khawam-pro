@@ -9,17 +9,26 @@ import os
 app = FastAPI(
     title="Khawam API",
     description="API for Khawam Printing Services",
-    version="1.0.1"
+    version="1.0.1",
+    lifespan=lifespan
 )
 
-@app.on_event("startup")
-async def init_pricing_table_on_startup():
-    """إنشاء جدول pricing_rules تلقائياً عند بدء التطبيق"""
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler - بديل لـ @app.on_event("startup")"""
+    # Startup
     try:
         import asyncio
         asyncio.create_task(_init_pricing_table())
     except Exception as e:
         print(f"Warning: Failed to initialize pricing table: {str(e)[:100]}")
+    
+    yield
+    
+    # Shutdown (if needed)
+    pass
 
 async def _init_pricing_table():
     """Create pricing_rules table"""

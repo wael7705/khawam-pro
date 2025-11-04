@@ -19,7 +19,7 @@ async def init_pricing_table_on_startup():
         import asyncio
         asyncio.create_task(_init_pricing_table())
     except Exception as e:
-        print(f"⚠️ Warning: Failed to initialize pricing table: {str(e)[:100]}")
+        print(f"Warning: Failed to initialize pricing table: {str(e)[:100]}")
 
 async def _init_pricing_table():
     """Create pricing_rules table"""
@@ -30,7 +30,7 @@ async def _init_pricing_table():
     try:
         conn = engine.connect()
     except Exception as e:
-        print(f"⚠️ Warning: Database connection failed: {str(e)[:100]}")
+        print(f"Warning: Database connection failed: {str(e)[:100]}")
         return
     
     if conn is None:
@@ -58,32 +58,32 @@ async def _init_pricing_table():
 
             # إضافة الأعمدة المفقودة
             columns_to_add = {
-                    'name_ar': "ALTER TABLE pricing_rules ADD COLUMN name_ar VARCHAR(200)",
-                    'name_en': "ALTER TABLE pricing_rules ADD COLUMN name_en VARCHAR(200)",
-                    'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
-                    'description_en': "ALTER TABLE pricing_rules ADD COLUMN description_en TEXT",
-                    'calculation_type': "ALTER TABLE pricing_rules ADD COLUMN calculation_type VARCHAR(20)",        
-                    'base_price': "ALTER TABLE pricing_rules ADD COLUMN base_price DECIMAL(10, 4)",
-                    'price_multipliers': "ALTER TABLE pricing_rules ADD COLUMN price_multipliers JSONB",
-                    'specifications': "ALTER TABLE pricing_rules ADD COLUMN specifications JSONB",
-                    'unit': "ALTER TABLE pricing_rules ADD COLUMN unit VARCHAR(50)",
-                    'is_active': "ALTER TABLE pricing_rules ADD COLUMN is_active BOOLEAN DEFAULT true",
-                    'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",        
-                    'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",        
-                    'updated_at': "ALTER TABLE pricing_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
-                }
+                'name_ar': "ALTER TABLE pricing_rules ADD COLUMN name_ar VARCHAR(200)",
+                'name_en': "ALTER TABLE pricing_rules ADD COLUMN name_en VARCHAR(200)",
+                'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
+                'description_en': "ALTER TABLE pricing_rules ADD COLUMN description_en TEXT",
+                'calculation_type': "ALTER TABLE pricing_rules ADD COLUMN calculation_type VARCHAR(20)",        
+                'base_price': "ALTER TABLE pricing_rules ADD COLUMN base_price DECIMAL(10, 4)",
+                'price_multipliers': "ALTER TABLE pricing_rules ADD COLUMN price_multipliers JSONB",
+                'specifications': "ALTER TABLE pricing_rules ADD COLUMN specifications JSONB",
+                'unit': "ALTER TABLE pricing_rules ADD COLUMN unit VARCHAR(50)",
+                'is_active': "ALTER TABLE pricing_rules ADD COLUMN is_active BOOLEAN DEFAULT true",
+                'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",        
+                'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",        
+                'updated_at': "ALTER TABLE pricing_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
+            }
 
             for col_name, alter_sql in columns_to_add.items():
                 if col_name not in existing_columns:
                     try:
                         conn.execute(text(alter_sql))
                         conn.commit()
-                        print(f"✅ تم إضافة العمود {col_name} إلى pricing_rules")
+                        print(f"Added column {col_name} to pricing_rules")
                     except Exception as e:
-                        print(f"⚠️ تحذير: فشل إضافة العمود {col_name}: {e}")
+                        print(f"Warning: Failed to add column {col_name}: {e}")
                         conn.rollback()
 
-            print("✅ جدول pricing_rules موجود ومحدث")
+            print("Table pricing_rules exists and updated")
         else:
             # إنشاء الجدول
             conn.execute(text("""
@@ -105,7 +105,7 @@ async def _init_pricing_table():
                 )
             """))
             conn.commit()
-            print("✅ تم إنشاء جدول pricing_rules بنجاح")
+            print("Created pricing_rules table successfully")
         
         # إنشاء جداول النظام الهرمي الجديد
         # 1. pricing_categories
@@ -133,7 +133,7 @@ async def _init_pricing_table():
                 )
             """))
             conn.commit()
-            print("✅ تم إنشاء جدول pricing_categories بنجاح")
+            print("Created pricing_categories table successfully")
         
         # 2. pricing_configs
         check_configs = conn.execute(text("""
@@ -162,10 +162,10 @@ async def _init_pricing_table():
                 )
             """))
             conn.commit()
-            print("✅ تم إنشاء جدول pricing_configs بنجاح")
+            print("Created pricing_configs table successfully")
 
     except Exception as e:
-        print(f"⚠️ Warning: Error initializing pricing tables: {str(e)[:200]}")
+        print(f"Warning: Error initializing pricing tables: {str(e)[:200]}")
         if conn:
             try:
                 conn.rollback()
@@ -208,21 +208,21 @@ try:
     app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
 except ImportError as e:
-    print(f"⚠️ Warning: Error importing main routers: {e}")
+    print(f"Warning: Error importing main routers: {e}")
 
 # إضافة router النظام الهرمي
 try:
     from routers import pricing_hierarchical
     app.include_router(pricing_hierarchical.router, prefix="/api/pricing-hierarchical", tags=["Pricing Hierarchical"])
 except ImportError as e:
-    print(f"⚠️ Warning: Error importing pricing_hierarchical router: {e}")
+    print(f"Warning: Error importing pricing_hierarchical router: {e}")
 
 # إضافة router اختبار قاعدة البيانات
 try:
     from routers import test_db
     app.include_router(test_db.router, prefix="/api", tags=["Test"])
 except ImportError as e:
-    print(f"⚠️ Warning: Error importing test_db router: {e}")
+    print(f"Warning: Error importing test_db router: {e}")
 
 # إضافة router إصلاح قاعدة البيانات (حل بديل بسيط)
 try:
@@ -236,7 +236,7 @@ try:
     app.include_router(fix_user_types_data.router, prefix="/api/fix", tags=["Fix"])
     app.include_router(update_user_types_final.router, prefix="/api/fix", tags=["Fix"])
 except ImportError as e:
-    print(f"⚠️ Warning: Error importing db_fix router: {e}")
+    print(f"Warning: Error importing db_fix router: {e}")
 
 # Mount static files
 if not os.path.exists("uploads"):

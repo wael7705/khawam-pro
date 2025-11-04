@@ -465,8 +465,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 'is_active': True
             })
             conn.commit()
-        created_users.append(f"مدير 1 ({phone1})")
-        print(f"   ✅ Admin 1: {phone1} / admin123")
+            created_users.append(f"مدير 1 ({phone1})")
+            print(f"   ✅ Admin 1: {phone1} / admin123")
         except Exception as e:
             print(f"   ⚠️  خطأ في إنشاء مدير 1: {e}")
         

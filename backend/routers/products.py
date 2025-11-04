@@ -1,16 +1,28 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Product
+from cache import get_cache_key, get_from_cache, set_cache, CACHE_TTL
 router = APIRouter()
 
 @router.get("/")
 async def get_products(
     featured: bool = Query(None),
     category_id: int = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    response: Response = None
 ):
     try:
+        # إنشاء مفتاح cache
+        cache_key = get_cache_key('products', featured=featured, category_id=category_id)
+        
+        # محاولة جلب من cache
+        cached_result = get_from_cache(cache_key)
+        if cached_result is not None:
+            response.headers["X-Cache"] = "HIT"
+            return cached_result
+        
         query = db.query(Product).filter(Product.is_visible == True)
         
         if featured is not None:
@@ -36,6 +48,12 @@ async def get_products(
                 "price": float(p.price) if p.price else 0,
                 "image_url": img or ""
             })
+        
+        # حفظ في cache
+        set_cache(cache_key, products_list, CACHE_TTL['products'])
+        if response:
+            response.headers["X-Cache"] = "MISS"
+        
         return products_list
     except Exception as e:
         print(f"Error: {e}")

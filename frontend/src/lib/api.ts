@@ -190,6 +190,13 @@ export const adminAPI = {
     })
     return response.data
   },
+  
+  // Payments
+  payments: {
+    getSettings: () => api.get('/admin/payment-settings'),
+    createSettings: (data: any) => api.post('/admin/payment-settings', data),
+    updateSettings: (id: number, data: any) => api.put(`/admin/payment-settings/${id}`, data),
+  },
 }
 
 // Pricing API

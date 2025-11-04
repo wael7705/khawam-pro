@@ -93,14 +93,16 @@ def init_default_users(db):
                 user_type_name_ar="موظف")
     
     create_user(db,
-                name="موظف 2",
+                name="نور",
                 email="khawam-2@gmail.com",
+                phone="+963955123456",  # رقم عشوائي
                 password="khawam-2",
                 user_type_name_ar="موظف")
     
     create_user(db,
-                name="موظف 3",
+                name="منذر",
                 email="khawam-3@gmail.com",
+                phone="+963955789012",  # رقم عشوائي
                 password="khawam-3",
                 user_type_name_ar="موظف")
     
@@ -207,8 +209,8 @@ if __name__ == "__main__":
         print("   - Phone: +963955773227, Password: khawam-p")
         print("\n   Employees:")
         print("   - Email: khawam-1@gmail.com, Password: khawam-1")
-        print("   - Email: khawam-2@gmail.com, Password: khawam-2")
-        print("   - Email: khawam-3@gmail.com, Password: khawam-3")
+        print("   - Name: نور, Email: khawam-2@gmail.com, Phone: +963955123456, Password: khawam-2")
+        print("   - Name: منذر, Email: khawam-3@gmail.com, Phone: +963955789012, Password: khawam-3")
         print("\n   Customer:")
         print("   - Email: customer@gmail.com, Password: 963214")
         

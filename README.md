@@ -24,6 +24,7 @@ pnpm setup
 - ✅ واجهة عميل احترافية
 - ✅ لوحة تحكم إدارية
 - ✅ استيديو معالجة الصور
+- ✅ نظام cache لتحسين الأداء
 - ✅ Backend: FastAPI + Python
 - ✅ Frontend: React + Vite + TypeScript
 
@@ -32,3 +33,19 @@ pnpm setup
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8000
 - Dashboard: http://localhost:5173/dashboard
+- API Docs: http://localhost:8000/docs
+
+## 📚 التوثيق
+
+راجع ملف [DOCUMENTATION.md](DOCUMENTATION.md) للتوثيق الشامل.
+
+## 🚢 النشر على Railway
+
+```bash
+git add .
+git commit -m "Deploy to Railway"
+git push origin main
+```
+
+Railway سينشر المشروع تلقائياً من GitHub.
+

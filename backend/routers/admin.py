@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Product, Service, PortfolioWork, Order, OrderItem, ProductCategory
@@ -198,6 +198,12 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
         db.add(new_product)
         db.commit()
         db.refresh(new_product)
+        
+        # إبطال cache المنتجات
+        from cache import invalidate_cache
+        invalidate_cache('products')
+        invalidate_cache('dashboard_stats')
+        
         return {
             "success": True,
             "product": {
@@ -229,6 +235,12 @@ async def update_product(product_id: int, product: ProductUpdate, db: Session = 
         
         db.commit()
         db.refresh(existing_product)
+        
+        # إبطال cache المنتجات
+        from cache import invalidate_cache
+        invalidate_cache('products')
+        invalidate_cache('dashboard_stats')
+        
         return {"success": True, "product": existing_product}
     except HTTPException:
         raise
@@ -246,6 +258,12 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
         
         db.delete(product)
         db.commit()
+        
+        # إبطال cache المنتجات
+        from cache import invalidate_cache
+        invalidate_cache('products')
+        invalidate_cache('dashboard_stats')
+        
         return {"success": True, "message": "Product deleted"}
     except HTTPException:
         raise
@@ -298,6 +316,11 @@ async def create_service(service: ServiceCreate, db: Session = Depends(get_db)):
         db.add(new_service)
         db.commit()
         db.refresh(new_service)
+        
+        # إبطال cache الخدمات
+        from cache import invalidate_cache
+        invalidate_cache('services')
+        
         return {"success": True, "service": new_service}
     except Exception as e:
         db.rollback()
@@ -318,6 +341,11 @@ async def update_service(service_id: int, service: ServiceUpdate, db: Session = 
         
         db.commit()
         db.refresh(existing_service)
+        
+        # إبطال cache الخدمات
+        from cache import invalidate_cache
+        invalidate_cache('services')
+        
         return {"success": True, "service": existing_service}
     except HTTPException:
         raise
@@ -335,6 +363,11 @@ async def delete_service(service_id: int, db: Session = Depends(get_db)):
         
         db.delete(service)
         db.commit()
+        
+        # إبطال cache الخدمات
+        from cache import invalidate_cache
+        invalidate_cache('services')
+        
         return {"success": True, "message": "Service deleted"}
     except HTTPException:
         raise
@@ -1681,9 +1714,20 @@ async def upload_image_by_url(url: str = Form(...)):
 # ============================================
 
 @router.get("/dashboard/stats")
-async def get_dashboard_stats(db: Session = Depends(get_db)):
+async def get_dashboard_stats(db: Session = Depends(get_db), response: Response = None):
     """Get dashboard statistics"""
     try:
+        from cache import get_cache_key, get_from_cache, set_cache, CACHE_TTL
+        
+        # إنشاء مفتاح cache
+        cache_key = get_cache_key('dashboard_stats')
+        
+        # محاولة جلب من cache
+        cached_result = get_from_cache(cache_key)
+        if cached_result is not None:
+            if response:
+                response.headers["X-Cache"] = "HIT"
+            return cached_result
         from sqlalchemy import func, text
         from datetime import datetime, timedelta
         
@@ -1797,7 +1841,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         if last_month_active > 0:
             orders_trend = ((this_month_active - last_month_active) / last_month_active) * 100
         
-        return {
+        result = {
             "success": True,
             "stats": {
                 "low_stock": low_stock,
@@ -1809,6 +1853,13 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
                 "orders_trend": round(orders_trend, 1)
             }
         }
+        
+        # حفظ في cache
+        set_cache(cache_key, result, CACHE_TTL['dashboard_stats'])
+        if response:
+            response.headers["X-Cache"] = "MISS"
+        
+        return result
     except Exception as e:
         print(f"Error fetching dashboard stats: {e}")
         import traceback
@@ -2418,8 +2469,9 @@ async def get_payment_settings_admin(db: Session = Depends(get_db)):
                 "account_name": settings.account_name,
                 "account_number": settings.account_number,
                 "phone_number": settings.phone_number,
-                "api_key": settings.api_key,
-                "api_secret": settings.api_secret,
+                # لا نرسل api_key و api_secret لأسباب أمنية - محمية بكلمة مرور
+                "api_key": "***" if settings.api_key else None,
+                "api_secret": "***" if settings.api_secret else None,
                 "is_active": settings.is_active,
                 "created_at": settings.created_at.isoformat() if settings.created_at else None,
                 "updated_at": settings.updated_at.isoformat() if settings.updated_at else None

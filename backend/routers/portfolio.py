@@ -1,14 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 from database import get_db
 from models import PortfolioWork
 from sqlalchemy import text
+from cache import get_cache_key, get_from_cache, set_cache, CACHE_TTL
 
 router = APIRouter()
 
 @router.get("/")
-async def get_portfolio_works(db: Session = Depends(get_db)):
+async def get_portfolio_works(db: Session = Depends(get_db), response: Response = None):
     try:
+        # إنشاء مفتاح cache
+        cache_key = get_cache_key('portfolio')
+        
+        # محاولة جلب من cache
+        cached_result = get_from_cache(cache_key)
+        if cached_result is not None:
+            if response:
+                response.headers["X-Cache"] = "HIT"
+            return cached_result
+        
         # استخدام raw SQL لتجنب مشكلة العمود images إذا لم يكن موجوداً
         query = text("""
             SELECT 
@@ -45,6 +56,12 @@ async def get_portfolio_works(db: Session = Depends(get_db)):
                 "is_featured": row.is_featured if hasattr(row, 'is_featured') else False,
                 "is_visible": True
             })
+        
+        # حفظ في cache
+        set_cache(cache_key, works_list, CACHE_TTL['portfolio'])
+        if response:
+            response.headers["X-Cache"] = "MISS"
+        
         return works_list
     except Exception as e:
         print(f"Error fetching portfolio works: {e}")

@@ -1085,110 +1085,140 @@ def _safe_get_design_files(item):
 async def get_order_details(order_id: int, db: Session = Depends(get_db)):
     """Get order details with items"""
     try:
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if not order:
+        from sqlalchemy import text
+        
+        # Use raw SQL to get order to avoid ORM issues with missing columns
+        order_result = db.execute(text("""
+            SELECT 
+                id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                delivery_address, notes, staff_notes, delivery_latitude, delivery_longitude,
+                rating, rating_comment, created_at
+            FROM orders
+            WHERE id = :order_id
+        """), {"order_id": order_id}).fetchone()
+        
+        if not order_result:
             raise HTTPException(status_code=404, detail="الطلب غير موجود")
         
-        items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+        # Use raw SQL to get order items to avoid ORM issues with design_files/specifications types
+        items_result = db.execute(text("""
+            SELECT 
+                id, order_id, product_id, product_name, quantity, unit_price, total_price,
+                specifications, design_files, status, created_at
+            FROM order_items
+            WHERE order_id = :order_id
+        """), {"order_id": order_id}).fetchall()
         
-        # Safely get customer info
-        customer_name = ""
-        customer_phone = ""
-        customer_whatsapp = ""
-        shop_name = ""
-        delivery_type = "self"
-        staff_notes = None
+        # Extract order data from raw SQL result
+        order = {
+            'id': order_result[0],
+            'order_number': order_result[1],
+            'customer_id': order_result[2],
+            'customer_name': order_result[3] or "",
+            'customer_phone': order_result[4] or "",
+            'customer_whatsapp': order_result[5] or order_result[4] or "",
+            'shop_name': order_result[6] or "",
+            'status': order_result[7] or 'pending',
+            'total_amount': order_result[8] or 0,
+            'final_amount': order_result[9] or 0,
+            'payment_status': order_result[10] or 'pending',
+            'delivery_type': order_result[11] or 'self',
+            'delivery_address': order_result[12],
+            'notes': order_result[13],
+            'staff_notes': order_result[14],
+            'delivery_latitude': float(order_result[15]) if order_result[15] is not None else None,
+            'delivery_longitude': float(order_result[16]) if order_result[16] is not None else None,
+            'rating': int(order_result[17]) if order_result[17] is not None else None,
+            'rating_comment': order_result[18],
+            'created_at': order_result[19]
+        }
         
-        try:
-            customer_name = order.customer_name or ""
-        except:
-            pass
-        try:
-            customer_phone = order.customer_phone or ""
-        except:
-            pass
-        try:
-            customer_whatsapp = order.customer_whatsapp or order.customer_phone or ""
-        except:
-            customer_whatsapp = customer_phone
-        try:
-            shop_name = order.shop_name or ""
-        except:
-            pass
-        try:
-            delivery_type = order.delivery_type or "self"
-        except:
-            pass
-        try:
-            staff_notes = order.staff_notes
-        except:
-            pass
+        # Helper function to safely parse JSONB/JSON from raw SQL
+        def safe_parse_json(value):
+            if value is None:
+                return {}
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, str):
+                try:
+                    import json
+                    return json.loads(value)
+                except:
+                    return {}
+            return {}
         
-        # Get delivery coordinates
-        delivery_latitude = None
-        delivery_longitude = None
-        try:
-            delivery_latitude = getattr(order, 'delivery_latitude', None)
-            if delivery_latitude is not None:
-                delivery_latitude = float(delivery_latitude)
-        except:
-            pass
-        try:
-            delivery_longitude = getattr(order, 'delivery_longitude', None)
-            if delivery_longitude is not None:
-                delivery_longitude = float(delivery_longitude)
-        except:
-            pass
+        def safe_parse_array(value):
+            if value is None:
+                return []
+            if isinstance(value, list):
+                return [f for f in value if f is not None]
+            if isinstance(value, str):
+                try:
+                    import json
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return [f for f in parsed if f is not None]
+                    elif isinstance(parsed, dict):
+                        return [f for f in parsed.values() if f is not None]
+                except:
+                    pass
+            if isinstance(value, dict):
+                return [f for f in value.values() if f is not None]
+            try:
+                result = list(value) if value else []
+                return [f for f in result if f is not None]
+            except:
+                return []
         
-        # Get rating
-        rating = None
-        rating_comment = None
-        try:
-            rating = getattr(order, 'rating', None)
-            if rating is not None:
-                rating = int(rating)
-        except:
-            pass
-        try:
-            rating_comment = getattr(order, 'rating_comment', None)
-        except:
-            pass
+        # Process items from raw SQL
+        items_list = []
+        for item_row in items_result:
+            item_id = item_row[0]
+            product_id = item_row[2]
+            product_name = item_row[3] or ""
+            quantity = item_row[4] or 0
+            unit_price = float(item_row[5] or 0)
+            total_price = float(item_row[6] or 0)
+            specifications_raw = item_row[7]
+            design_files_raw = item_row[8]
+            status = item_row[9] or 'pending'
+            
+            items_list.append({
+                "id": item_id,
+                "product_id": product_id,
+                "product_name": product_name,
+                "quantity": quantity,
+                "unit_price": unit_price,
+                "total_price": total_price,
+                "specifications": safe_parse_json(specifications_raw),
+                "design_files": safe_parse_array(design_files_raw),
+                "status": status
+            })
         
         return {
             "success": True,
             "order": {
-                "id": order.id,
-                "order_number": getattr(order, 'order_number', None),
-                "customer_name": customer_name,
-                "customer_phone": customer_phone,
-                "customer_whatsapp": customer_whatsapp,
-                "shop_name": shop_name,
-                "status": getattr(order, 'status', 'pending'),
-                "delivery_type": delivery_type,
-                "total_amount": float(order.total_amount) if order.total_amount is not None else 0,
-                "final_amount": float(order.final_amount) if order.final_amount is not None else 0,
-                "payment_status": getattr(order, 'payment_status', 'pending'),
-                "delivery_address": getattr(order, 'delivery_address', None),
-                "delivery_latitude": delivery_latitude,
-                "delivery_longitude": delivery_longitude,
-                "rating": rating,
-                "rating_comment": rating_comment,
-                "notes": getattr(order, 'notes', None),
-                "staff_notes": staff_notes,
-                "created_at": order.created_at.isoformat() if order.created_at else None,
-                "items": [
-                    {
-                        "id": item.id,
-                        "product_name": getattr(item, 'product_name', '') or '',
-                        "quantity": getattr(item, 'quantity', 0) or 0,
-                        "unit_price": float(getattr(item, 'unit_price', 0) or 0),
-                        "total_price": float(getattr(item, 'total_price', 0) or 0),
-                        "specifications": _safe_get_specifications(item),
-                        "design_files": _safe_get_design_files(item),
-                        "status": getattr(item, 'status', 'pending') or 'pending'
-                    }
-                    for item in items
-                ]
+                "id": order['id'],
+                "order_number": order['order_number'],
+                "customer_name": order['customer_name'],
+                "customer_phone": order['customer_phone'],
+                "customer_whatsapp": order['customer_whatsapp'],
+                "shop_name": order['shop_name'],
+                "status": order['status'],
+                "delivery_type": order['delivery_type'],
+                "total_amount": float(order['total_amount']),
+                "final_amount": float(order['final_amount']),
+                "payment_status": order['payment_status'],
+                "delivery_address": order['delivery_address'],
+                "delivery_latitude": order['delivery_latitude'],
+                "delivery_longitude": order['delivery_longitude'],
+                "rating": order['rating'],
+                "rating_comment": order['rating_comment'],
+                "notes": order['notes'],
+                "staff_notes": order['staff_notes'],
+                "created_at": order['created_at'].isoformat() if order['created_at'] else None,
+                "items": items_list
             }
         }
     except HTTPException:

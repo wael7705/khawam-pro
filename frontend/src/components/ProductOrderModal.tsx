@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, ShoppingCart, Package, Truck, MapPin, FileText, CheckCircle, WhatsApp } from 'lucide-react'
+import { X, ShoppingCart, Package, Truck, MapPin, FileText, CheckCircle, MessageCircle } from 'lucide-react'
 import { ordersAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import { isAuthenticated, getUserData } from '../lib/auth'
@@ -230,13 +230,13 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
                 />
                 <small className="form-hint">
                   {whatsappNumber && (
-                    <a
+                      <a
                       href={`https://wa.me/963${whatsappNumber.replace(/^0/, '').replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="whatsapp-link"
                     >
-                      <WhatsApp size={16} /> فتح واتساب
+                      <MessageCircle size={16} /> فتح واتساب
                     </a>
                   )}
                 </small>

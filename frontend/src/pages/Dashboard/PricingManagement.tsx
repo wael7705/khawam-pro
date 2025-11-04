@@ -1,28 +1,15 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Calculator, ToggleLeft, ToggleRight, Search, Settings } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, DollarSign, Loader2 } from 'lucide-react'
 import { pricingAPI } from '../../lib/api'
-import { Link } from 'react-router-dom'
+import { showSuccess, showError } from '../../utils/toast'
 import './PricingManagement.css'
 
 interface PricingRule {
   id: number
   name_ar: string
   name_en?: string
-  description_ar?: string
-  description_en?: string
   calculation_type: 'piece' | 'area' | 'page'
   base_price: number
-  price_multipliers?: {
-    color?: { bw?: number; color?: number }
-    sides?: { single?: number; double?: number }
-    [key: string]: any
-  }
-  specifications?: {
-    paper_size?: string
-    paper_type?: string
-    color?: boolean
-    [key: string]: any
-  }
   unit?: string
   is_active: boolean
   display_order: number
@@ -32,20 +19,23 @@ export default function PricingManagement() {
   const [rules, setRules] = useState<PricingRule[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
+  const [editingRule, setEditingRule] = useState<PricingRule | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const [formData, setFormData] = useState({
+    name_ar: '',
+    name_en: '',
+    calculation_type: 'piece' as 'piece' | 'area' | 'page',
+    base_price: 0,
+    unit: '',
+    is_active: true,
+    display_order: 0,
+  })
 
   useEffect(() => {
     loadRules()
   }, [])
-
-  // Filter rules based on search query
-  const filteredRules = rules.filter(rule => {
-    const query = searchQuery.toLowerCase()
-    return (
-      rule.name_ar.toLowerCase().includes(query) ||
-      (rule.name_en && rule.name_en.toLowerCase().includes(query)) ||
-      (rule.description_ar && rule.description_ar.toLowerCase().includes(query))
-    )
-  })
 
   const loadRules = async () => {
     try {
@@ -56,88 +46,73 @@ export default function PricingManagement() {
       }
     } catch (error) {
       console.error('Error loading pricing rules:', error)
-      alert('خطأ في جلب قواعد الأسعار')
+      showError('خطأ في جلب قواعد الأسعار')
     } finally {
       setLoading(false)
     }
   }
 
-  const [isAdding, setIsAdding] = useState(false)
-  const [editingRule, setEditingRule] = useState<PricingRule | null>(null)
-  const [formData, setFormData] = useState({
-    name_ar: '',
-    name_en: '',
-    description_ar: '',
-    description_en: '',
-    calculation_type: 'piece' as 'piece' | 'area' | 'page',
-    base_price: 0,
-    unit: '',
-    is_active: true,
-    display_order: 0,
-    // Multipliers
-    color_bw: 1.0,
-    color_color: 1.5,
-    sides_single: 1.0,
-    sides_double: 1.3,
-    // Specifications
-    paper_size: 'A4',
-    paper_type: 'normal',
+  // Filter rules based on search query
+  const filteredRules = rules.filter(rule => {
+    const query = searchQuery.toLowerCase()
+    return (
+      rule.name_ar.toLowerCase().includes(query) ||
+      (rule.name_en && rule.name_en.toLowerCase().includes(query)) ||
+      (rule.unit && rule.unit.toLowerCase().includes(query))
+    )
   })
+
+  const getCalculationTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      piece: 'قطعة',
+      area: 'متر مربع',
+      page: 'صفحة',
+    }
+    return labels[type] || type
+  }
+
+  const getQuantityDisplay = (rule: PricingRule) => {
+    const unit = rule.unit || getCalculationTypeLabel(rule.calculation_type)
+    return `1 ${unit}`
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!formData.name_ar.trim() || formData.base_price <= 0) {
+      showError('يرجى إدخال اسم المادة والسعر')
+      return
+    }
+
     try {
-      const price_multipliers: any = {}
-      
-      // إضافة معاملات اللون إذا كانت مختلفة عن القيم الافتراضية
-      if (formData.color_bw !== 1.0 || formData.color_color !== 1.5) {
-        price_multipliers.color = {
-          bw: formData.color_bw,
-          color: formData.color_color,
-        }
-      }
-      
-      // إضافة معاملات الوجهين إذا كانت مختلفة عن القيم الافتراضية
-      if (formData.sides_single !== 1.0 || formData.sides_double !== 1.3) {
-        price_multipliers.sides = {
-          single: formData.sides_single,
-          double: formData.sides_double,
-        }
-      }
-
-      const specifications: any = {}
-      if (formData.paper_size) specifications.paper_size = formData.paper_size
-      if (formData.paper_type) specifications.paper_type = formData.paper_type
-
+      setSaving(true)
       const data = {
         name_ar: formData.name_ar,
         name_en: formData.name_en || undefined,
-        description_ar: formData.description_ar || undefined,
-        description_en: formData.description_en || undefined,
         calculation_type: formData.calculation_type,
         base_price: formData.base_price,
-        price_multipliers: Object.keys(price_multipliers).length > 0 ? price_multipliers : undefined,
-        specifications: Object.keys(specifications).length > 0 ? specifications : undefined,
-        unit: formData.unit || undefined,
+        unit: formData.unit || getCalculationTypeLabel(formData.calculation_type),
         is_active: formData.is_active,
         display_order: formData.display_order,
       }
 
       if (editingRule) {
         await pricingAPI.update(editingRule.id, data)
-        alert('تم تحديث قاعدة السعر بنجاح')
+        showSuccess('تم تحديث قاعدة السعر بنجاح')
       } else {
         await pricingAPI.create(data)
-        alert('تم إنشاء قاعدة السعر بنجاح')
+        showSuccess('تم إنشاء قاعدة السعر بنجاح')
       }
 
       setIsAdding(false)
       setEditingRule(null)
-      loadRules()
       resetForm()
+      loadRules()
     } catch (error: any) {
       console.error('Error saving pricing rule:', error)
-      alert(error.response?.data?.detail || 'خطأ في حفظ قاعدة السعر')
+      showError(error.response?.data?.detail || 'خطأ في حفظ قاعدة السعر')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -146,19 +121,11 @@ export default function PricingManagement() {
     setFormData({
       name_ar: rule.name_ar,
       name_en: rule.name_en || '',
-      description_ar: rule.description_ar || '',
-      description_en: rule.description_en || '',
       calculation_type: rule.calculation_type,
       base_price: rule.base_price,
       unit: rule.unit || '',
       is_active: rule.is_active,
       display_order: rule.display_order,
-      color_bw: rule.price_multipliers?.color?.bw || 1.0,
-      color_color: rule.price_multipliers?.color?.color || 1.5,
-      sides_single: rule.price_multipliers?.sides?.single || 1.0,
-      sides_double: rule.price_multipliers?.sides?.double || 1.3,
-      paper_size: rule.specifications?.paper_size || 'A4',
-      paper_type: rule.specifications?.paper_type || 'normal',
     })
     setIsAdding(true)
   }
@@ -168,21 +135,11 @@ export default function PricingManagement() {
     
     try {
       await pricingAPI.delete(id)
-      alert('تم حذف قاعدة السعر بنجاح')
+      showSuccess('تم حذف قاعدة السعر بنجاح')
       loadRules()
     } catch (error: any) {
       console.error('Error deleting pricing rule:', error)
-      alert(error.response?.data?.detail || 'خطأ في حذف قاعدة السعر')
-    }
-  }
-
-  const toggleActive = async (rule: PricingRule) => {
-    try {
-      await pricingAPI.update(rule.id, { is_active: !rule.is_active })
-      loadRules()
-    } catch (error: any) {
-      console.error('Error toggling rule:', error)
-      alert('خطأ في تحديث حالة قاعدة السعر')
+      showError(error.response?.data?.detail || 'خطأ في حذف قاعدة السعر')
     }
   }
 
@@ -190,136 +147,136 @@ export default function PricingManagement() {
     setFormData({
       name_ar: '',
       name_en: '',
-      description_ar: '',
-      description_en: '',
       calculation_type: 'piece',
       base_price: 0,
       unit: '',
       is_active: true,
       display_order: 0,
-      color_bw: 1.0,
-      color_color: 1.5,
-      sides_single: 1.0,
-      sides_double: 1.3,
-      paper_size: 'A4',
-      paper_type: 'normal',
     })
+    setEditingRule(null)
   }
 
-  const getCalculationTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      piece: 'بالقطعة',
-      area: 'بالمتر المربع',
-      page: 'بالصفحة',
-    }
-    return labels[type] || type
+  const handleAddClick = () => {
+    resetForm()
+    setIsAdding(true)
   }
 
   return (
     <div className="pricing-management">
-      <div className="section-header">
+      {/* Header */}
+      <div className="pricing-header">
         <div>
-          <h1>إدارة الأسعار</h1>
-          <p>إدارة قواعد الأسعار والخدمات المالية</p>
+          <h1>القواعد المالية</h1>
+          <p>إدارة قواعد الأسعار والمواد المالية</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Link to="/dashboard/pricing/wizard" className="btn btn-secondary">
-            <Settings size={20} />
-            إضافة أسعار (خطوة بخطوة)
-          </Link>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setIsAdding(true); setEditingRule(null) }}>
-            <Plus size={20} />
-            إضافة قاعدة سعر
-          </button>
+        <button className="btn-add-pricing" onClick={handleAddClick}>
+          <Plus size={20} />
+          إضافة قاعدة سعر جديدة
+        </button>
+      </div>
+
+      {/* Search Box */}
+      <div className="search-container">
+        <div className="search-box">
+          <Search size={20} className="search-icon" />
+          <input
+            type="text"
+            placeholder="ابحث عن مادة بالعربي أو الإنجليزي..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
+      {/* Table */}
       {loading ? (
-        <div className="loading">جاري التحميل...</div>
-      ) : (
-        <>
-          {/* Search Box */}
-          <div className="search-box-container">
-            <div className="search-box">
-              <Search size={20} />
-              <input
-                type="text"
-                placeholder="ابحث عن قاعدة سعر بالعربي أو الإنجليزي..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {rules.length === 0 ? (
-            <div className="empty-state">
-              <p>لا توجد قواعد أسعار حتى الآن</p>
-              <button className="btn btn-primary" onClick={() => { resetForm(); setIsAdding(true) }}>
-                <Plus size={20} />
-                إضافة قاعدة سعر جديدة
-              </button>
-            </div>
-          ) : filteredRules.length === 0 ? (
-            <div className="empty-state">
-              <p>لم يتم العثور على قواعد أسعار تطابق البحث</p>
-              <button className="btn btn-secondary" onClick={() => setSearchQuery('')}>
-                مسح البحث
-              </button>
-            </div>
-          ) : (
-            <div className="pricing-table-container">
-              <table className="pricing-table">
-                <thead>
-                  <tr>
-                    <th>اسم قاعدة السعر</th>
-                    <th>الوحدة</th>
-                    <th>السعر الأساسي</th>
-                    <th>الإجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRules.map(rule => (
-                    <tr key={rule.id} className={!rule.is_active ? 'inactive' : ''}>
-                      <td>
-                        <div className="rule-name-cell">
-                          <strong>{rule.name_ar}</strong>
-                          {rule.name_en && <span className="rule-english">{rule.name_en}</span>}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="unit-value">{rule.unit || '-'}</span>
-                      </td>
-                      <td>
-                        <strong className="price-value">{rule.base_price.toLocaleString()} ل.س</strong>
-                      </td>
-                      <td>
-                        <div className="table-actions">
-                          <button className="icon-btn edit" onClick={() => handleEdit(rule)} title="تعديل">
-                            <Edit size={18} />
-                          </button>
-                          <button className="icon-btn delete" onClick={() => handleDelete(rule.id)} title="حذف">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="loading-container">
+          <Loader2 className="spinner" size={32} />
+          <p>جاري تحميل القواعد المالية...</p>
+        </div>
+      ) : filteredRules.length === 0 ? (
+        <div className="empty-state">
+          <p>{searchQuery ? 'لم يتم العثور على قواعد تطابق البحث' : 'لا توجد قواعد أسعار حتى الآن'}</p>
+          {!searchQuery && (
+            <button className="btn-add-pricing" onClick={handleAddClick}>
+              <Plus size={20} />
+              إضافة قاعدة سعر جديدة
+            </button>
           )}
-        </>
+        </div>
+      ) : (
+        <div className="pricing-table-wrapper">
+          <table className="pricing-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>اسم المادة</th>
+                <th>نوع الوحدة</th>
+                <th>الكمية</th>
+                <th>السعر</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRules.map((rule, index) => (
+                <tr key={rule.id} className={!rule.is_active ? 'inactive' : ''}>
+                  <td className="row-number">{rule.id}</td>
+                  <td className="material-name">
+                    <strong>{rule.name_ar}</strong>
+                    {rule.name_en && <span className="name-en">{rule.name_en}</span>}
+                  </td>
+                  <td>
+                    <span className="unit-badge unit-{rule.calculation_type}">
+                      {getCalculationTypeLabel(rule.calculation_type)}
+                    </span>
+                  </td>
+                  <td className="quantity-cell">
+                    {getQuantityDisplay(rule)}
+                  </td>
+                  <td className="price-cell">
+                    <strong>{rule.base_price.toLocaleString()} ل.س</strong>
+                  </td>
+                  <td>
+                    <div className="table-actions">
+                      <button 
+                        className="action-btn edit-btn" 
+                        onClick={() => handleEdit(rule)}
+                        title="تعديل"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button 
+                        className="action-btn delete-btn" 
+                        onClick={() => handleDelete(rule.id)}
+                        title="حذف"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Add/Edit Modal */}
       {(isAdding || editingRule) && (
-        <div className="modal-overlay" onClick={() => { setIsAdding(false); setEditingRule(null); resetForm() }}>
+        <div className="modal-overlay" onClick={() => { setIsAdding(false); resetForm() }}>
           <div className="modal-content pricing-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingRule ? 'تعديل قاعدة السعر' : 'إضافة قاعدة سعر جديدة'}</h2>
+              <div className="modal-header-icon">
+                <DollarSign size={24} />
+              </div>
+              <div>
+                <h2>{editingRule ? 'تعديل قاعدة السعر' : 'إضافة قاعدة سعر جديدة'}</h2>
+                <p>{editingRule ? 'قم بتعديل بيانات قاعدة السعر' : 'أضف قاعدة سعر جديدة للمواد'}</p>
+              </div>
               <button 
                 className="modal-close-btn"
-                onClick={() => { setIsAdding(false); setEditingRule(null); resetForm() }}
+                onClick={() => { setIsAdding(false); resetForm() }}
+                title="إغلاق"
               >
                 ✕
               </button>
@@ -328,60 +285,72 @@ export default function PricingManagement() {
             <form className="pricing-form" onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group">
-                  <label>اسم قاعدة السعر (عربي) *</label>
+                  <label>اسم المادة (عربي) *</label>
                   <input
                     type="text"
                     value={formData.name_ar}
                     onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+                    placeholder="مثال: طباعة A4"
                     required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>اسم قاعدة السعر (إنجليزي)</label>
+                  <label>اسم المادة (إنجليزي)</label>
                   <input
                     type="text"
                     value={formData.name_en}
                     onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+                    placeholder="Example: A4 Printing"
                   />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>نوع الحساب *</label>
+                  <label>نوع الوحدة *</label>
                   <select
                     value={formData.calculation_type}
-                    onChange={(e) => setFormData({ ...formData, calculation_type: e.target.value as any })}
+                    onChange={(e) => {
+                      const newType = e.target.value as 'piece' | 'area' | 'page'
+                      setFormData({ 
+                        ...formData, 
+                        calculation_type: newType,
+                        unit: formData.unit || getCalculationTypeLabel(newType)
+                      })
+                    }}
                     required
                   >
-                    <option value="piece">بالقطعة</option>
-                    <option value="area">بالمتر المربع</option>
-                    <option value="page">بالصفحة</option>
+                    <option value="piece">قطعة</option>
+                    <option value="area">متر مربع</option>
+                    <option value="page">صفحة</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label>السعر الأساسي *</label>
+                  <label>الكمية (الوحدة) *</label>
+                  <input
+                    type="text"
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    placeholder={getCalculationTypeLabel(formData.calculation_type)}
+                    required
+                  />
+                  <small>مثال: صفحة، قطعة، متر مربع</small>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>السعر (ليرة سورية) *</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={formData.base_price}
                     onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
                     required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>الوحدة</label>
-                  <input
-                    type="text"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="قطعة، متر مربع، صفحة..."
                   />
                 </div>
 
@@ -391,89 +360,8 @@ export default function PricingManagement() {
                     type="number"
                     value={formData.display_order}
                     onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
                   />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>الوصف (عربي)</label>
-                <textarea
-                  rows={3}
-                  value={formData.description_ar}
-                  onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                  className="form-textarea"
-                />
-              </div>
-
-              <div className="form-section">
-                <h3>معاملات السعر (اختياري)</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>معامل الأبيض والأسود</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.color_bw}
-                      onChange={(e) => setFormData({ ...formData, color_bw: parseFloat(e.target.value) || 1.0 })}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>معامل الملون</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.color_color}
-                      onChange={(e) => setFormData({ ...formData, color_color: parseFloat(e.target.value) || 1.5 })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>معامل الوجه الواحد</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.sides_single}
-                      onChange={(e) => setFormData({ ...formData, sides_single: parseFloat(e.target.value) || 1.0 })}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>معامل الوجهين</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.sides_double}
-                      onChange={(e) => setFormData({ ...formData, sides_double: parseFloat(e.target.value) || 1.3 })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-section">
-                <h3>المواصفات (اختياري)</h3>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>حجم الورق</label>
-                    <input
-                      type="text"
-                      value={formData.paper_size}
-                      onChange={(e) => setFormData({ ...formData, paper_size: e.target.value })}
-                      placeholder="A4, A3..."
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>نوع الورق</label>
-                    <input
-                      type="text"
-                      value={formData.paper_type}
-                      onChange={(e) => setFormData({ ...formData, paper_type: e.target.value })}
-                      placeholder="عادي، ورق مصقول..."
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -492,12 +380,22 @@ export default function PricingManagement() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => { setIsAdding(false); setEditingRule(null); resetForm() }}
+                  onClick={() => { setIsAdding(false); resetForm() }}
+                  disabled={saving}
                 >
                   إلغاء
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingRule ? 'تحديث' : 'إضافة'}
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="spinner" size={18} />
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    <>
+                      {editingRule ? 'تحديث' : 'إضافة'}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -507,4 +405,3 @@ export default function PricingManagement() {
     </div>
   )
 }
-

@@ -1,6 +1,6 @@
 .user-menu {
   position: relative;
-  z-index: 1001;
+  z-index: 1002;
 }
 
 .user-menu-overlay {
@@ -10,7 +10,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.3);
-  z-index: 999;
+  z-index: 1001;
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -71,7 +71,7 @@
   min-width: 280px;
   max-width: 90vw;
   overflow: hidden;
-  z-index: 1000;
+  z-index: 1002;
   animation: slideDown 0.3s ease-out;
 }
 

@@ -225,16 +225,16 @@ app.add_middleware(
 # Import routers - استيراد آمن مع معالجة الأخطاء
 try:
     from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple, pricing, init_pricing
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(products.router, prefix="/api/products", tags=["Products"])
-app.include_router(services.router, prefix="/api/services", tags=["Services"])
-app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
-app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
-app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
-app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
-app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
+    app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+    app.include_router(products.router, prefix="/api/products", tags=["Products"])
+    app.include_router(services.router, prefix="/api/services", tags=["Services"])
+    app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
+    app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
+    app.include_router(studio.router, prefix="/api/studio", tags=["Studio"])
+    app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+    app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
+    app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
+    app.include_router(setup_simple.router, prefix="/api/setup", tags=["Setup"])
     app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
 except ImportError as e:
@@ -267,6 +267,13 @@ try:
     app.include_router(update_user_types_final.router, prefix="/api/fix", tags=["Fix"])
 except ImportError as e:
     print(f"Warning: Error importing db_fix router: {e}")
+
+# إضافة router مراحل الخدمات
+try:
+    from routers import service_workflows
+    app.include_router(service_workflows.router, prefix="/api/workflows", tags=["Service Workflows"])
+except ImportError as e:
+    print(f"Warning: Error importing service_workflows router: {e}")
 
 # Mount static files
 if not os.path.exists("uploads"):

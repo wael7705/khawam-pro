@@ -1690,7 +1690,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         # التحقق من وجود الأعمدة المطلوبة أولاً
         # Get total products
         try:
-            total_products = db.query(Product).filter(Product.is_visible == True).count()
+        total_products = db.query(Product).filter(Product.is_visible == True).count()
         except Exception as e:
             print(f"Error getting products: {e}")
             total_products = 0
@@ -1714,7 +1714,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
                 FROM orders 
                 WHERE status = 'completed'
             """)).scalar()
-            total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
+        total_revenue = float(total_revenue_result) if total_revenue_result else 0.0
         except Exception as e:
             print(f"Error getting total revenue: {e}")
             total_revenue = 0.0

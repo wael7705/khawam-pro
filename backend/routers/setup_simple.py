@@ -202,13 +202,13 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 users_deleted = 0
             else:
                 print(f"\n📋 Found {len(user_ids_to_delete)} admin/employee users to delete: {user_ids_to_delete}")
-                
+            
                 # Step 2: Delete studio_projects for these users
                 print("\n1️⃣ Deleting studio_projects for admins/employees...")
-                studio_deleted = 0
+            studio_deleted = 0
                 trans = None
-                try:
-                    trans = conn.begin()
+            try:
+                trans = conn.begin()
                     if user_ids_to_delete:
                         # Delete studio_projects one by one to avoid SQL parameter issues
                         for uid in user_ids_to_delete:
@@ -217,11 +217,11 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                                 {"uid": uid}
                             )
                             studio_deleted += result.rowcount
-                    trans.commit()
-                    print(f"   ✅ Deleted {studio_deleted} studio projects")
-                except Exception as e:
-                    if trans:
-                        trans.rollback()
+                trans.commit()
+                print(f"   ✅ Deleted {studio_deleted} studio projects")
+            except Exception as e:
+                if trans:
+                    trans.rollback()
                     # Try deleting all if specific deletion fails
                     try:
                         trans = conn.begin()
@@ -250,7 +250,7 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                     trans.rollback()
                     print(f"   ⚠️  Error getting orders: {e}")
                 print(f"   📋 Found {len(order_ids)} orders to delete")
-                
+            
                 # Step 4: Delete order_items for these orders
                 if order_ids:
                     print("\n3️⃣ Deleting order_items...")
@@ -295,7 +295,7 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 
                 # Step 6: Delete admins and employees (not customers)
                 print("\n5️⃣ Deleting admin/employee users...")
-                trans = conn.begin()
+            trans = conn.begin()
                 try:
                     for uid in user_ids_to_delete:
                         conn.execute(
@@ -303,7 +303,7 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                             {"uid": uid}
                         )
                     users_deleted = len(user_ids_to_delete)
-                    trans.commit()
+            trans.commit()
                     print(f"   ✅ Deleted {users_deleted} admin/employee users")
                 except Exception as e:
                     trans.rollback()
@@ -465,8 +465,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 'is_active': True
             })
             conn.commit()
-            created_users.append(f"مدير 1 ({phone1})")
-            print(f"   ✅ Admin 1: {phone1} / admin123")
+        created_users.append(f"مدير 1 ({phone1})")
+        print(f"   ✅ Admin 1: {phone1} / admin123")
         except Exception as e:
             print(f"   ⚠️  خطأ في إنشاء مدير 1: {e}")
         
@@ -486,8 +486,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                 'is_active': True
             })
             conn.commit()
-            created_users.append(f"مدير 2 ({phone2})")
-            print(f"   ✅ Admin 2: {phone2} / khawam-p")
+        created_users.append(f"مدير 2 ({phone2})")
+        print(f"   ✅ Admin 2: {phone2} / khawam-p")
         except Exception as e:
             print(f"   ⚠️  خطأ في إنشاء مدير 2: {e}")
         
@@ -508,8 +508,8 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
                     'is_active': True
                 })
                 conn.commit()
-                created_users.append(f"موظف {i} ({email})")
-                print(f"   ✅ Employee {i}: {email} / khawam-{i}")
+            created_users.append(f"موظف {i} ({email})")
+            print(f"   ✅ Employee {i}: {email} / khawam-{i}")
             except Exception as e:
                 print(f"   ⚠️  خطأ في إنشاء موظف {i}: {e}")
         print(f"\n💾 All {len(created_users)} users created successfully!")
@@ -551,16 +551,16 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
     finally:
         if conn:
             conn.close()
-    
-    return {
-        "success": True,
+        
+        return {
+            "success": True,
         "deleted_studio_projects": studio_deleted,
         "deleted_order_items": order_items_deleted,
-        "deleted_orders": orders_deleted,
-        "deleted_users": users_deleted,
+            "deleted_orders": orders_deleted,
+            "deleted_users": users_deleted,
         "customers_preserved": customers_count,
-        "created_users": len(created_users),
-        "created_user_list": created_users,
+            "created_users": len(created_users),
+            "created_user_list": created_users,
         "total_users_now": all_users_count,
         "all_users_have_passwords": users_without_password == 0,
         "message": f"تم حذف {studio_deleted} مشروع استيديو و {orders_deleted} طلب و {users_deleted} مستخدم (مدير/موظف) وإنشاء {len(created_users)} مستخدم جديد. تم الاحتفاظ بـ {customers_count} عميل."

@@ -127,6 +127,7 @@ export const adminAPI = {
   // Dashboard Statistics
   dashboard: {
     getStats: () => api.get('/admin/dashboard/stats'),
+    getPerformanceStats: () => api.get('/admin/dashboard/performance-stats'),
     getTopProducts: () => api.get('/admin/dashboard/top-products'),
     getTopServices: () => api.get('/admin/dashboard/top-services'),
     getSalesOverview: (period: string = 'month') => api.get(`/admin/dashboard/sales-overview?period=${period}`),

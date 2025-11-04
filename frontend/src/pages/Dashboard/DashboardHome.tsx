@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Package, ShoppingCart, DollarSign, AlertTriangle, RefreshCw } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts'
 import { adminAPI } from '../../lib/api'
+import DashboardStats from '../../components/DashboardStats'
 import './DashboardHome.css'
 
 interface DashboardStats {
@@ -361,6 +362,9 @@ export default function DashboardHome() {
           )}
         </div>
       </div>
+
+      {/* Performance Stats Widgets */}
+      <DashboardStats />
 
       {/* Recent Activity */}
       <div className="activity-grid">

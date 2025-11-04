@@ -125,10 +125,10 @@ export default function Dashboard() {
           {!sidebarCollapsed && (
             <div className="sidebar-footer">
               {/* Show "Go to Website" button for all users */}
-              <Link to="/" className="go-to-website-btn">
-                <HomeIcon size={18} />
+                <Link to="/" className="go-to-website-btn">
+                  <HomeIcon size={18} />
                 <span>العودة إلى الصفحة الرئيسية</span>
-              </Link>
+                </Link>
               {isAdmin() && (
                 <button className="language-btn">
                   <span>EN</span>

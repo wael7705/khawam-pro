@@ -315,7 +315,15 @@ export default function PricingManagement() {
       {(isAdding || editingRule) && (
         <div className="modal-overlay" onClick={() => { setIsAdding(false); setEditingRule(null); resetForm() }}>
           <div className="modal-content pricing-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingRule ? 'تعديل قاعدة السعر' : 'إضافة قاعدة سعر جديدة'}</h2>
+            <div className="modal-header">
+              <h2>{editingRule ? 'تعديل قاعدة السعر' : 'إضافة قاعدة سعر جديدة'}</h2>
+              <button 
+                className="modal-close-btn"
+                onClick={() => { setIsAdding(false); setEditingRule(null); resetForm() }}
+              >
+                ✕
+              </button>
+            </div>
             
             <form className="pricing-form" onSubmit={handleSubmit}>
               <div className="form-row">

@@ -223,14 +223,15 @@ async def create_order(
                 except:
                     pass
             
-            # Insert order item using raw SQL
+            # Insert order item using raw SQL with proper JSONB casting
+            # Use CAST instead of ::jsonb in VALUES to avoid SQL syntax error
             db.execute(text("""
                 INSERT INTO order_items 
                 (order_id, product_id, product_name, quantity, unit_price, total_price, 
                  specifications, design_files, status)
                 VALUES 
                 (:order_id, :product_id, :product_name, :quantity, :unit_price, :total_price,
-                 :specifications::jsonb, :design_files::jsonb, :status)
+                 CAST(:specifications AS jsonb), CAST(:design_files AS jsonb), :status)
             """), {
                 "order_id": order_id,
                 "product_id": item_data.product_id,

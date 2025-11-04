@@ -20,6 +20,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [loadingWorkflow, setLoadingWorkflow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [image, setImage] = useState<File | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [totalPages, setTotalPages] = useState<number>(0)
+  const [isAnalyzingPages, setIsAnalyzingPages] = useState(false)
   const [length, setLength] = useState('')
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
@@ -29,6 +32,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [notes, setNotes] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerWhatsApp, setCustomerWhatsApp] = useState('')
+  const [customerPhoneExtra, setCustomerPhoneExtra] = useState('')
   const [shopName, setShopName] = useState('')
   const [deliveryType, setDeliveryType] = useState('self')
   const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
@@ -90,28 +94,64 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
             <div className="form-group">
-              <label>رفع الملفات {stepConfig.required ? '' : <span className="optional">(اختياري)</span>}</label>
+              <label>رفع الملفات {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
               <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={stepConfig.accept || "image/*"}
+                  accept={stepConfig.accept || "application/pdf,.pdf"}
                   onChange={handleImageUpload}
                   className="hidden"
                   multiple={stepConfig.multiple || false}
                 />
-                {image ? (
-                  <div className="uploaded-file">
-                    <img src={URL.createObjectURL(image)} alt="Preview" />
-                    <p>{image.name}</p>
+                {uploadedFiles.length > 0 ? (
+                  <div className="uploaded-files-list">
+                    {uploadedFiles.map((file, idx) => (
+                      <div key={idx} className="uploaded-file-item">
+                        <FileText size={20} />
+                        <span>{file.name}</span>
+                        <span className="file-size">({(file.size / 1024).toFixed(1)} KB)</span>
+                      </div>
+                    ))}
+                    {stepConfig.analyze_pages && (
+                      <div className="pages-analysis">
+                        {isAnalyzingPages ? (
+                          <p>جاري تحليل عدد الصفحات...</p>
+                        ) : totalPages > 0 ? (
+                          <p className="pages-count">
+                            <strong>عدد الصفحات المكتشفة: {totalPages}</strong>
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="upload-placeholder">
-                    <p>اضغط لرفع {stepConfig.multiple ? 'الملفات' : 'الصورة'}</p>
+                    <p>اضغط لرفع {stepConfig.multiple ? 'ملفات PDF' : 'ملف PDF'}</p>
+                    <small>PDF فقط</small>
                   </div>
                 )}
               </div>
             </div>
+            {stepConfig.show_quantity && (
+              <div className="form-group">
+                <label>الكمية (عدد النسخ) <span className="required">*</span></label>
+                <input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="form-input"
+                  placeholder="1"
+                  required
+                />
+                {totalPages > 0 && (
+                  <small className="form-hint">
+                    إجمالي الصفحات: {totalPages} × {quantity} نسخة = {totalPages * quantity} صفحة
+                  </small>
+                )}
+              </div>
+            )}
           </div>
         )
 
@@ -276,8 +316,27 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             {workflowStep.step_description_ar && (
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
+            
+            {/* قياس الورق */}
+            {stepConfig.paper_size && (
+              <div className="form-group">
+                <label>قياس الورق</label>
+                <select 
+                  value={paperSize} 
+                  onChange={(e) => setPaperSize(e.target.value)} 
+                  className="form-input"
+                >
+                  <option value="A4">A4</option>
+                  <option value="A3">A3</option>
+                  <option value="A5">A5</option>
+                </select>
+                <small className="form-hint">القياس الافتراضي: {stepConfig.paper_size || 'A4'}</small>
+              </div>
+            )}
+            
+            {/* نوع الطباعة */}
             <div className="form-group">
-              <label>نوع الطباعة</label>
+              <label>نوع الطباعة <span className="required">*</span></label>
               <div className="delivery-options">
                 <label className="radio-option">
                   <input
@@ -285,7 +344,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     name="printColor"
                     value="bw"
                     checked={printColor === 'bw'}
-                    onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                    onChange={(e) => {
+                      setPrintColor(e.target.value as 'bw' | 'color')
+                      setPrintQuality('standard') // Reset quality when switching to BW
+                    }}
                   />
                   <span>أبيض وأسود</span>
                 </label>
@@ -301,31 +363,35 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 </label>
               </div>
             </div>
-            <div className="form-group">
-              <label>الطباعة</label>
-              <div className="delivery-options">
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    name="printSides"
-                    value="single"
-                    checked={printSides === 'single'}
-                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                  />
-                  <span>وجه واحد</span>
-                </label>
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    name="printSides"
-                    value="double"
-                    checked={printSides === 'double'}
-                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                  />
-                  <span>وجهين</span>
-                </label>
+            
+            {/* خيارات الجودة للملون فقط */}
+            {printColor === 'color' && stepConfig.quality_options?.color && (
+              <div className="form-group">
+                <label>جودة الطباعة <span className="required">*</span></label>
+                <div className="delivery-options">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="printQuality"
+                      value="standard"
+                      checked={printQuality === 'standard'}
+                      onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'laser')}
+                    />
+                    <span>طباعة عادية</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="printQuality"
+                      value="laser"
+                      checked={printQuality === 'laser'}
+                      onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'laser')}
+                    />
+                    <span>دقة عالية (ليزرية)</span>
+                  </label>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )
 
@@ -343,6 +409,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className="form-input"
+                placeholder="أدخل اسمك"
                 required={stepConfig.required}
               />
             </div>
@@ -356,10 +423,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   setCustomerWhatsApp(value)
                 }}
                 className="form-input"
-                placeholder="963xxxxxxxxx"
+                placeholder="09xxxxxxxx"
                 required={stepConfig.required}
               />
             </div>
+            {stepConfig.fields?.includes('whatsapp_optional') && (
+              <div className="form-group">
+                <label>رقم تواصل إضافي <span className="optional">(اختياري)</span></label>
+                <input
+                  type="tel"
+                  value={customerPhoneExtra}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9+]/g, '')
+                    setCustomerPhoneExtra(value)
+                  }}
+                  className="form-input"
+                  placeholder="09xxxxxxxx"
+                />
+                <small className="form-hint">يمكن استخدام رقم آخر للتواصل</small>
+              </div>
+            )}
             <div className="form-group">
               <label>اسم المتجر {stepConfig.required ? '' : <span className="optional">(اختياري)</span>}</label>
               <input
@@ -367,6 +450,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 value={shopName}
                 onChange={(e) => setShopName(e.target.value)}
                 className="form-input"
+                placeholder="اسم المتجر أو المؤسسة"
               />
             </div>
           </div>
@@ -441,6 +525,81 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   اختر موقع التوصيل
                 </button>
               )}
+            </div>
+          </div>
+        )
+
+      case 'invoice':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="invoice-summary">
+              <div className="invoice-item">
+                <span>الخدمة:</span>
+                <span>{serviceName}</span>
+              </div>
+              {totalPages > 0 && (
+                <div className="invoice-item">
+                  <span>عدد الصفحات:</span>
+                  <span>{totalPages}</span>
+                </div>
+              )}
+              {paperSize && (
+                <div className="invoice-item">
+                  <span>قياس الورق:</span>
+                  <span>{paperSize}</span>
+                </div>
+              )}
+              <div className="invoice-item">
+                <span>نوع الطباعة:</span>
+                <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>
+              </div>
+              {printColor === 'color' && (
+                <div className="invoice-item">
+                  <span>جودة الطباعة:</span>
+                  <span>{printQuality === 'laser' ? 'دقة عالية (ليزرية)' : 'طباعة عادية'}</span>
+                </div>
+              )}
+              <div className="invoice-item">
+                <span>الكمية (عدد النسخ):</span>
+                <span>{quantity}</span>
+              </div>
+              {customerName && (
+                <div className="invoice-item">
+                  <span>اسم العميل:</span>
+                  <span>{customerName}</span>
+                </div>
+              )}
+              {customerWhatsApp && (
+                <div className="invoice-item">
+                  <span>رقم التواصل:</span>
+                  <span>{customerWhatsApp}</span>
+                </div>
+              )}
+              {customerPhoneExtra && (
+                <div className="invoice-item">
+                  <span>رقم إضافي:</span>
+                  <span>{customerPhoneExtra}</span>
+                </div>
+              )}
+              <div className="invoice-item">
+                <span>طريقة الاستلام:</span>
+                <span>{deliveryType === 'self' ? 'استلام ذاتي' : 'توصيل'}</span>
+              </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="invoice-item">
+                  <span>عنوان التوصيل:</span>
+                  <span>{deliveryAddress.street || 'تم تحديد الموقع'}</span>
+                </div>
+              )}
+              <div className="invoice-divider"></div>
+              <div className="invoice-item total">
+                <span>المجموع الكلي:</span>
+                <span>{totalPrice > 0 ? totalPrice.toLocaleString() : 'يتم الحساب...'} ل.س</span>
+              </div>
             </div>
           </div>
         )

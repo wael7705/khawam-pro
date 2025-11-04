@@ -10,6 +10,9 @@ export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
 
   useEffect(() => {
     const userData = getUserData()
@@ -75,6 +78,22 @@ export default function UserMenu() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Calculate dropdown position for fixed positioning on small screens
+  useEffect(() => {
+    if (isOpen && buttonRef.current && dropdownRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect()
+      const isSmallScreen = window.innerWidth < 1024
+      
+      if (isSmallScreen) {
+        // Fixed positioning - calculate position relative to viewport
+        setDropdownPosition({
+          top: buttonRect.bottom + 10,
+          right: window.innerWidth - buttonRect.right
+        })
+      }
+    }
+  }, [isOpen])
 
   return (
     <div className="user-menu" ref={menuRef}>

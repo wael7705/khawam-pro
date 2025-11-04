@@ -176,10 +176,27 @@ async def create_order(
         order_id = result.scalar()
         db.commit()
         
-        # Refresh to get the full order object
-        new_order = db.query(Order).filter(Order.id == order_id).first()
+        # Get order data using raw SQL to avoid ORM issues with missing columns
+        order_result = db.execute(text("""
+            SELECT 
+                id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                delivery_address, notes, created_at
+            FROM orders
+            WHERE id = :order_id
+        """), {"order_id": order_id}).fetchone()
         
-        # Create order items
+        # Create a simple order object for response
+        order_dict_response = {
+            "id": order_result[0],
+            "order_number": order_result[1],
+            "status": order_result[7],
+            "total_amount": float(order_result[8]) if order_result[8] else 0.0,
+            "final_amount": float(order_result[9]) if order_result[9] else 0.0,
+            "created_at": order_result[14].isoformat() if order_result[14] else None
+        }
+        
+        # Create order items using raw SQL
         for item_data in order_data.items:
             # Prepare specifications JSON
             specs = {}
@@ -190,21 +207,31 @@ async def create_order(
             if item_data.colors:
                 specs["colors"] = item_data.colors
             
-            order_item = OrderItem(
-                order_id=new_order.id,
-                product_id=item_data.product_id,
-                product_name=item_data.service_name or f"Service Item",
-                quantity=item_data.quantity,
-                unit_price=item_data.unit_price,
-                total_price=item_data.total_price,
-                specifications=specs if specs else None,
-                design_files=item_data.design_files or [],
-                status="pending"
-            )
-            db.add(order_item)
+            import json
+            specs_json = json.dumps(specs) if specs else None
+            design_files_json = json.dumps(item_data.design_files or [])
+            
+            # Insert order item using raw SQL
+            db.execute(text("""
+                INSERT INTO order_items 
+                (order_id, product_id, product_name, quantity, unit_price, total_price, 
+                 specifications, design_files, status)
+                VALUES 
+                (:order_id, :product_id, :product_name, :quantity, :unit_price, :total_price,
+                 :specifications::jsonb, :design_files::jsonb, :status)
+            """), {
+                "order_id": order_id,
+                "product_id": item_data.product_id,
+                "product_name": item_data.service_name or "Service Item",
+                "quantity": item_data.quantity,
+                "unit_price": float(item_data.unit_price),
+                "total_price": float(item_data.total_price),
+                "specifications": specs_json,
+                "design_files": design_files_json,
+                "status": "pending"
+            })
         
         db.commit()
-        db.refresh(new_order)
         
         # Add background task for notifications
         background_tasks.add_task(
@@ -216,14 +243,7 @@ async def create_order(
         
         return {
             "success": True,
-            "order": {
-                "id": new_order.id,
-                "order_number": new_order.order_number,
-                "status": new_order.status,
-                "total_amount": float(new_order.total_amount),
-                "final_amount": float(new_order.final_amount),
-                "created_at": new_order.created_at.isoformat()
-            },
+            "order": order_dict_response,
             "message": f"تم إنشاء الطلب بنجاح: {order_number}"
         }
     except Exception as e:

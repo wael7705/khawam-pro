@@ -97,7 +97,16 @@ export default function UserMenu() {
 
   return (
     <div className="user-menu" ref={menuRef}>
-      <button className="user-menu-btn" onClick={() => setIsOpen(!isOpen)}>
+      <button 
+        ref={buttonRef}
+        className="user-menu-btn" 
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen(!isOpen)
+        }}
+        aria-label={isLoggedIn ? 'قائمة المستخدم' : 'تسجيل الدخول'}
+        aria-expanded={isOpen}
+      >
         {isLoggedIn && user ? (
           <>
             <div className="user-avatar">
@@ -111,7 +120,21 @@ export default function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="user-menu-dropdown">
+        <>
+          <div 
+            className="user-menu-overlay" 
+            onClick={() => setIsOpen(false)}
+          ></div>
+          <div 
+            ref={dropdownRef}
+            className="user-menu-dropdown"
+            style={window.innerWidth < 1024 ? {
+              position: 'fixed',
+              top: `${dropdownPosition.top}px`,
+              right: `${dropdownPosition.right}px`,
+              left: 'auto'
+            } : {}}
+          >
           {isLoggedIn && user ? (
             <>
               <div className="user-info">
@@ -154,7 +177,8 @@ export default function UserMenu() {
               </div>
             </>
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   )

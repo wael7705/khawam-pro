@@ -113,6 +113,7 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
         items: [
           {
             product_id: product.id,
+            product_name: product.name_ar || product.name || 'منتج',
             quantity: quantity,
             unit_price: product.base_price || product.price,
             total_price: totalPrice,

@@ -30,6 +30,10 @@ export default function ProductCard({ product, index }: ProductCardProps) {
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: index * 0.1 }}
         viewport={{ once: true }}
+        onClick={(e) => {
+          // Prevent card click from triggering modal
+          e.stopPropagation()
+        }}
       >
         <div className="product-image">
           {product.image_url && product.image_url.trim() ? (
@@ -70,7 +74,13 @@ export default function ProductCard({ product, index }: ProductCardProps) {
         <div className="product-info">
           <h3>{product.name_ar}</h3>
           <p className="price">{product.base_price || product.price} ل.س</p>
-          <button className="btn btn-primary" onClick={() => setIsOrderModalOpen(true)}>
+          <button 
+            className="btn btn-primary" 
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOrderModalOpen(true)
+            }}
+          >
             <ShoppingBag /> اطلب الآن
           </button>
         </div>

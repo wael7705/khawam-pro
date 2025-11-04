@@ -559,14 +559,12 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         "deleted_orders": orders_deleted,
         "deleted_users": users_deleted,
         "customers_preserved": customers_count,
-            "created_users": len(created_users),
-            "created_user_list": created_users,
-            "total_users_now": all_users_count,
-            "all_users_have_passwords": users_without_password == 0,
-            "message": f"تم حذف {studio_deleted} مشروع استيديو و {orders_deleted} طلب و {users_deleted} مستخدم (مدير/موظف) وإنشاء {len(created_users)} مستخدم جديد. تم الاحتفاظ بـ {customers_count} عميل."
-        }
-        
-    except Exception as e:
+        "created_users": len(created_users),
+        "created_user_list": created_users,
+        "total_users_now": all_users_count,
+        "all_users_have_passwords": users_without_password == 0,
+        "message": f"تم حذف {studio_deleted} مشروع استيديو و {orders_deleted} طلب و {users_deleted} مستخدم (مدير/موظف) وإنشاء {len(created_users)} مستخدم جديد. تم الاحتفاظ بـ {customers_count} عميل."
+    }
         print(f"\n❌ ERROR: {e}")
         import traceback
         traceback.print_exc()

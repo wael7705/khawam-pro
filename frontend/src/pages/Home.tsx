@@ -166,7 +166,10 @@ function FeaturedWorksSection() {
       } else {
         setWorks([])
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Silently fail - don't show error for featured works
+      console.error('Error loading featured works:', error)
+      setWorks([]) catch (error) {
       console.error('Error loading featured works:', error)
       setWorks([
         {

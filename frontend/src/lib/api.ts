@@ -1,10 +1,11 @@
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api',
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 seconds timeout
 })
 
 // Add request interceptor to include auth token
@@ -14,7 +15,46 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
+}, (error) => {
+  return Promise.reject(error)
 })
+
+// Add response interceptor for error handling and retry logic
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as any
+
+    // Retry logic for network errors
+    if (
+      error.code === 'ERR_NETWORK' ||
+      error.code === 'ERR_NETWORK_CHANGED' ||
+      error.code === 'ERR_CONNECTION_RESET' ||
+      error.message?.includes('Network Error') ||
+      error.message?.includes('ERR_NETWORK')
+    ) {
+      // Retry up to 3 times
+      if (!originalRequest._retry && originalRequest._retryCount < 3) {
+        originalRequest._retry = true
+        originalRequest._retryCount = (originalRequest._retryCount || 0) + 1
+
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * originalRequest._retryCount))
+
+        return api(originalRequest)
+      }
+    }
+
+    // Handle 401 errors (unauthorized)
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('user_data')
+      // Don't redirect on API errors, let the component handle it
+    }
+
+    return Promise.reject(error)
+  }
+)
 
 // Products API
 export const productsAPI = {

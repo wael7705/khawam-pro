@@ -97,8 +97,11 @@ export default function DashboardHome() {
       if (ordersRes.data.success) {
         setRecentOrders(ordersRes.data.orders || [])
       }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error)
+    } catch (error: any) {
+      // Only log if it's not a network error (handled by interceptor)
+      if (!error.code || (!error.code.includes('ERR_NETWORK') && !error.message?.includes('Network'))) {
+        console.error('Error loading dashboard data:', error)
+      }
       // Error handling - can add toast notification here
     } finally {
       setLoading(false)

@@ -20,11 +20,7 @@ export default function UserMenu() {
       // تحديث البيانات من API
       const token = localStorage.getItem('auth_token')
       if (token) {
-        api.get('/auth/me', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        })
+        authAPI.getMe()
           .then(response => {
             const updatedUser = response.data
             localStorage.setItem('user_data', JSON.stringify(updatedUser))

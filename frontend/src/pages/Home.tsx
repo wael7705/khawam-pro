@@ -170,17 +170,6 @@ function FeaturedWorksSection() {
       // Silently fail - don't show error for featured works
       console.error('Error loading featured works:', error)
       setWorks([])
-          title_ar: 'بانر إعلاني',
-          category_ar: 'البانرات',
-          image_url: '',
-        },
-        {
-          id: 3,
-          title_ar: 'تصميم جرافيكي',
-          category_ar: 'التصميم',
-          image_url: '',
-        },
-      ])
     } finally {
       setLoading(false)
     }

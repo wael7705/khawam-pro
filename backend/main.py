@@ -4,16 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 from database import engine
-import os
-
-app = FastAPI(
-    title="Khawam API",
-    description="API for Khawam Printing Services",
-    version="1.0.1",
-    lifespan=lifespan
-)
-
 from contextlib import asynccontextmanager
+import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +21,13 @@ async def lifespan(app: FastAPI):
     
     # Shutdown (if needed)
     pass
+
+app = FastAPI(
+    title="Khawam API",
+    description="API for Khawam Printing Services",
+    version="1.0.1",
+    lifespan=lifespan
+)
 
 async def _init_pricing_table():
     """Create pricing_rules table"""

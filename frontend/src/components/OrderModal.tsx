@@ -749,33 +749,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         return null
     }
   }
-  const [image, setImage] = useState<File | null>(null)
-  const [length, setLength] = useState('')
-  const [width, setWidth] = useState('')
-  const [height, setHeight] = useState('')
-  const [unit, setUnit] = useState('cm')
-  const [selectedColors, setSelectedColors] = useState<string[]>([])
-  const [workType, setWorkType] = useState('')
-  const [notes, setNotes] = useState('')
-  const [customerName, setCustomerName] = useState('')
-  const [customerWhatsApp, setCustomerWhatsApp] = useState('')
-  const [shopName, setShopName] = useState('')
-  const [deliveryType, setDeliveryType] = useState('self')
-  const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
-  const [addressConfirmed, setAddressConfirmed] = useState(false)
-  const [totalPrice, setTotalPrice] = useState(0)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const hasRestoredState = useRef(false)
-  
-  // Pricing system states
-  const [pricingRule, setPricingRule] = useState<any>(null)
-  const [calculationType, setCalculationType] = useState<'piece' | 'area' | 'page'>('piece')
-  const [printColor, setPrintColor] = useState<'bw' | 'color'>('bw')
-  const [printSides, setPrintSides] = useState<'single' | 'double'>('single')
-  const [numberOfPages, setNumberOfPages] = useState<number>(1)
-  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load workflow steps when modal opens and serviceId is available
   useEffect(() => {

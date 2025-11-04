@@ -202,6 +202,39 @@ class PricingConfig(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
+class ServiceWorkflow(Base):
+    """مراحل الطلب لكل خدمة - خوارزميات مختلفة لكل خدمة"""
+    __tablename__ = "service_workflows"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    
+    # رقم المرحلة (1, 2, 3, 4, 5, ...)
+    step_number = Column(Integer, nullable=False)
+    
+    # اسم المرحلة
+    step_name_ar = Column(String(200), nullable=False)
+    step_name_en = Column(String(200))
+    
+    # وصف المرحلة
+    step_description_ar = Column(Text)
+    step_description_en = Column(Text)
+    
+    # نوع المرحلة (مثل: dimensions, colors, files, quantity, pages, print_options, etc.)
+    step_type = Column(String(50), nullable=False)  # dimensions, colors, files, quantity, pages, print_options, customer_info, delivery
+    
+    # إعدادات المرحلة (JSON) - يمكن أن تحتوي على حقول مطلوبة، خيارات، إلخ
+    step_config = Column(JSON, nullable=True)  # مثل: {"fields": ["length", "width"], "required": true, "unit": "cm", "options": [...]}
+    
+    # ترتيب العرض
+    display_order = Column(Integer, default=0)
+    
+    # حالة التفعيل
+    is_active = Column(Boolean, default=True)
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
 class PricingRule(Base):
     """قواعد التسعير القديمة (للتوافق مع النظام القديم)"""
     __tablename__ = "pricing_rules"

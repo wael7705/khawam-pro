@@ -543,16 +543,22 @@ async def force_reset_users(keep_customers: bool = True, db: Session = Depends(g
         
         print("=" * 70 + "\n")
         
-        finally:
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+    finally:
+        if conn:
             conn.close()
-        
-        return {
-            "success": True,
-            "deleted_studio_projects": studio_deleted,
-            "deleted_order_items": order_items_deleted,
-            "deleted_orders": orders_deleted,
-            "deleted_users": users_deleted,
-            "customers_preserved": customers_count,
+    
+    return {
+        "success": True,
+        "deleted_studio_projects": studio_deleted,
+        "deleted_order_items": order_items_deleted,
+        "deleted_orders": orders_deleted,
+        "deleted_users": users_deleted,
+        "customers_preserved": customers_count,
             "created_users": len(created_users),
             "created_user_list": created_users,
             "total_users_now": all_users_count,

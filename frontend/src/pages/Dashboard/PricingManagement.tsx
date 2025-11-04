@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Calculator, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Edit, Trash2, Calculator, ToggleLeft, ToggleRight, Search } from 'lucide-react'
 import { pricingAPI } from '../../lib/api'
 import './PricingManagement.css'
 
@@ -30,10 +30,21 @@ interface PricingRule {
 export default function PricingManagement() {
   const [rules, setRules] = useState<PricingRule[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     loadRules()
   }, [])
+
+  // Filter rules based on search query
+  const filteredRules = rules.filter(rule => {
+    const query = searchQuery.toLowerCase()
+    return (
+      rule.name_ar.toLowerCase().includes(query) ||
+      (rule.name_en && rule.name_en.toLowerCase().includes(query)) ||
+      (rule.description_ar && rule.description_ar.toLowerCase().includes(query))
+    )
+  })
 
   const loadRules = async () => {
     try {
@@ -220,6 +231,19 @@ export default function PricingManagement() {
         <div className="loading">جاري التحميل...</div>
       ) : (
         <>
+          {/* Search Box */}
+          <div className="search-box-container">
+            <div className="search-box">
+              <Search size={20} />
+              <input
+                type="text"
+                placeholder="ابحث عن قاعدة سعر بالعربي أو الإنجليزي..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
           {rules.length === 0 ? (
             <div className="empty-state">
               <p>لا توجد قواعد أسعار حتى الآن</p>
@@ -228,23 +252,26 @@ export default function PricingManagement() {
                 إضافة قاعدة سعر جديدة
               </button>
             </div>
+          ) : filteredRules.length === 0 ? (
+            <div className="empty-state">
+              <p>لم يتم العثور على قواعد أسعار تطابق البحث</p>
+              <button className="btn btn-secondary" onClick={() => setSearchQuery('')}>
+                مسح البحث
+              </button>
+            </div>
           ) : (
             <div className="pricing-table-container">
               <table className="pricing-table">
                 <thead>
                   <tr>
                     <th>اسم قاعدة السعر</th>
-                    <th>نوع الحساب</th>
-                    <th>السعر الأساسي</th>
                     <th>الوحدة</th>
-                    <th>المعاملات</th>
-                    <th>الوصف</th>
-                    <th>الحالة</th>
+                    <th>السعر الأساسي</th>
                     <th>الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rules.map(rule => (
+                  {filteredRules.map(rule => (
                     <tr key={rule.id} className={!rule.is_active ? 'inactive' : ''}>
                       <td>
                         <div className="rule-name-cell">
@@ -253,45 +280,18 @@ export default function PricingManagement() {
                         </div>
                       </td>
                       <td>
-                        <span className="rule-type-badge">{getCalculationTypeLabel(rule.calculation_type)}</span>
+                        <span className="unit-value">{rule.unit || '-'}</span>
                       </td>
                       <td>
                         <strong className="price-value">{rule.base_price.toLocaleString()} ل.س</strong>
                       </td>
-                      <td>{rule.unit || '-'}</td>
-                      <td>
-                        <div className="multipliers-cell">
-                          {rule.price_multipliers?.color && (
-                            <span className="multiplier-tag">لون</span>
-                          )}
-                          {rule.price_multipliers?.sides && (
-                            <span className="multiplier-tag">وجهين</span>
-                          )}
-                          {!rule.price_multipliers && <span className="text-muted">-</span>}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="description-cell">
-                          {rule.description_ar || '-'}
-                        </div>
-                      </td>
-                      <td>
-                        <button
-                          className="toggle-btn-table"
-                          onClick={() => toggleActive(rule)}
-                          title={rule.is_active ? 'تعطيل' : 'تفعيل'}
-                        >
-                          {rule.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-                          <span className="status-text">{rule.is_active ? 'نشط' : 'معطل'}</span>
-                        </button>
-                      </td>
                       <td>
                         <div className="table-actions">
-                          <button className="icon-btn" onClick={() => handleEdit(rule)} title="تعديل">
-                            <Edit size={16} />
+                          <button className="icon-btn edit" onClick={() => handleEdit(rule)} title="تعديل">
+                            <Edit size={18} />
                           </button>
                           <button className="icon-btn delete" onClick={() => handleDelete(rule.id)} title="حذف">
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       </td>

@@ -17,9 +17,10 @@ interface Product {
 interface ProductCardProps {
   product: Product
   index: number
+  onOrderClick?: () => void
 }
 
-export default function ProductCard({ product, index }: ProductCardProps) {
+export default function ProductCard({ product, index, onOrderClick }: ProductCardProps) {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
 
   return (
@@ -78,7 +79,11 @@ export default function ProductCard({ product, index }: ProductCardProps) {
             className="btn btn-primary" 
             onClick={(e) => {
               e.stopPropagation()
-              setIsOrderModalOpen(true)
+              if (onOrderClick) {
+                onOrderClick()
+              } else {
+                setIsOrderModalOpen(true)
+              }
             }}
           >
             <ShoppingBag /> اطلب الآن
@@ -86,11 +91,13 @@ export default function ProductCard({ product, index }: ProductCardProps) {
         </div>
       </motion.div>
 
-      <ProductOrderModal
-        isOpen={isOrderModalOpen}
-        onClose={() => setIsOrderModalOpen(false)}
-        product={product}
-      />
+      {!onOrderClick && (
+        <ProductOrderModal
+          isOpen={isOrderModalOpen}
+          onClose={() => setIsOrderModalOpen(false)}
+          product={product}
+        />
+      )}
     </>
   )
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { X, ShoppingCart, Package, Truck, MapPin, FileText, CheckCircle, MessageCircle } from 'lucide-react'
 import { ordersAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
@@ -19,12 +20,14 @@ interface ProductOrderModalProps {
 }
 
 export default function ProductOrderModal({ isOpen, onClose, product }: ProductOrderModalProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [step, setStep] = useState(1)
   const [quantity, setQuantity] = useState(1)
   const [notes, setNotes] = useState('')
   const [whatsappNumber, setWhatsappNumber] = useState('')
   const [deliveryType, setDeliveryType] = useState<'self' | 'delivery'>('self')
-  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
   const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null)
   const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null)
   const [addressConfirmed, setAddressConfirmed] = useState(false)
@@ -32,27 +35,79 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const hasRestoredState = useRef(false)
 
+  // Load saved form state and delivery address when modal opens
   useEffect(() => {
-    if (isOpen) {
-      // Reset form when modal opens
-      setStep(1)
-      setQuantity(1)
-      setNotes('')
-      setWhatsappNumber('')
-      setDeliveryType('self')
-      setDeliveryAddress('')
-      setAddressConfirmed(false)
-      setIsSubmitting(false)
+    if (isOpen && !hasRestoredState.current) {
+      // Check if we should restore state (only when returning from location picker)
+      const shouldReopen = localStorage.getItem('shouldReopenProductOrderModal')
       
-      // Load user data if authenticated
-      if (isAuthenticated()) {
-        const userData = getUserData()
-        if (userData) {
-          setCustomerName(userData.name || '')
-          setCustomerPhone(userData.phone || userData.email || '')
+      if (shouldReopen === 'true') {
+        // Restore form state if exists
+        const savedFormState = localStorage.getItem('productOrderFormState')
+        if (savedFormState) {
+          try {
+            const formState = JSON.parse(savedFormState)
+            if (formState.step) setStep(formState.step)
+            if (formState.quantity !== undefined) setQuantity(formState.quantity)
+            if (formState.notes !== undefined) setNotes(formState.notes)
+            if (formState.whatsappNumber !== undefined) setWhatsappNumber(formState.whatsappNumber)
+            if (formState.deliveryType !== undefined) setDeliveryType(formState.deliveryType)
+            if (formState.customerName !== undefined) setCustomerName(formState.customerName)
+            if (formState.customerPhone !== undefined) setCustomerPhone(formState.customerPhone)
+            
+            hasRestoredState.current = true
+          } catch (error) {
+            console.error('Error loading form state:', error)
+          }
+        }
+
+        // Load saved delivery address
+        const savedAddress = localStorage.getItem('deliveryAddress')
+        if (savedAddress) {
+          try {
+            const address = JSON.parse(savedAddress)
+            setDeliveryAddress(address)
+            setDeliveryLatitude(address.latitude || null)
+            setDeliveryLongitude(address.longitude || null)
+            setAddressConfirmed(true)
+            showSuccess('تم حفظ الموقع بنجاح')
+            console.log('✅ Delivery address restored')
+          } catch (error) {
+            console.error('Error loading delivery address:', error)
+          }
+        }
+
+        // Clear flags
+        localStorage.removeItem('shouldReopenProductOrderModal')
+      } else {
+        // Reset form when modal opens normally
+        setStep(1)
+        setQuantity(1)
+        setNotes('')
+        setWhatsappNumber('')
+        setDeliveryType('self')
+        setDeliveryAddress(null)
+        setDeliveryLatitude(null)
+        setDeliveryLongitude(null)
+        setAddressConfirmed(false)
+        setIsSubmitting(false)
+        
+        // Load user data if authenticated
+        if (isAuthenticated()) {
+          const userData = getUserData()
+          if (userData) {
+            setCustomerName(userData.name || '')
+            setCustomerPhone(userData.phone || userData.email || '')
+          }
         }
       }
+    }
+
+    // Reset flag when modal closes
+    if (!isOpen) {
+      hasRestoredState.current = false
     }
   }, [isOpen])
 
@@ -74,21 +129,35 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
     }
   }
 
-  const handleConfirmLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setDeliveryLatitude(position.coords.latitude)
-          setDeliveryLongitude(position.coords.longitude)
-          setAddressConfirmed(true)
-          showSuccess('تم تأكيد الموقع بنجاح')
-        },
-        (error) => {
-          showError('فشل الحصول على الموقع. يرجى إدخال العنوان يدوياً')
+  const handleDeliveryTypeChange = (type: 'self' | 'delivery') => {
+    setDeliveryType(type)
+    // Clear address confirmation when switching to self-pickup
+    if (type === 'self') {
+      setAddressConfirmed(false)
+      setDeliveryAddress(null)
+      setDeliveryLatitude(null)
+      setDeliveryLongitude(null)
+    } else if (type === 'delivery') {
+      // Save current form state including current step
+      localStorage.setItem('productOrderFormState', JSON.stringify({
+        step,
+        quantity,
+        notes,
+        whatsappNumber,
+        deliveryType: 'delivery',
+        customerName,
+        customerPhone,
+        productId: product.id,
+        productName: product.name_ar || product.name
+      }))
+      localStorage.setItem('shouldReopenProductOrderModal', 'true')
+      // Navigate to location picker
+      navigate('/location-picker', { 
+        state: { 
+          from: 'product-order',
+          productId: product.id
         }
-      )
-    } else {
-      showError('المتصفح لا يدعم تحديد الموقع')
+      })
     }
   }
 
@@ -126,9 +195,11 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
         total_amount: totalPrice,
         final_amount: totalPrice,
         delivery_type: deliveryType,
-        delivery_address: deliveryType === 'delivery' ? deliveryAddress : null,
-        delivery_latitude: deliveryType === 'delivery' ? deliveryLatitude : null,
-        delivery_longitude: deliveryType === 'delivery' ? deliveryLongitude : null,
+        delivery_address: deliveryType === 'delivery' 
+          ? (deliveryAddress?.street || deliveryAddress?.address || null)
+          : null,
+        delivery_latitude: deliveryType === 'delivery' ? (deliveryLatitude || deliveryAddress?.latitude || null) : null,
+        delivery_longitude: deliveryType === 'delivery' ? (deliveryLongitude || deliveryAddress?.longitude || null) : null,
         notes: notes,
       }
 
@@ -304,7 +375,7 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
               <div className="delivery-options">
                 <div
                   className={`delivery-option ${deliveryType === 'self' ? 'selected' : ''}`}
-                  onClick={() => setDeliveryType('self')}
+                  onClick={() => handleDeliveryTypeChange('self')}
                 >
                   <Package size={24} />
                   <div>
@@ -315,7 +386,7 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
                 </div>
                 <div
                   className={`delivery-option ${deliveryType === 'delivery' ? 'selected' : ''}`}
-                  onClick={() => setDeliveryType('delivery')}
+                  onClick={() => handleDeliveryTypeChange('delivery')}
                 >
                   <Truck size={24} />
                   <div>
@@ -325,44 +396,65 @@ export default function ProductOrderModal({ isOpen, onClose, product }: ProductO
                   {deliveryType === 'delivery' && <CheckCircle size={20} />}
                 </div>
               </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="delivery-address-info" style={{ marginTop: '16px', padding: '12px', background: '#f0f9ff', borderRadius: '8px', borderRight: '4px solid #3b82f6' }}>
+                  <p><strong>العنوان:</strong> {deliveryAddress.street || deliveryAddress.address || 'تم تحديد الموقع'}</p>
+                  {addressConfirmed && (
+                    <p style={{ color: '#059669', fontSize: '0.9rem', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle size={16} /> تم حفظ الموقع بنجاح
+                    </p>
+                  )}
+                </div>
+              )}
+              {deliveryType === 'delivery' && !addressConfirmed && (
+                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                  <p style={{ color: '#6b7280', marginBottom: '12px' }}>سيتم نقلك إلى صفحة تحديد الموقع</p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Step 4: Delivery Address */}
+          {/* Step 4: Delivery Address - Show confirmation if delivery selected */}
           {step === 4 && (
             <div>
               {deliveryType === 'delivery' ? (
                 <>
                   <h3>عنوان التوصيل</h3>
-                  <div className="form-group">
-                    <label>
-                      العنوان <span className="required">*</span>
-                    </label>
-                    <textarea
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      className="form-input"
-                      rows={3}
-                      placeholder="أدخل عنوان التوصيل الكامل..."
-                      required
-                    />
-                  </div>
-
-                  <div className="location-actions">
-                    <button
-                      className="btn btn-secondary"
-                      onClick={handleConfirmLocation}
-                      disabled={addressConfirmed}
-                    >
-                      <MapPin size={18} />
-                      {addressConfirmed ? 'تم تأكيد الموقع' : 'تأكيد الموقع'}
-                    </button>
-                  </div>
-
-                  {addressConfirmed && (
-                    <div className="location-confirmed">
-                      <CheckCircle size={20} />
-                      <span>تم تأكيد موقعك بنجاح</span>
+                  {deliveryAddress && addressConfirmed ? (
+                    <div className="location-confirmed" style={{ padding: '20px', background: '#f0f9ff', borderRadius: '12px', borderRight: '4px solid #3b82f6' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <CheckCircle size={24} color="#059669" />
+                        <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#059669' }}>تم حفظ الموقع بنجاح</span>
+                      </div>
+                      <div style={{ marginTop: '16px' }}>
+                        <p><strong>العنوان:</strong> {deliveryAddress.street || deliveryAddress.address || 'تم تحديد الموقع'}</p>
+                        {deliveryAddress.neighborhood && (
+                          <p><strong>الحي:</strong> {deliveryAddress.neighborhood}</p>
+                        )}
+                        {deliveryAddress.building && (
+                          <p><strong>المبنى:</strong> {deliveryAddress.building}</p>
+                        )}
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleDeliveryTypeChange('delivery')}
+                        style={{ marginTop: '16px' }}
+                      >
+                        <MapPin size={18} />
+                        تغيير الموقع
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                      <MapPin size={48} color="#6b7280" style={{ marginBottom: '16px' }} />
+                      <p style={{ color: '#6b7280', marginBottom: '20px' }}>يرجى تحديد موقع التوصيل</p>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => handleDeliveryTypeChange('delivery')}
+                      >
+                        <MapPin size={18} />
+                        اختر موقع التوصيل
+                      </button>
                     </div>
                   )}
                 </>

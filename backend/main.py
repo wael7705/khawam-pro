@@ -106,9 +106,66 @@ async def _init_pricing_table():
             """))
             conn.commit()
             print("✅ تم إنشاء جدول pricing_rules بنجاح")
+        
+        # إنشاء جداول النظام الهرمي الجديد
+        # 1. pricing_categories
+        check_categories = conn.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'pricing_categories'
+            )
+        """)).fetchone()
+        
+        if not (check_categories and check_categories[0]):
+            conn.execute(text("""
+                CREATE TABLE pricing_categories (
+                    id SERIAL PRIMARY KEY,
+                    name_ar VARCHAR(200) NOT NULL,
+                    name_en VARCHAR(200),
+                    description_ar TEXT,
+                    description_en TEXT,
+                    icon VARCHAR(50),
+                    is_active BOOLEAN DEFAULT true,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+            print("✅ تم إنشاء جدول pricing_categories بنجاح")
+        
+        # 2. pricing_configs
+        check_configs = conn.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'pricing_configs'
+            )
+        """)).fetchone()
+        
+        if not (check_configs and check_configs[0]):
+            conn.execute(text("""
+                CREATE TABLE pricing_configs (
+                    id SERIAL PRIMARY KEY,
+                    category_id INTEGER NOT NULL REFERENCES pricing_categories(id) ON DELETE CASCADE,
+                    paper_size VARCHAR(10) NOT NULL,
+                    paper_type VARCHAR(50),
+                    print_type VARCHAR(20) NOT NULL,
+                    quality_type VARCHAR(20),
+                    price_per_page DECIMAL(10, 4) NOT NULL,
+                    unit VARCHAR(50) DEFAULT 'صفحة',
+                    is_active BOOLEAN DEFAULT true,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+            print("✅ تم إنشاء جدول pricing_configs بنجاح")
 
     except Exception as e:
-        print(f"⚠️ Warning: Error initializing pricing_rules table: {str(e)[:200]}")
+        print(f"⚠️ Warning: Error initializing pricing tables: {str(e)[:200]}")
         if conn:
             try:
                 conn.rollback()
@@ -120,9 +177,6 @@ async def _init_pricing_table():
                 conn.close()
             except:
                 pass
-    
-    # تشغيل الكود في الخلفية
-    asyncio.create_task(_init_table())
 
 # CORS - Allow all origins for Railway deployment
 allowed_origins = [
@@ -155,6 +209,13 @@ try:
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
 except ImportError as e:
     print(f"⚠️ Warning: Error importing main routers: {e}")
+
+# إضافة router النظام الهرمي
+try:
+    from routers import pricing_hierarchical
+    app.include_router(pricing_hierarchical.router, prefix="/api/pricing-hierarchical", tags=["Pricing Hierarchical"])
+except ImportError as e:
+    print(f"⚠️ Warning: Error importing pricing_hierarchical router: {e}")
 
 # إضافة router اختبار قاعدة البيانات
 try:

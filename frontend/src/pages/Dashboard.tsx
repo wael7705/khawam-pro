@@ -9,6 +9,7 @@ import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
 import CustomersManagement from './Dashboard/CustomersManagement'
 import PricingManagement from './Dashboard/PricingManagement'
+import PricingWizard from './Dashboard/PricingWizard'
 import Studio from './Studio'
 import ProfileSettings from './ProfileSettings'
 import { isEmployee, isAdmin, getUserData, isAuthenticated } from '../lib/auth'
@@ -158,6 +159,7 @@ export default function Dashboard() {
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}
             {isAdmin() && <Route path="/works" element={<WorksManagement />} />}
             {isAdmin() && <Route path="/pricing" element={<PricingManagement />} />}
+            {isAdmin() && <Route path="/pricing/wizard" element={<PricingWizard />} />}
             <Route path="/studio" element={<Studio />} />
             <Route path="/profile" element={<ProfileSettings />} />
             <Route path="*" element={<Navigate to={isEmployee() ? "/dashboard/orders" : "/dashboard"} replace />} />

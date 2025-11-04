@@ -153,7 +153,57 @@ class OrderItem(Base):
     status = Column(String(20), default="pending")
     created_at = Column(TIMESTAMP, server_default=func.now())
 
+class PricingCategory(Base):
+    """فئات التسعير الرئيسية (مثل: الطباعة على ورق)"""
+    __tablename__ = "pricing_categories"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name_ar = Column(String(200), nullable=False)  # اسم الفئة
+    name_en = Column(String(200))
+    description_ar = Column(Text)
+    description_en = Column(Text)
+    icon = Column(String(50))  # أيقونة الفئة
+    is_active = Column(Boolean, default=True)
+    display_order = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+class PricingConfig(Base):
+    """إعدادات التسعير الهرمية مع الأسعار"""
+    __tablename__ = "pricing_configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("pricing_categories.id"), nullable=False)
+    
+    # القياس (A1, A2, A3, A4, A5, B1, B2, B3, B4, B5)
+    paper_size = Column(String(10), nullable=False)  # A4, A3, etc.
+    
+    # نوع الورق (اختياري - يمكن أن يكون null إذا كان ينطبق على جميع الأنواع)
+    paper_type = Column(String(50), nullable=True)  # normal, glossy, etc.
+    
+    # نوع الطباعة
+    print_type = Column(String(20), nullable=False)  # "bw" (أبيض وأسود) أو "color" (ملون)
+    
+    # نوع الدقة (للملون فقط)
+    quality_type = Column(String(20), nullable=True)  # "standard" (عادية) أو "laser" (ليزرية/عالية)
+    
+    # السعر لكل صفحة
+    price_per_page = Column(DECIMAL(10, 4), nullable=False)
+    
+    # الوحدة
+    unit = Column(String(50), default="صفحة")
+    
+    # حالة التفعيل
+    is_active = Column(Boolean, default=True)
+    
+    # ترتيب العرض
+    display_order = Column(Integer, default=0)
+    
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
 class PricingRule(Base):
+    """قواعد التسعير القديمة (للتوافق مع النظام القديم)"""
     __tablename__ = "pricing_rules"
     
     id = Column(Integer, primary_key=True, index=True)

@@ -163,10 +163,31 @@ export const pricingAPI = {
   create: (data: any) => api.post('/pricing/pricing-rules', data),
   update: (id: number, data: any) => api.put(`/pricing/pricing-rules/${id}`, data),
   delete: (id: number) => api.delete(`/pricing/pricing-rules/${id}`),
-  calculatePrice: (data: { calculation_type: string; quantity: number; specifications: any }) => 
+  calculatePrice: (data: { calculation_type: string; quantity: number; specifications: any }) =>
     api.post('/pricing/calculate-price', data),
-  calculatePriceByRule: (ruleId: number, data: { quantity: number; specifications: any }) => 
+  calculatePriceByRule: (ruleId: number, data: { quantity: number; specifications: any }) =>
     api.post(`/pricing/calculate-price-by-rule/${ruleId}`, data),
+}
+
+export const pricingHierarchicalAPI = {
+  getCategories: () => api.get('/pricing-hierarchical/categories'),
+  createCategory: (data: any) => api.post('/pricing-hierarchical/categories', data),
+  getConfigs: (params?: { category_id?: number; paper_size?: string }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.category_id) queryParams.append('category_id', params.category_id.toString())
+    if (params?.paper_size) queryParams.append('paper_size', params.paper_size)
+    return api.get(`/pricing-hierarchical/configs?${queryParams.toString()}`)
+  },
+  createConfig: (data: any) => api.post('/pricing-hierarchical/configs', data),
+  deleteConfig: (id: number) => api.delete(`/pricing-hierarchical/configs/${id}`),
+  calculatePrice: (data: {
+    category_id: number
+    paper_size: string
+    paper_type?: string
+    print_type: string
+    quality_type?: string
+    quantity: number
+  }) => api.post('/pricing-hierarchical/calculate-price', data),
 }
 
 export default api

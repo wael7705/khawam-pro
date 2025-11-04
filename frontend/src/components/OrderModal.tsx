@@ -196,17 +196,17 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         qty = numberOfPages || qty
       } else if (length && width) {
         // حساب المساحة بالمتر المربع
-        const l = parseFloat(String(length)) || 0
-        const w = parseFloat(String(width)) || 0
-        const h = parseFloat(String(height)) || 0
-        
-        if (h > 0 && l > 0 && w > 0) {
+      const l = parseFloat(String(length)) || 0
+      const w = parseFloat(String(width)) || 0
+      const h = parseFloat(String(height)) || 0
+      
+      if (h > 0 && l > 0 && w > 0) {
           // جسم ثلاثي الأبعاد - حساب المساحة الإجمالية
           const area = ((l * w * 2) + (l * h * 2) + (w * h * 2)) / 10000 // تحويل من سم² إلى م²
           calcType = 'area'
           qty = area
-        } else if (l > 0 && w > 0) {
-          // بوستر ثنائي الأبعاد
+      } else if (l > 0 && w > 0) {
+        // بوستر ثنائي الأبعاد
           const area = (l * w) / 10000 // تحويل من سم² إلى م²
           calcType = 'area'
           qty = area
@@ -258,7 +258,7 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         if (printSides === 'double') fallbackPrice *= 1.3
       } else if (calcType === 'area') {
         fallbackPrice = qty * 5000 // 5000 ل.س لكل متر مربع
-      } else {
+    } else {
         fallbackPrice = qty * 2000 // 2000 ل.س لكل قطعة
       }
       
@@ -320,8 +320,8 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
         }
       }
 
-              // Prepare order data - التأكد من عدم وجود NaN
-        const safeQuantity = Number(quantity) || 1
+      // Prepare order data - التأكد من عدم وجود NaN
+      const safeQuantity = Number(quantity) || 1
         let safeTotalPrice = Number(totalPrice)
         if (!safeTotalPrice || safeTotalPrice === 0) {
           safeTotalPrice = await calculatePrice() || 2000
@@ -518,15 +518,15 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
               />
             </div>
 
-                          <div className="form-group">
-                <label>وحدة القياس</label>
-                <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
-                  <option value="cm">سم (cm)</option>
-                  <option value="mm">ملم (mm)</option>
-                  <option value="in">إنش (in)</option>
-                  <option value="m">متر (m)</option>
-                </select>
-              </div>
+            <div className="form-group">
+              <label>وحدة القياس</label>
+              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
+                <option value="cm">سم (cm)</option>
+                <option value="mm">ملم (mm)</option>
+                <option value="in">إنش (in)</option>
+                <option value="m">متر (m)</option>
+              </select>
+            </div>
 
               {/* خيارات الطباعة - للخدمات التي تتطلب طباعة */}
               {(serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) && (
@@ -601,8 +601,8 @@ export default function OrderModal({ isOpen, onClose, serviceName }: OrderModalP
                   </div>
                 </>
               )}
-            </div>
-          )}
+          </div>
+        )}
 
         {/* Step 3: الألوان */}
         {step === 3 && (

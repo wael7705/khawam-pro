@@ -49,11 +49,11 @@ export default function Navbar() {
         <div className="nav-right">
           {/* Show Studio for admin and employee */}
           {isAuthenticated() && showStudio && (
-            <Link to="/studio" className="btn btn-primary">استيديو</Link>
+              <Link to="/studio" className="btn btn-primary">استيديو</Link>
           )}
           {/* Show Dashboard only for admin */}
           {isAuthenticated() && showDashboard && (
-            <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
+              <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
           )}
           <UserMenu />
           <div className="logo">خوام</div>

@@ -395,10 +395,10 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
         # استخدم أول user_type موجود (افتراضي)
         user_type_result = db.execute(text("SELECT id, name_ar FROM user_types ORDER BY id LIMIT 1")).fetchone()
         if not user_type_result:
-            raise HTTPException(
-                status_code=500,
+                raise HTTPException(
+                    status_code=500,
                 detail="لا يوجد أنواع مستخدمين في قاعدة البيانات"
-            )
+                )
         user_type_id, user_type_name_ar = user_type_result
         
         # تشفير كلمة المرور

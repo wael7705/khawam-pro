@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Calculator, ToggleLeft, ToggleRight, Search } from 'lucide-react'
+import { Plus, Edit, Trash2, Calculator, ToggleLeft, ToggleRight, Search, Settings } from 'lucide-react'
 import { pricingAPI } from '../../lib/api'
+import { Link } from 'react-router-dom'
 import './PricingManagement.css'
 
 interface PricingRule {
@@ -221,10 +222,16 @@ export default function PricingManagement() {
           <h1>إدارة الأسعار</h1>
           <p>إدارة قواعد الأسعار والخدمات المالية</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { resetForm(); setIsAdding(true); setEditingRule(null) }}>
-          <Plus size={20} />
-          إضافة قاعدة سعر
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Link to="/dashboard/pricing/wizard" className="btn btn-secondary">
+            <Settings size={20} />
+            إضافة أسعار (خطوة بخطوة)
+          </Link>
+          <button className="btn btn-primary" onClick={() => { resetForm(); setIsAdding(true); setEditingRule(null) }}>
+            <Plus size={20} />
+            إضافة قاعدة سعر
+          </button>
+        </div>
       </div>
 
       {loading ? (

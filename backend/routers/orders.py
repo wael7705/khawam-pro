@@ -211,6 +211,18 @@ async def create_order(
             specs_json = json.dumps(specs) if specs else None
             design_files_json = json.dumps(item_data.design_files or [])
             
+            # Get product name if product_id is provided
+            product_name = item_data.service_name or "Service Item"
+            if item_data.product_id:
+                try:
+                    product_result = db.execute(text("""
+                        SELECT name_ar FROM products WHERE id = :product_id
+                    """), {"product_id": item_data.product_id}).fetchone()
+                    if product_result:
+                        product_name = product_result[0]
+                except:
+                    pass
+            
             # Insert order item using raw SQL
             db.execute(text("""
                 INSERT INTO order_items 
@@ -222,7 +234,7 @@ async def create_order(
             """), {
                 "order_id": order_id,
                 "product_id": item_data.product_id,
-                "product_name": item_data.service_name or "Service Item",
+                "product_name": product_name,
                 "quantity": item_data.quantity,
                 "unit_price": float(item_data.unit_price),
                 "total_price": float(item_data.total_price),

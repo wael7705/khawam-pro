@@ -15,7 +15,8 @@ import LocationPickerPage from './pages/LocationPickerPage'
 import RateOrderPage from './pages/RateOrderPage'
 import Footer from './components/Footer'
 import { ToastContainer } from './components/Toast'
-import { subscribe, getToasts, removeToast, Toast } from './utils/toast'
+import { subscribe, getToasts, removeToast } from './utils/toast'
+import type { Toast } from './utils/toast'
 import './App.css'
 
 function App() {

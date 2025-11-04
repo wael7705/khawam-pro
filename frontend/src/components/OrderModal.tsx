@@ -318,7 +318,25 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             )}
             
             {/* قياس الورق */}
-            {stepConfig.paper_size && (
+            {stepConfig.paper_sizes && stepConfig.paper_sizes.length > 0 ? (
+              <div className="form-group">
+                <label>قياس الورق <span className="required">*</span></label>
+                <div className="delivery-options">
+                  {stepConfig.paper_sizes.map((size: string) => (
+                    <label key={size} className="radio-option">
+                      <input
+                        type="radio"
+                        name="paperSize"
+                        value={size}
+                        checked={paperSize === size}
+                        onChange={(e) => setPaperSize(e.target.value)}
+                      />
+                      <span>{size}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : stepConfig.paper_size ? (
               <div className="form-group">
                 <label>قياس الورق</label>
                 <select 
@@ -327,12 +345,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   className="form-input"
                 >
                   <option value="A4">A4</option>
-                  <option value="A3">A3</option>
                   <option value="A5">A5</option>
                 </select>
                 <small className="form-hint">القياس الافتراضي: {stepConfig.paper_size || 'A4'}</small>
               </div>
-            )}
+            ) : null}
             
             {/* نوع الطباعة */}
             <div className="form-group">
@@ -392,6 +409,41 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 </div>
               </div>
             )}
+          </div>
+        )
+
+      case 'print_sides':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>عدد الوجوه <span className="required">*</span></label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printSides"
+                    value="single"
+                    checked={printSides === 'single'}
+                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                  />
+                  <span>وجه واحد</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printSides"
+                    value="double"
+                    checked={printSides === 'double'}
+                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                  />
+                  <span>وجهين</span>
+                </label>
+              </div>
+            </div>
           </div>
         )
 

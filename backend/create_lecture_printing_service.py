@@ -64,11 +64,11 @@ def create_lecture_printing_service():
                 "step_number": 2,
                 "step_name_ar": "خيارات الطباعة",
                 "step_name_en": "Print Options",
-                "step_description_ar": "اختر نوع الطباعة وجودتها",
+                "step_description_ar": "اختر نوع الطباعة وجودتها وقياس الورق",
                 "step_type": "print_options",
                 "step_config": {
                     "required": True,
-                    "paper_size": "A4",
+                    "paper_sizes": ["A4", "A5"],
                     "print_types": ["bw", "color"],
                     "quality_options": {
                         "color": ["standard", "laser"]
@@ -77,6 +77,17 @@ def create_lecture_printing_service():
             },
             {
                 "step_number": 3,
+                "step_name_ar": "عدد الوجوه",
+                "step_name_en": "Print Sides",
+                "step_description_ar": "اختر إذا كنت تريد طباعة وجه واحد أم وجهين",
+                "step_type": "print_sides",
+                "step_config": {
+                    "required": True,
+                    "options": ["single", "double"]
+                }
+            },
+            {
+                "step_number": 4,
                 "step_name_ar": "معلومات التواصل",
                 "step_name_en": "Contact Information",
                 "step_type": "customer_info",
@@ -86,7 +97,7 @@ def create_lecture_printing_service():
                 }
             },
             {
-                "step_number": 4,
+                "step_number": 5,
                 "step_name_ar": "طريقة الاستلام",
                 "step_name_en": "Delivery Method",
                 "step_type": "delivery",
@@ -97,7 +108,7 @@ def create_lecture_printing_service():
                 }
             },
             {
-                "step_number": 5,
+                "step_number": 6,
                 "step_name_ar": "الفاتورة والتأكيد",
                 "step_name_en": "Invoice and Confirmation",
                 "step_type": "invoice",

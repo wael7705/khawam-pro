@@ -1010,6 +1010,39 @@ async def get_all_orders(db: Session = Depends(get_db)):
         # Return empty list on error instead of crashing
         return []
 
+def _safe_get_design_files(item):
+    """Safely get design_files from order item, handling both array and jsonb types"""
+    try:
+        design_files = getattr(item, 'design_files', None)
+        if design_files is None:
+            return []
+        
+        # If it's already a list (array type), return as is
+        if isinstance(design_files, list):
+            return design_files
+        
+        # If it's a string (JSON string), parse it
+        if isinstance(design_files, str):
+            import json
+            try:
+                parsed = json.loads(design_files)
+                return parsed if isinstance(parsed, list) else []
+            except:
+                return []
+        
+        # If it's a dict (JSONB), convert to list
+        if isinstance(design_files, dict):
+            return list(design_files.values()) if design_files else []
+        
+        # Try to convert to list
+        try:
+            return list(design_files) if design_files else []
+        except:
+            return []
+    except Exception as e:
+        print(f"Warning: Error getting design_files: {e}")
+        return []
+
 @router.get("/orders/{order_id}")
 async def get_order_details(order_id: int, db: Session = Depends(get_db)):
     """Get order details with items"""
@@ -1112,8 +1145,8 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                         "quantity": item.quantity,
                         "unit_price": float(item.unit_price) if item.unit_price else 0,
                         "total_price": float(item.total_price) if item.total_price else 0,
-                        "specifications": item.specifications,
-                        "design_files": item.design_files or [],
+                        "specifications": item.specifications if item.specifications else {},
+                        "design_files": _safe_get_design_files(item),
                         "status": item.status
                     }
                     for item in items

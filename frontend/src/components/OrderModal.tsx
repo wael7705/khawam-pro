@@ -993,8 +993,15 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               if (formState.notes !== undefined) setNotes(formState.notes)
               if (formState.customerName !== undefined) setCustomerName(formState.customerName)
               if (formState.customerWhatsApp !== undefined) setCustomerWhatsApp(formState.customerWhatsApp)
+              if (formState.customerPhoneExtra !== undefined) setCustomerPhoneExtra(formState.customerPhoneExtra)
               if (formState.shopName !== undefined) setShopName(formState.shopName)
               if (formState.totalPrice !== undefined) setTotalPrice(formState.totalPrice)
+              if (formState.printColor !== undefined) setPrintColor(formState.printColor)
+              if (formState.printQuality !== undefined) setPrintQuality(formState.printQuality)
+              if (formState.printSides !== undefined) setPrintSides(formState.printSides)
+              if (formState.numberOfPages !== undefined) setNumberOfPages(formState.numberOfPages)
+              if (formState.paperSize !== undefined) setPaperSize(formState.paperSize)
+              if (formState.totalPages !== undefined) setTotalPages(formState.totalPages)
               
               // Restore delivery type
               if (formState.deliveryType === 'delivery') {
@@ -1048,9 +1055,61 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }, [isOpen, serviceName])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImage(file)
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const fileArray = Array.from(files)
+    setImage(fileArray[0]) // Keep first file for image preview
+    
+    // Check if multiple files are allowed and if PDFs
+    const workflowStep = workflowSteps.find(s => s.step_type === 'files')
+    const stepConfig = workflowStep?.step_config || {}
+    
+    if (stepConfig.multiple && stepConfig.analyze_pages) {
+      // Handle multiple PDF files
+      setUploadedFiles(fileArray)
+      analyzePDFPages(fileArray)
+    } else {
+      // Single file
+      setUploadedFiles([fileArray[0]])
+      if (fileArray[0].type === 'application/pdf') {
+        analyzePDFPages([fileArray[0]])
+      }
+    }
+  }
+
+  const analyzePDFPages = async (files: File[]) => {
+    setIsAnalyzingPages(true)
+    let total = 0
+    
+    try {
+      for (const file of files) {
+        if (file.type === 'application/pdf') {
+          // Simple PDF page count estimation
+          const text = await file.text()
+          // Count occurrences of /Type /Page (basic heuristic)
+          const pageMatches = text.match(/\/Type[\s\/]*Page[^s]/g)
+          if (pageMatches) {
+            total += pageMatches.length
+          } else {
+            // Fallback: estimate based on file size (rough approximation)
+            // Average PDF page is ~50-100KB
+            total += Math.max(1, Math.ceil(file.size / 75000))
+          }
+        }
+      }
+      
+      setTotalPages(total)
+      setNumberOfPages(total)
+      setQuantity(total)
+    } catch (error) {
+      console.error('Error analyzing PDF:', error)
+      // Fallback: set quantity to 1
+      setTotalPages(1)
+      setNumberOfPages(1)
+      setQuantity(1)
+    } finally {
+      setIsAnalyzingPages(false)
     }
   }
 
@@ -1249,7 +1308,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       const orderData = {
         customer_name: customerName,
         customer_phone: customerWhatsApp,
-        customer_whatsapp: customerWhatsApp,
+        customer_whatsapp: customerPhoneExtra || customerWhatsApp,
         shop_name: shopName || null,
         service_name: serviceName,
         items: [
@@ -1259,8 +1318,17 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             unit_price: unitPrice,
             total_price: safeTotalPrice,
             specifications: {
-              work_type: workType,
-              notes: notes
+              dimensions: length || width || height ? { length, width, height, unit } : undefined,
+              colors: selectedColors.length > 0 ? selectedColors : undefined,
+              work_type: workType || undefined,
+              notes: notes || undefined,
+              print_color: printColor,
+              print_quality: printQuality,
+              print_sides: printSides,
+              number_of_pages: totalPages || numberOfPages,
+              paper_size: paperSize || 'A4',
+              total_pages: totalPages,
+              files_count: uploadedFiles.length,
             },
             dimensions: {
               length: length || null,
@@ -1308,7 +1376,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setNotes('')
         setCustomerName('')
         setCustomerWhatsApp('')
+        setCustomerPhoneExtra('')
         setShopName('')
+        setUploadedFiles([])
+        setTotalPages(0)
+        setPrintQuality('standard')
+        setPaperSize('A4')
         setDeliveryType('self')
         setDeliveryAddress(null)
         setAddressConfirmed(false)

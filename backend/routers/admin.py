@@ -1087,16 +1087,38 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
     try:
         from sqlalchemy import text
         
+        # Check which columns exist first
+        from sqlalchemy import inspect as sqlalchemy_inspect
+        inspector = sqlalchemy_inspect(db.bind)
+        available_cols = [col['name'] for col in inspector.get_columns('orders')]
+        
+        # Build SELECT query dynamically based on available columns
+        select_parts = ["id", "order_number", "customer_id", "customer_name", "customer_phone", 
+                       "customer_whatsapp", "shop_name", "status", "total_amount", "final_amount",
+                       "payment_status", "delivery_type", "delivery_address", "notes", "created_at"]
+        
+        # Add optional columns if they exist
+        optional_cols = {
+            'staff_notes': 'staff_notes',
+            'delivery_latitude': 'delivery_latitude',
+            'delivery_longitude': 'delivery_longitude',
+            'rating': 'rating',
+            'rating_comment': 'rating_comment'
+        }
+        
+        for col_key, col_name in optional_cols.items():
+            if col_name in available_cols:
+                select_parts.append(col_name)
+            else:
+                select_parts.append(f"NULL as {col_name}")
+        
         # Use raw SQL to get order to avoid ORM issues with missing columns
-        order_result = db.execute(text("""
-            SELECT 
-                id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
-                shop_name, status, total_amount, final_amount, payment_status, delivery_type,
-                delivery_address, notes, staff_notes, delivery_latitude, delivery_longitude,
-                rating, rating_comment, created_at
+        query = f"""
+            SELECT {', '.join(select_parts)}
             FROM orders
             WHERE id = :order_id
-        """), {"order_id": order_id}).fetchone()
+        """
+        order_result = db.execute(text(query), {"order_id": order_id}).fetchone()
         
         if not order_result:
             raise HTTPException(status_code=404, detail="الطلب غير موجود")

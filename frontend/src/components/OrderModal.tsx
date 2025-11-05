@@ -1329,7 +1329,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       // إذا كان اسم الخدمة يحتوي على "طباعة" أو "محاضرات"، استخدم حساب الصفحات
       if (serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) {
         calcType = 'page'
-        qty = numberOfPages || qty
+        // حساب إجمالي الصفحات: عدد الصفحات × عدد النسخ
+        const pagesPerCopy = totalPages > 0 ? totalPages : numberOfPages
+        qty = pagesPerCopy * quantity
       } else if (length && width) {
         // حساب المساحة بالمتر المربع
       const l = parseFloat(String(length)) || 0

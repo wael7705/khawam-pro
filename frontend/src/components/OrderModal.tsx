@@ -73,19 +73,29 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
   // Helper function to render step content based on step_type
   const renderStepContent = (currentStep: number) => {
+    console.log('📋 renderStepContent called - Step:', currentStep, 'WorkflowSteps:', workflowSteps.length)
+    
     if (workflowSteps.length === 0) {
+      console.log('⚠️ No workflow steps, using default')
       // Fallback to default steps
       return renderDefaultStep(currentStep)
     }
 
     const workflowStep = workflowSteps.find(s => s.step_number === currentStep)
-    if (!workflowStep) return null
+    if (!workflowStep) {
+      console.log('⚠️ No workflow step found for step:', currentStep)
+      return null
+    }
 
     const stepConfig = workflowStep.step_config || {}
     const stepType = workflowStep.step_type
+    
+    console.log('📋 Found workflow step:', stepType, 'Config:', stepConfig)
+    console.log('📋 ServiceHandler exists:', !!serviceHandler, 'Has renderStep:', !!(serviceHandler && serviceHandler.renderStep))
 
     // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص
     if (serviceHandler && serviceHandler.renderStep) {
+      console.log('✅ ServiceHandler and renderStep exist, proceeding...')
       const serviceData = {
         uploadedFiles,
         setUploadedFiles,

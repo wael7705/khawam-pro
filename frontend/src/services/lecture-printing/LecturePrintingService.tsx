@@ -20,6 +20,8 @@ export const LecturePrintingService: ServiceHandler = {
   },
   
   renderStep: (_stepNumber: number, stepType: string, stepConfig: any, serviceData: any, handlers: any) => {
+    console.log('🎯 LecturePrintingService.renderStep called - StepType:', stepType, 'StepConfig:', stepConfig)
+    
     const {
       uploadedFiles,
       quantity, setQuantity,
@@ -38,6 +40,8 @@ export const LecturePrintingService: ServiceHandler = {
     
     const { handleImageUpload, handleFileUpload } = handlers
     const fileUploadHandler = handleFileUpload || handleImageUpload
+    
+    console.log('🎯 Switching on stepType:', stepType)
     
     switch (stepType) {
       case 'files':
@@ -354,6 +358,7 @@ export const LecturePrintingService: ServiceHandler = {
         )
       
       default:
+        console.log('⚠️ LecturePrintingService: No handler for stepType:', stepType, 'returning null')
         return null
     }
   },

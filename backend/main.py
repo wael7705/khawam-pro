@@ -224,26 +224,28 @@ async def _setup_lecture_printing_service():
     import time
     import json
     import asyncio
-    await asyncio.sleep(3)  # انتظار حتى تكون قاعدة البيانات جاهزة
+    await asyncio.sleep(5)  # انتظار أكثر حتى تكون قاعدة البيانات جاهزة
     
     conn = None
     try:
+        print("🔄 Starting lecture printing service setup...")
         conn = engine.connect()
         
         # التحقق من وجود الخدمة
         existing_service = conn.execute(text("""
-            SELECT id FROM services 
+            SELECT id, name_ar FROM services 
             WHERE name_ar LIKE '%طباعة محاضرات%' OR name_ar LIKE '%محاضرات%'
             LIMIT 1
         """)).fetchone()
         
         if existing_service:
             service_id = existing_service[0]
-            print("✅ خدمة طباعة المحاضرات موجودة بالفعل")
+            print(f"✅ خدمة طباعة المحاضرات موجودة بالفعل (ID: {service_id})")
             # حذف المراحل القديمة وإعادة إضافتها
-            conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+            deleted = conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
                         {"service_id": service_id})
             conn.commit()
+            print(f"🗑️ تم حذف المراحل القديمة: {deleted.rowcount} مرحلة")
         else:
             # إنشاء الخدمة الجديدة
             result = conn.execute(text("""
@@ -336,30 +338,42 @@ async def _setup_lecture_printing_service():
         ]
         
         for workflow in workflows:
-            conn.execute(text("""
-                INSERT INTO service_workflows 
-                (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-                 step_type, step_config, display_order, is_active)
-                VALUES 
-                (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-                 :step_type, :step_config::jsonb, :display_order, :is_active)
-            """), {
-                "service_id": service_id,
-                "step_number": workflow["step_number"],
-                "step_name_ar": workflow["step_name_ar"],
-                "step_name_en": workflow["step_name_en"],
-                "step_description_ar": workflow["step_description_ar"],
-                "step_type": workflow["step_type"],
-                "step_config": json.dumps(workflow["step_config"]),
-                "display_order": workflow["step_number"],
-                "is_active": True
-            })
+            try:
+                result = conn.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, :step_config::jsonb, :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": json.dumps(workflow["step_config"]),
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ Added step {workflow['step_number']}: {workflow['step_name_ar']} ({workflow['step_type']})")
+            except Exception as step_error:
+                print(f"  ❌ Error adding step {workflow['step_number']}: {str(step_error)[:100]}")
         
         conn.commit()
-        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة المحاضرات")
+        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة المحاضرات (Service ID: {service_id})")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify = conn.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"✅ Verification: {verify} workflows found for service {service_id}")
         
     except Exception as e:
-        print(f"⚠️ Warning: Error setting up lecture printing service: {str(e)[:200]}")
+        print(f"❌ Error setting up lecture printing service: {str(e)}")
+        import traceback
+        traceback.print_exc()
         if conn:
             try:
                 conn.rollback()

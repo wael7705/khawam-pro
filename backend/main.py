@@ -491,6 +491,17 @@ async def root():
         return FileResponse(index_path)
     return {"message": "Khawam API is running"}
 
+@app.post("/api/setup-lecture-printing-now")
+async def setup_lecture_printing_now():
+    """إعداد خدمة طباعة المحاضرات مباشرة - يمكن استدعاؤها يدوياً"""
+    try:
+        await _setup_lecture_printing_service()
+        return {"success": True, "message": "تم إعداد خدمة طباعة المحاضرات بنجاح"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():

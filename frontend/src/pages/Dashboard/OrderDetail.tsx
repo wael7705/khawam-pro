@@ -308,6 +308,36 @@ export default function OrderDetail() {
                           <span>{item.specifications.work_type}</span>
                         </div>
                       )}
+                      {item.specifications.print_color && (
+                        <div className="spec-group">
+                          <label>نوع الطباعة:</label>
+                          <span>{item.specifications.print_color === 'color' ? 'ملون' : 'أبيض وأسود'}</span>
+                        </div>
+                      )}
+                      {item.specifications.print_sides && (
+                        <div className="spec-group">
+                          <label>الوجهين:</label>
+                          <span>{item.specifications.print_sides === 'double' ? 'وجهين' : 'وجه واحد'}</span>
+                        </div>
+                      )}
+                      {item.specifications.number_of_pages && (
+                        <div className="spec-group">
+                          <label>عدد الصفحات:</label>
+                          <span>{item.specifications.number_of_pages}</span>
+                        </div>
+                      )}
+                      {item.specifications.paper_size && (
+                        <div className="spec-group">
+                          <label>حجم الورق:</label>
+                          <span>{item.specifications.paper_size}</span>
+                        </div>
+                      )}
+                      {item.specifications.delivery_type && (
+                        <div className="spec-group">
+                          <label>نوع التوصيل:</label>
+                          <span>{item.specifications.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+                        </div>
+                      )}
                       {item.specifications.notes && (
                         <div className="spec-group">
                           <label>ملاحظات:</label>

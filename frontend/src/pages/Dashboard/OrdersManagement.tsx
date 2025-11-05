@@ -732,7 +732,19 @@ export default function OrdersManagement() {
 
               <div className="order-card-content">
                 <div className="order-card-header">
-                  <div className="order-number">#{order.order_number}</div>
+                  <div className="order-number-header">
+                    <div className="order-number">#{order.order_number}</div>
+                    {order.order_type && (
+                      <span className={`order-type-badge ${order.order_type}`}>
+                        {order.order_type === 'service' ? '🛠️ خدمة' : '📦 منتج'}
+                      </span>
+                    )}
+                    {order.total_quantity && order.total_quantity > 0 && (
+                      <span className="order-quantity-badge">
+                        الكمية: {order.total_quantity}
+                      </span>
+                    )}
+                  </div>
                   <div className="order-status-controls">
                     {/* Status Display - No dropdown */}
                     <div 

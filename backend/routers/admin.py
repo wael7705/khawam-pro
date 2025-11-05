@@ -739,11 +739,64 @@ async def get_all_orders(db: Session = Depends(get_db)):
             print(f"Executing query with {len(select_parts)} columns")
             result = db.execute(text(query))
             rows = result.fetchall()
+            
+            # Get order items for each order to determine order type and quantity
+            orders_with_items = []
+            for row in rows:
+                order_id = row[0]
+                # Get items for this order
+                items_query = db.execute(text("""
+                    SELECT product_id, quantity, specifications
+                    FROM order_items
+                    WHERE order_id = :order_id
+                    LIMIT 1
+                """), {"order_id": order_id}).fetchone()
+                
+                order_type = "product"
+                total_quantity = 0
+                service_name = None
+                
+                if items_query:
+                    product_id, quantity, specs_raw = items_query
+                    total_quantity = quantity or 0
+                    
+                    # Parse specifications to check for service
+                    if specs_raw:
+                        try:
+                            import json
+                            if isinstance(specs_raw, str):
+                                specs = json.loads(specs_raw)
+                            elif isinstance(specs_raw, dict):
+                                specs = specs_raw
+                            else:
+                                specs = {}
+                            
+                            if not product_id or (specs and 'service_name' in specs):
+                                order_type = "service"
+                                service_name = specs.get('service_name')
+                        except:
+                            pass
+                    
+                    if not product_id:
+                        order_type = "service"
+                
+                orders_with_items.append((row, order_type, total_quantity, service_name))
             print(f"Found {len(rows)} orders using raw SQL")
             
             orders_list = []
+            # Create a map of order_id to order info (type, quantity, service_name)
+            order_info_map = {}
+            for row, order_type, total_quantity, service_name in orders_with_items:
+                order_info_map[row[0]] = {
+                    'order_type': order_type,
+                    'total_quantity': total_quantity,
+                    'service_name': service_name
+                }
+            
             for row in rows:
                 order_id = row[0]
+                order_info = order_info_map.get(order_id, {'order_type': 'product', 'total_quantity': 0, 'service_name': None})
+                
                 # Get image from first order item
                 first_item = db.query(OrderItem).filter(OrderItem.order_id == order_id).order_by(OrderItem.id.asc()).first()
                 raw_image = None
@@ -842,7 +895,10 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     "rejection_reason": rejection_reason,
                     "delivery_latitude": delivery_latitude,
                     "delivery_longitude": delivery_longitude,
-                    "image_url": raw_image
+                    "image_url": raw_image,
+                    "order_type": order_info['order_type'],  # "product" or "service"
+                    "total_quantity": order_info['total_quantity'],
+                    "service_name": order_info['service_name']
                 })
             print(f"Returning {len(orders_list)} orders from raw SQL")
             return orders_list
@@ -1206,14 +1262,26 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             design_files_raw = item_row[8]
             status = item_row[9] or 'pending'
             
+            # Determine order type from specifications or item data
+            specs = safe_parse_json(specifications_raw)
+            order_type = "product"  # default
+            service_name = None
+            
+            # Check if this is a service order (has service_name in specs or no product_id)
+            if not product_id or (specs and 'service_name' in specs):
+                order_type = "service"
+                service_name = specs.get('service_name') if specs else None
+            
             items_list.append({
                 "id": item_id,
                 "product_id": product_id,
                 "product_name": product_name,
+                "service_name": service_name,
+                "order_type": order_type,  # "product" or "service"
                 "quantity": quantity,
                 "unit_price": unit_price,
                 "total_price": total_price,
-                "specifications": safe_parse_json(specifications_raw),
+                "specifications": specs,
                 "design_files": safe_parse_array(design_files_raw),
                 "status": status
             })
@@ -1240,7 +1308,10 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "notes": order['notes'],
                 "staff_notes": order['staff_notes'],
                 "created_at": order['created_at'].isoformat() if order['created_at'] else None,
-                "items": items_list
+                "items": items_list,
+                # Calculate order type and total quantity from items
+                "order_type": "service" if any(item.get('order_type') == 'service' for item in items_list) else "product",
+                "total_quantity": sum(item.get('quantity', 0) for item in items_list)
             }
         }
     except HTTPException:

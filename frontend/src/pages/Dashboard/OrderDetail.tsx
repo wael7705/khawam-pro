@@ -8,7 +8,10 @@ import './OrderDetail.css'
 
 interface OrderItem {
   id: number
+  product_id?: number
   product_name: string
+  service_name?: string
+  order_type?: 'product' | 'service'
   quantity: number
   unit_price: number
   total_price: number
@@ -37,6 +40,8 @@ interface Order {
   created_at: string
   items: OrderItem[]
   image_url?: string
+  order_type?: 'product' | 'service'
+  total_quantity?: number
 }
 
 export default function OrderDetail() {
@@ -192,6 +197,18 @@ export default function OrderDetail() {
                 {order.customer_whatsapp || order.customer_phone}
               </button>
             </div>
+            {order.customer_whatsapp && order.customer_whatsapp !== order.customer_phone && (
+              <div className="info-item">
+                <label>واتساب إضافي:</label>
+                <button 
+                  className="whatsapp-btn"
+                  onClick={() => openWhatsApp(order.customer_whatsapp)}
+                >
+                  <MessageSquare size={16} />
+                  {order.customer_whatsapp}
+                </button>
+              </div>
+            )}
             {order.shop_name && (
               <div className="info-item">
                 <label>اسم المتجر:</label>
@@ -205,11 +222,30 @@ export default function OrderDetail() {
         {/* Order Items */}
         <div className="detail-card items-card">
           <h2>عناصر الطلب</h2>
+          {order.order_type && (
+            <div className="order-type-badge-container">
+              <span className={`order-type-badge ${order.order_type}`}>
+                {order.order_type === 'service' ? '🛠️ طلب خدمة' : '📦 طلب منتج'}
+              </span>
+              {order.total_quantity && order.total_quantity > 0 && (
+                <span className="total-quantity-badge">
+                  الكمية الإجمالية: {order.total_quantity}
+                </span>
+              )}
+            </div>
+          )}
           <div className="items-list">
             {order.items.map((item) => (
               <div key={item.id} className="order-item-card">
                 <div className="item-header">
-                  <h3>{item.product_name}</h3>
+                  <div className="item-name-section">
+                    <h3>{item.service_name || item.product_name}</h3>
+                    {item.order_type && (
+                      <span className={`item-type-badge ${item.order_type}`}>
+                        {item.order_type === 'service' ? '🛠️ خدمة' : '📦 منتج'}
+                      </span>
+                    )}
+                  </div>
                   <span className="item-quantity">الكمية: {item.quantity}</span>
                 </div>
                 <div className="item-details">
@@ -334,23 +370,47 @@ export default function OrderDetail() {
                   </div>
                 )}
                 {order.delivery_latitude && order.delivery_longitude && (
-                  <div className="summary-item">
-                    <label>الإحداثيات:</label>
-                    <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
-                  </div>
-                )}
-                {showLocationMap && order.delivery_latitude && order.delivery_longitude && (
-                  <div className="summary-item location-map-item">
-                    <label>الموقع على الخريطة:</label>
-                    <div className="location-map-container">
-                      <SimpleMap
-                        latitude={order.delivery_latitude}
-                        longitude={order.delivery_longitude}
-                        defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
-                        defaultZoom={17}
-                      />
+                  <>
+                    <div className="summary-item">
+                      <label>الإحداثيات:</label>
+                      <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
                     </div>
-                  </div>
+                    <div className="summary-item">
+                      <label>رابط الخريطة:</label>
+                      <a 
+                        href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="map-link"
+                      >
+                        <MapPin size={16} />
+                        فتح في Google Maps
+                      </a>
+                    </div>
+                    <div className="summary-item">
+                      <button
+                        className="show-location-btn"
+                        onClick={() => setShowLocationMap(!showLocationMap)}
+                      >
+                        <MapPin size={16} />
+                        {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
+                      </button>
+                    </div>
+                    {showLocationMap && (
+                      <div className="summary-item location-map-item">
+                        <label>الموقع على الخريطة:</label>
+                        <div className="location-map-container">
+                          <SimpleMap
+                            address={order.delivery_address}
+                            latitude={order.delivery_latitude}
+                            longitude={order.delivery_longitude}
+                            defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                            defaultZoom={17}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

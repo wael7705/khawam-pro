@@ -26,6 +26,9 @@ interface Order {
   delivery_longitude?: number
   rating?: number
   rating_comment?: string
+  order_type?: 'product' | 'service'  // نوع الطلب
+  total_quantity?: number  // الكمية الإجمالية
+  service_name?: string  // اسم الخدمة إذا كان طلب خدمة
 }
 
 const statusTabs = [
@@ -907,9 +910,25 @@ export default function OrdersManagement() {
                           title="فتح واتساب"
                         >
                           <MessageSquare size={16} />
-        </button>
+                        </button>
                       )}
                     </div>
+                    {order.customer_whatsapp && order.customer_whatsapp !== order.customer_phone && (
+                      <div className="customer-whatsapp-extra">
+                        <span className="label">واتساب إضافي:</span>
+                        <span className="value">{order.customer_whatsapp}</span>
+                        <button
+                          className="whatsapp-link-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openWhatsApp(order.customer_whatsapp)
+                          }}
+                          title="فتح واتساب الإضافي"
+                        >
+                          <MessageSquare size={16} />
+                        </button>
+                      </div>
+                    )}
       </div>
 
                   <div className="order-meta">

@@ -249,6 +249,8 @@ export const LecturePrintingService: ServiceHandler = {
         )
       
       case 'customer_info':
+        const { deliveryType, setDeliveryType, deliveryAddress, addressConfirmed, navigate } = serviceData
+        
         return (
           <div className="modal-body">
             <h3>{stepConfig.step_name_ar || 'معلومات العميل'}</h3>
@@ -296,6 +298,54 @@ export const LecturePrintingService: ServiceHandler = {
                 <small className="form-hint">يمكن استخدام رقم آخر للتواصل عبر واتساب</small>
               </div>
             )}
+            
+            {/* نوع الاستلام */}
+            <div className="form-group">
+              <label>نوع الاستلام <span className="required">*</span></label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="self"
+                    checked={deliveryType === 'self'}
+                    onChange={(e) => setDeliveryType && setDeliveryType(e.target.value)}
+                  />
+                  <span>استلام ذاتي</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="delivery"
+                    checked={deliveryType === 'delivery'}
+                    onChange={(e) => setDeliveryType && setDeliveryType(e.target.value)}
+                  />
+                  <span>توصيل</span>
+                </label>
+              </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="delivery-address-info" style={{ marginTop: '10px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+                  <p><strong>العنوان:</strong> {deliveryAddress.street || 'لم يتم تحديد العنوان'}</p>
+                  {addressConfirmed && (
+                    <p style={{ color: 'green', fontSize: '0.9rem', marginTop: '5px' }}>✓ تم حفظ الموقع</p>
+                  )}
+                </div>
+              )}
+              {deliveryType === 'delivery' && !addressConfirmed && navigate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // حفظ الحالة والعودة بعد اختيار العنوان
+                    localStorage.setItem('shouldReopenOrderModal', 'true')
+                    localStorage.setItem('orderModalService', 'طباعة محاضرات')
+                    navigate('/location-picker')
+                  }}
+                  className="btn btn-secondary"
+                  style={{ marginTop: '10px' }}
+                >
+                  اختر موقع التوصيل
+                </button>
+              )}
+            </div>
           </div>
         )
       

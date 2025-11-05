@@ -72,7 +72,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const stepType = workflowStep.step_type
 
     // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص
-    if (serviceHandler) {
+    if (serviceHandler && serviceHandler.renderStep) {
       const serviceData = {
         uploadedFiles,
         setUploadedFiles,
@@ -92,12 +92,27 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setPrintSides,
         notes,
         setNotes,
-        fileInputRef
+        customerName,
+        setCustomerName,
+        customerWhatsApp,
+        setCustomerWhatsApp,
+        customerPhoneExtra,
+        setCustomerPhoneExtra,
+        shopName,
+        setShopName,
+        deliveryType,
+        setDeliveryType: handleDeliveryTypeChange,
+        deliveryAddress,
+        setDeliveryAddress,
+        addressConfirmed,
+        setAddressConfirmed,
+        fileInputRef,
+        navigate
       }
       
       const handlers = {
         handleImageUpload,
-        handleFileUpload: handleImageUpload
+        handleFileUpload: handleImageUpload  // استخدام handleImageUpload الذي يدعم PDF و Word
       }
       
       const rendered = serviceHandler.renderStep(
@@ -108,8 +123,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         handlers
       )
       
-      // إذا كانت الخدمة تعيد null، استمر في المنطق الافتراضي
-      if (rendered !== null) {
+      // إذا كانت الخدمة تعيد JSX element، استخدمه مباشرة
+      if (rendered !== null && rendered !== undefined) {
         return rendered
       }
     }

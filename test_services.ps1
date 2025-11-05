@@ -6,22 +6,24 @@ $baseUrl = "https://khawam-pro-production.up.railway.app"
 # $baseUrl = "http://localhost:8000"
 
 Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "Test Services Visibility" -ForegroundColor Cyan
 Write-Host "اختبار ظهور الخدمات" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
 try {
     # جلب جميع الخدمات
-    Write-Host "📡 جلب الخدمات من API..." -ForegroundColor Yellow
+    Write-Host "[INFO] جلب الخدمات من API..." -ForegroundColor Yellow
     $response = Invoke-RestMethod -Uri "$baseUrl/api/services/" -Method Get -Headers @{
         "Content-Type" = "application/json"
     }
     
-    Write-Host "✅ تم جلب الخدمات بنجاح!" -ForegroundColor Green
+    Write-Host "[SUCCESS] تم جلب الخدمات بنجاح!" -ForegroundColor Green
     Write-Host ""
     
     # عرض جميع الخدمات
-    Write-Host "📋 الخدمات المتاحة:" -ForegroundColor Cyan
+    Write-Host "Available Services:" -ForegroundColor Cyan
+    Write-Host "الخدمات المتاحة:" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Cyan
     
     if ($response -is [Array]) {
@@ -60,21 +62,21 @@ try {
     
     # تقرير النتيجة
     if ($foundLectureService) {
-        Write-Host "✅ نجح: خدمة 'طباعة محاضرات' موجودة وظاهرة!" -ForegroundColor Green
+        Write-Host "[SUCCESS] نجح: خدمة 'طباعة محاضرات' موجودة وظاهرة!" -ForegroundColor Green
     } else {
-        Write-Host "⚠️  تحذير: خدمة 'طباعة محاضرات' غير موجودة!" -ForegroundColor Yellow
+        Write-Host "[WARNING] تحذير: خدمة 'طباعة محاضرات' غير موجودة!" -ForegroundColor Yellow
         Write-Host "   يرجى تشغيل: python backend/create_lecture_printing_service.py" -ForegroundColor Yellow
     }
     
     Write-Host ""
-    Write-Host "📊 إجمالي الخدمات: $($services.Count)" -ForegroundColor Cyan
+    Write-Host "Total Services: $($services.Count)" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Cyan
     
 } catch {
-    Write-Host "❌ خطأ في الاتصال بـ API:" -ForegroundColor Red
+    Write-Host "[ERROR] خطأ في الاتصال بـ API:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     Write-Host ""
-    Write-Host "💡 تأكد من:" -ForegroundColor Yellow
+    Write-Host "Tips:" -ForegroundColor Yellow
     Write-Host "   1. أن الخادم يعمل" -ForegroundColor Yellow
     Write-Host "   2. أن الرابط صحيح" -ForegroundColor Yellow
     Write-Host "   3. أن الاتصال بالإنترنت متاح" -ForegroundColor Yellow

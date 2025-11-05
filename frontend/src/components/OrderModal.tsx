@@ -1530,6 +1530,37 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
 
     setIsSubmitting(true)
+    
+    // Validation checks before try block
+    const safeQuantity = Number(quantity) || 1
+    let safeTotalPrice = Number(totalPrice)
+    
+    // إذا كان السعر 0 أو غير محسوب، نحسبه من القواعد المالية
+    if (!safeTotalPrice || safeTotalPrice === 0) {
+      try {
+        safeTotalPrice = await calculatePrice() || 0
+      } catch (calcError) {
+        console.error('Error calculating price:', calcError)
+        safeTotalPrice = 0
+      }
+    }
+    
+    // التحقق من أن السعر صحيح من القواعد المالية
+    if (!safeTotalPrice || safeTotalPrice === 0) {
+      showError('لا يمكن إنشاء الطلب: السعر = 0. يرجى إضافة قاعدة سعر مناسبة في القواعد المالية.')
+      setIsSubmitting(false)
+      return
+    }
+    
+    const unitPrice = safeTotalPrice / safeQuantity
+    
+    // التأكد من أن unitPrice ليس NaN
+    if (isNaN(unitPrice) || unitPrice <= 0) {
+      showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية والكمية.')
+      setIsSubmitting(false)
+      return
+    }
+    
     try {
       // Upload image if exists
       let imageUrl = null
@@ -1543,31 +1574,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         } catch (uploadError) {
           console.warn('Image upload failed, continuing without image:', uploadError)
         }
-      }
-
-      // Prepare order data - التأكد من عدم وجود NaN
-      const safeQuantity = Number(quantity) || 1
-      let safeTotalPrice = Number(totalPrice)
-      
-      // إذا كان السعر 0 أو غير محسوب، نحسبه من القواعد المالية
-      if (!safeTotalPrice || safeTotalPrice === 0) {
-        safeTotalPrice = await calculatePrice() || 0
-      }
-      
-      // التحقق من أن السعر صحيح من القواعد المالية
-      if (!safeTotalPrice || safeTotalPrice === 0) {
-        showError('لا يمكن إنشاء الطلب: السعر = 0. يرجى إضافة قاعدة سعر مناسبة في القواعد المالية.')
-        setIsSubmitting(false)
-        return
-      }
-      
-      const unitPrice = safeTotalPrice / safeQuantity
-      
-      // التأكد من أن unitPrice ليس NaN
-      if (isNaN(unitPrice) || unitPrice <= 0) {
-        showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية والكمية.')
-        setIsSubmitting(false)
-        return
       }
       // تحضير البيانات الأساسية
       const baseOrderData = {
@@ -1670,6 +1676,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             : null,
           notes: notes || workType || null
         }
+      }
 
       const response = await ordersAPI.create(orderData)
       

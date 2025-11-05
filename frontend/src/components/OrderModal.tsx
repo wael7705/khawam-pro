@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI } from '../lib/api'
+import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import './OrderModal.css'
@@ -505,6 +505,76 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 placeholder="اسم المتجر أو المؤسسة"
               />
             </div>
+            
+            {/* نوع الاستلام */}
+            <div className="form-group">
+              <label>نوع الاستلام <span className="required">*</span></label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="self"
+                    checked={deliveryType === 'self'}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+                  />
+                  <span>استلام ذاتي</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    value="delivery"
+                    checked={deliveryType === 'delivery'}
+                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+                  />
+                  <span>توصيل</span>
+                </label>
+              </div>
+              {deliveryType === 'delivery' && deliveryAddress && (
+                <div className="delivery-address-info" style={{ marginTop: '10px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+                  <p><strong>العنوان:</strong> {deliveryAddress.street || 'لم يتم تحديد العنوان'}</p>
+                  {addressConfirmed && (
+                    <p style={{ color: 'green', fontSize: '0.9rem', marginTop: '5px' }}>✓ تم حفظ الموقع</p>
+                  )}
+                </div>
+              )}
+              {deliveryType === 'delivery' && !addressConfirmed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('orderFormState', JSON.stringify({
+                      step,
+                      quantity,
+                      length,
+                      width,
+                      height,
+                      unit,
+                      selectedColors,
+                      workType,
+                      notes,
+                      customerName,
+                      customerWhatsApp,
+                      customerPhoneExtra,
+                      shopName,
+                      deliveryType,
+                      printColor,
+                      printSides,
+                      printQuality,
+                      paperSize,
+                      numberOfPages,
+                      totalPages,
+                      uploadedFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type }))
+                    }))
+                    localStorage.setItem('shouldReopenOrderModal', 'true')
+                    localStorage.setItem('orderModalService', serviceName)
+                    navigate('/location-picker')
+                  }}
+                  className="btn btn-secondary"
+                  style={{ marginTop: '10px' }}
+                >
+                  اختر موقع التوصيل
+                </button>
+              )}
+            </div>
           </div>
         )
 
@@ -652,6 +722,35 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <span>المجموع الكلي:</span>
                 <span>{totalPrice > 0 ? totalPrice.toLocaleString() : 'يتم الحساب...'} ل.س</span>
               </div>
+            </div>
+            <div style={{ marginTop: '20px', padding: '15px', background: '#e3f2fd', borderRadius: '8px', color: '#1565c0' }}>
+              <p style={{ margin: 0, fontWeight: 600 }}>
+                💬 سيتم التواصل معك عبر واتساب للوقت المستغرق لتنتهي الخدمة
+              </p>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem' }}>
+                يرجى حفظ رقم الطلب الذي سيظهر بعد تأكيد الطلب
+              </p>
+            </div>
+          </div>
+        )
+
+      case 'notes':
+        return (
+          <div className="modal-body">
+            <h3>{workflowStep.step_name_ar}</h3>
+            {workflowStep.step_description_ar && (
+              <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            <div className="form-group">
+              <label>ملاحظات {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="form-input"
+                placeholder="أضف أي ملاحظات إضافية..."
+                rows={5}
+                required={stepConfig.required}
+              />
             </div>
           </div>
         )
@@ -1135,27 +1234,41 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     let total = 0
     
     try {
-      for (const file of files) {
-        if (file.type === 'application/pdf') {
-          // Simple PDF page count estimation
-          const text = await file.text()
-          // Count occurrences of /Type /Page (basic heuristic)
-          const pageMatches = text.match(/\/Type[\s\/]*Page[^s]/g)
-          if (pageMatches) {
-            total += pageMatches.length
-          } else {
-            // Fallback: estimate based on file size (rough approximation)
-            // Average PDF page is ~50-100KB
-            total += Math.max(1, Math.ceil(file.size / 75000))
+      // استخدام API لتحليل الملفات
+      try {
+        const response = await fileAnalysisAPI.analyzeFiles(files)
+        if (response.data.success) {
+          total = response.data.total_pages || 0
+          console.log('File analysis result:', response.data)
+        }
+      } catch (apiError) {
+        console.warn('API analysis failed, using fallback:', apiError)
+        // Fallback: تحليل بسيط محلي
+        for (const file of files) {
+          if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+            try {
+              const text = await file.text()
+              const pageMatches = text.match(/\/Type[\s\/]*Page[^s]/g)
+              if (pageMatches) {
+                total += pageMatches.length
+              } else {
+                total += Math.max(1, Math.ceil(file.size / 75000))
+              }
+            } catch (e) {
+              total += Math.max(1, Math.ceil(file.size / 75000))
+            }
+          } else if (file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')) {
+            // تقدير لملفات Word: كل ~50 سطر = صفحة
+            total += Math.max(1, Math.ceil(file.size / 50000))
           }
         }
       }
       
       setTotalPages(total)
       setNumberOfPages(total)
-      setQuantity(total)
+      // لا نقوم بتغيير quantity تلقائياً - يبقى كما اختاره المستخدم
     } catch (error) {
-      console.error('Error analyzing PDF:', error)
+      console.error('Error analyzing files:', error)
       // Fallback: set quantity to 1
       setTotalPages(1)
       setNumberOfPages(1)
@@ -1252,10 +1365,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
       
       if (calcType === 'page') {
-        specifications.paper_size = 'A4' // افتراضي
+        specifications.paper_size = paperSize || 'A4'
+        specifications.print_quality = printQuality || 'standard'
+        specifications.number_of_pages = totalPages > 0 ? totalPages : numberOfPages
+        specifications.total_pages = qty
+        specifications.files_count = uploadedFiles.length
       }
       
-      // حساب السعر باستخدام API
+      // حساب السعر باستخدام API - يجب أن يأتي من القواعد المالية فقط
       try {
         const response = await pricingAPI.calculatePrice({
           calculation_type: calcType,
@@ -1263,36 +1380,45 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           specifications: specifications,
         })
         
-        if (response.data.success) {
+        if (response.data.success && response.data.total_price !== undefined) {
           const calculatedPrice = response.data.total_price || 0
           setTotalPrice(calculatedPrice)
           setPricingRule(response.data)
+          
+          // إذا كان السعر 0، يعني لم يتم العثور على قاعدة سعر
+          if (calculatedPrice === 0) {
+            console.warn('No pricing rule matched - price is 0')
+            showError('لم يتم العثور على قاعدة سعر مناسبة. يرجى التحقق من القواعد المالية.')
+          }
+          
           return calculatedPrice
+        } else {
+          // إذا لم تنجح العملية، السعر = 0
+          console.warn('Price calculation failed:', response.data)
+          setTotalPrice(0)
+          setPricingRule(null)
+          showError(response.data?.message || 'لم يتم العثور على قاعدة سعر مناسبة')
+          return 0
         }
-      } catch (apiError) {
-        console.warn('Error calculating price from API, using fallback:', apiError)
+      } catch (apiError: any) {
+        console.error('Error calculating price from API:', apiError)
+        // في حالة الخطأ، السعر = 0
+        setTotalPrice(0)
+        setPricingRule(null)
+        
+        // عرض رسالة خطأ للمستخدم
+        const errorMessage = apiError.response?.data?.message || apiError.message || 'خطأ في حساب السعر'
+        showError(errorMessage)
+        return 0
       }
-      
-      // Fallback: حساب يدوي إذا فشل API
-      let fallbackPrice = 0
-      if (calcType === 'page') {
-        fallbackPrice = qty * 50 // 50 ل.س لكل صفحة
-        if (printColor === 'color') fallbackPrice *= 1.5
-        if (printSides === 'double') fallbackPrice *= 1.3
-      } else if (calcType === 'area') {
-        fallbackPrice = qty * 5000 // 5000 ل.س لكل متر مربع
-    } else {
-        fallbackPrice = qty * 2000 // 2000 ل.س لكل قطعة
-      }
-      
-      setTotalPrice(fallbackPrice)
-      return fallbackPrice
       
     } catch (error) {
       console.error('Error calculating price:', error)
-      const fallbackTotal = 2000 * (Number(quantity) || 1)
-      setTotalPrice(fallbackTotal)
-      return fallbackTotal
+      // لا نستخدم حساب يدوي - السعر يجب أن يأتي من القواعد المالية فقط
+      setTotalPrice(0)
+      setPricingRule(null)
+      showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية.')
+      return 0
     } finally {
       setIsCalculatingPrice(false)
     }
@@ -1345,15 +1471,25 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
       // Prepare order data - التأكد من عدم وجود NaN
       const safeQuantity = Number(quantity) || 1
-        let safeTotalPrice = Number(totalPrice)
-        if (!safeTotalPrice || safeTotalPrice === 0) {
-          safeTotalPrice = await calculatePrice() || 2000
-        }
+      let safeTotalPrice = Number(totalPrice)
+      
+      // إذا كان السعر 0 أو غير محسوب، نحسبه من القواعد المالية
+      if (!safeTotalPrice || safeTotalPrice === 0) {
+        safeTotalPrice = await calculatePrice() || 0
+      }
+      
+      // التحقق من أن السعر صحيح من القواعد المالية
+      if (!safeTotalPrice || safeTotalPrice === 0) {
+        showError('لا يمكن إنشاء الطلب: السعر = 0. يرجى إضافة قاعدة سعر مناسبة في القواعد المالية.')
+        setIsSubmitting(false)
+        return
+      }
+      
       const unitPrice = safeTotalPrice / safeQuantity
       
       // التأكد من أن unitPrice ليس NaN
       if (isNaN(unitPrice) || unitPrice <= 0) {
-        showError('خطأ في حساب السعر. يرجى التحقق من الأبعاد والكمية')
+        showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية والكمية.')
         setIsSubmitting(false)
         return
       }

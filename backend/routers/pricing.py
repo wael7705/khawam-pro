@@ -85,7 +85,14 @@ def calculate_price(
         total = price * Decimal(str(quantity))
     elif calculation_type == "page":
         # السعر = السعر الأساسي × عدد الصفحات
-        total = price * Decimal(str(quantity))
+        # ملاحظة مهمة: السعر الأساسي هو سعر صفحة وجه واحد
+        # طباعة وجهين = السعر الأساسي × 2
+        if specifications and specifications.get("sides") == "double":
+            # طباعة وجهين: السعر الأساسي × 2 × عدد الصفحات
+            total = price * Decimal("2") * Decimal(str(quantity))
+        else:
+            # طباعة وجه واحد: السعر الأساسي × عدد الصفحات
+            total = price * Decimal(str(quantity))
     else:
         total = price * Decimal(str(quantity))
     
@@ -347,36 +354,110 @@ async def calculate_price_endpoint(
     """
     حساب السعر بناءً على المواصفات
     يستخدم قاعدة السعر المناسبة تلقائياً
+    إذا لم يجد تطابق، يعيد السعر = 0
     """
     try:
         from sqlalchemy import text
+        import json
         
         # البحث عن قاعدة السعر المناسبة
-        # بناء query البحث
+        # بناء query البحث الأساسي
         query = """
-            SELECT id, base_price, price_multipliers, specifications
+            SELECT id, base_price, price_multipliers, specifications, unit, name_ar
             FROM pricing_rules
             WHERE calculation_type = :calculation_type 
             AND is_active = true
         """
         params = {"calculation_type": request.calculation_type}
         
-        # إضافة فلاتر بناءً على المواصفات
-        if request.specifications:
-            # يمكن إضافة فلاتر أكثر تعقيداً هنا
-            pass
+        # جلب جميع القواعد المطابقة لنوع الحساب
+        query += " ORDER BY display_order, id"
         
-        query += " ORDER BY display_order, id LIMIT 1"
+        all_rules = db.execute(text(query), params).fetchall()
         
-        result = db.execute(text(query), params).fetchone()
+        if not all_rules:
+            # لا توجد قواعد مالية - إرجاع 0
+            print(f"Warning: No pricing rules found for calculation_type: {request.calculation_type}")
+            return {
+                "success": False,
+                "message": f"لا توجد قاعدة سعر نشطة لنوع الحساب: {request.calculation_type}",
+                "total_price": 0.0,
+                "rule_id": None,
+                "calculation_type": request.calculation_type
+            }
         
-        if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"لا توجد قاعدة سعر نشطة لنوع الحساب: {request.calculation_type}"
-            )
+        # البحث عن أفضل قاعدة تطابق بناءً على المواصفات
+        best_match = None
+        best_match_score = 0
         
-        rule_id, base_price, price_multipliers, rule_specifications = result
+        for rule in all_rules:
+            rule_id, base_price, price_multipliers, rule_specifications, unit, name_ar = rule
+            
+            # حساب نقاط المطابقة
+            match_score = 0
+            
+            # تحويل JSONB إلى dict إذا لزم الأمر
+            if isinstance(rule_specifications, str):
+                try:
+                    rule_specifications = json.loads(rule_specifications)
+                except:
+                    rule_specifications = {}
+            
+            if isinstance(price_multipliers, str):
+                try:
+                    price_multipliers = json.loads(price_multipliers)
+                except:
+                    price_multipliers = {}
+            
+            # مطابقة المواصفات الأساسية
+            if request.specifications:
+                # مطابقة نوع اللون
+                if 'color' in request.specifications and rule_specifications:
+                    if 'color' in rule_specifications:
+                        if request.specifications.get('color') == rule_specifications.get('color'):
+                            match_score += 2
+                
+                # مطابقة عدد الوجوه
+                if 'sides' in request.specifications and rule_specifications:
+                    if 'sides' in rule_specifications:
+                        if request.specifications.get('sides') == rule_specifications.get('sides'):
+                            match_score += 2
+                
+                # مطابقة قياس الورق
+                if 'paper_size' in request.specifications and rule_specifications:
+                    if 'paper_size' in rule_specifications:
+                        if request.specifications.get('paper_size') == rule_specifications.get('paper_size'):
+                            match_score += 1
+                
+                # مطابقة نوع الوحدة
+                if unit and request.specifications.get('unit'):
+                    if unit == request.specifications.get('unit'):
+                        match_score += 1
+            
+            # إذا كانت القاعدة لا تحتوي على مواصفات محددة، تعتبر قاعدة عامة
+            if not rule_specifications or len(rule_specifications) == 0:
+                match_score = 1  # قاعدة عامة - أقل أولوية
+            
+            # اختيار أفضل مطابقة
+            if match_score > best_match_score:
+                best_match_score = match_score
+                best_match = rule
+        
+        # إذا لم نجد أي مطابقة، نستخدم أول قاعدة (القاعدة العامة)
+        if not best_match or best_match_score == 0:
+            best_match = all_rules[0]
+            rule_id, base_price, price_multipliers, rule_specifications, unit, name_ar = best_match
+            print(f"Using default rule: {name_ar} (ID: {rule_id})")
+        else:
+            rule_id, base_price, price_multipliers, rule_specifications, unit, name_ar = best_match
+            print(f"Matched rule: {name_ar} (ID: {rule_id}, score: {best_match_score})")
+        
+        # تحويل JSONB إلى dict
+        if isinstance(price_multipliers, str):
+            try:
+                price_multipliers = json.loads(price_multipliers)
+            except:
+                price_multipliers = {}
         
         # حساب السعر
         total_price = calculate_price(
@@ -390,11 +471,13 @@ async def calculate_price_endpoint(
         return {
             "success": True,
             "rule_id": rule_id,
+            "rule_name": name_ar,
             "base_price": float(base_price),
             "quantity": request.quantity,
             "specifications": request.specifications,
             "total_price": float(total_price),
-            "calculation_type": request.calculation_type
+            "calculation_type": request.calculation_type,
+            "unit": unit
         }
     except HTTPException:
         raise
@@ -402,7 +485,14 @@ async def calculate_price_endpoint(
         print(f"Error calculating price: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ في حساب السعر: {str(e)}")
+        # في حالة الخطأ، إرجاع 0 بدلاً من رفع استثناء
+        return {
+            "success": False,
+            "message": f"خطأ في حساب السعر: {str(e)}",
+            "total_price": 0.0,
+            "rule_id": None,
+            "calculation_type": request.calculation_type
+        }
 
 @router.post("/calculate-price-by-rule/{rule_id}")
 async def calculate_price_by_rule(

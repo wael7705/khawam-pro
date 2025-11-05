@@ -247,4 +247,15 @@ export const workflowsAPI = {
   deleteWorkflow: (workflowId: number) => api.delete(`/workflows/workflow/${workflowId}`),
 }
 
+// File Analysis API
+export const fileAnalysisAPI = {
+  analyzeFiles: (files: File[]) => {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+    return api.post('/files/analyze-files', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+}
+
 export default api

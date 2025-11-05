@@ -46,14 +46,15 @@ try {
         Write-Host "   ID: $id" -ForegroundColor White
         Write-Host "   الاسم: $nameAr" -ForegroundColor White
         Write-Host "   Name: $nameEn" -ForegroundColor Gray
-        Write-Host "   Visible: $isVisible" -ForegroundColor $(if ($isVisible) { "Green" } else { "Red" })
+        $visibleColor = if ($isVisible) { "Green" } else { "Red" }
+        Write-Host "   Visible: $isVisible" -ForegroundColor $visibleColor
         Write-Host "   Base Price: $basePrice ل.س" -ForegroundColor White
         Write-Host "   ---" -ForegroundColor Gray
         
         # التحقق من وجود "طباعة محاضرات"
         if ($nameAr -like "*محاضرات*" -or $nameAr -like "*طباعة محاضرات*") {
             $foundLectureService = $true
-            Write-Host "   ✅ تم العثور على خدمة 'طباعة محاضرات'!" -ForegroundColor Green
+            Write-Host "   [FOUND] تم العثور على خدمة 'طباعة محاضرات'!" -ForegroundColor Green
         }
     }
     

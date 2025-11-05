@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
+import { findServiceHandler } from '../services/serviceRegistry'
 import './OrderModal.css'
 
 interface OrderModalProps {
@@ -48,8 +49,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [printSides, setPrintSides] = useState<'single' | 'double'>('single')
   const [numberOfPages, setNumberOfPages] = useState<number>(1)
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
+  const [paperSize, setPaperSize] = useState<string>('A4')
+  const [printQuality, setPrintQuality] = useState<'standard' | 'laser'>('standard')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Service Handler - منطق الخدمة المحددة
+  const serviceHandler = findServiceHandler(serviceName, serviceId)
 
   // Helper function to render step content based on step_type
   const renderStepContent = (currentStep: number) => {
@@ -64,6 +70,50 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const stepConfig = workflowStep.step_config || {}
     const stepType = workflowStep.step_type
 
+    // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص
+    if (serviceHandler) {
+      const serviceData = {
+        uploadedFiles,
+        setUploadedFiles,
+        quantity,
+        setQuantity,
+        totalPages,
+        setTotalPages,
+        isAnalyzingPages,
+        setIsAnalyzingPages,
+        paperSize,
+        setPaperSize,
+        printColor,
+        setPrintColor,
+        printQuality,
+        setPrintQuality,
+        printSides,
+        setPrintSides,
+        notes,
+        setNotes,
+        fileInputRef
+      }
+      
+      const handlers = {
+        handleImageUpload,
+        handleFileUpload: handleImageUpload
+      }
+      
+      const rendered = serviceHandler.renderStep(
+        currentStep,
+        stepType,
+        { ...stepConfig, step_name_ar: workflowStep.step_name_ar, step_description_ar: workflowStep.step_description_ar },
+        serviceData,
+        handlers
+      )
+      
+      // إذا كانت الخدمة تعيد null، استمر في المنطق الافتراضي
+      if (rendered !== null) {
+        return rendered
+      }
+    }
+
+    // المنطق الافتراضي (للخدمات غير المسجلة)
     switch (stepType) {
       case 'quantity':
         return (
@@ -1322,6 +1372,30 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     try {
       setIsCalculatingPrice(true)
       
+      // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص
+      if (serviceHandler) {
+        const serviceData = {
+          uploadedFiles,
+          quantity,
+          totalPages,
+          paperSize,
+          printColor,
+          printQuality,
+          printSides,
+          notes
+        }
+        
+        const calculatedPrice = await serviceHandler.calculatePrice(serviceData)
+        setTotalPrice(calculatedPrice)
+        
+        if (calculatedPrice === 0) {
+          showError('لم يتم العثور على قاعدة سعر مناسبة. يرجى التحقق من القواعد المالية.')
+        }
+        
+        return calculatedPrice
+      }
+      
+      // المنطق الافتراضي (للخدمات غير المسجلة)
       // تحديد نوع الحساب بناءً على اسم الخدمة والأبعاد
       let calcType: 'piece' | 'area' | 'page' = 'piece'
       let qty = Number(quantity) || 1
@@ -1495,41 +1569,93 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setIsSubmitting(false)
         return
       }
-      const orderData = {
+      // تحضير البيانات الأساسية
+      const baseOrderData = {
         customer_name: customerName,
         customer_phone: customerWhatsApp,
         customer_whatsapp: customerPhoneExtra || customerWhatsApp,
         shop_name: shopName || null,
         service_name: serviceName,
-        items: [
-          {
+        total_amount: safeTotalPrice,
+        final_amount: safeTotalPrice,
+        delivery_type: deliveryType,
+        delivery_address: deliveryType === 'delivery' 
+          ? (deliveryAddress?.street || shopName || null)
+          : null,
+        delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude 
+          ? deliveryAddress.latitude 
+          : null,
+        delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude 
+          ? deliveryAddress.longitude 
+          : null,
+        notes: notes || workType || null
+      }
+      
+      // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص لتحضير البيانات
+      let orderData: any
+      if (serviceHandler) {
+        const serviceData = {
+          uploadedFiles,
+          quantity: safeQuantity,
+          totalPages,
+          paperSize,
+          printColor,
+          printQuality,
+          printSides,
+          notes,
+          length,
+          width,
+          height,
+          unit,
+          selectedColors,
+          workType
+        }
+        
+        orderData = serviceHandler.prepareOrderData(serviceData, baseOrderData)
+        // التأكد من أن items موجودة
+        if (!orderData.items) {
+          orderData.items = [{
             service_name: serviceName,
             quantity: safeQuantity,
             unit_price: unitPrice,
             total_price: safeTotalPrice,
-            specifications: {
-              dimensions: length || width || height ? { length, width, height, unit } : undefined,
-              colors: selectedColors.length > 0 ? selectedColors : undefined,
-              work_type: workType || undefined,
-              notes: notes || undefined,
-              print_color: printColor,
-              print_quality: printQuality,
-              print_sides: printSides,
-              number_of_pages: totalPages || numberOfPages,
-              paper_size: paperSize || 'A4',
-              total_pages: totalPages,
-              files_count: uploadedFiles.length,
-            },
-            dimensions: {
-              length: length || null,
-              width: width || null,
-              height: height || null,
-              unit: unit
-            },
-            colors: selectedColors,
-            design_files: imageUrl ? [imageUrl] : []
-          }
-        ],
+            specifications: serviceHandler.getSpecifications(serviceData),
+            design_files: uploadedFiles || []
+          }]
+        }
+      } else {
+        // المنطق الافتراضي
+        orderData = {
+          ...baseOrderData,
+          items: [
+            {
+              service_name: serviceName,
+              quantity: safeQuantity,
+              unit_price: unitPrice,
+              total_price: safeTotalPrice,
+              specifications: {
+                dimensions: length || width || height ? { length, width, height, unit } : undefined,
+                colors: selectedColors.length > 0 ? selectedColors : undefined,
+                work_type: workType || undefined,
+                notes: notes || undefined,
+                print_color: printColor,
+                print_quality: printQuality,
+                print_sides: printSides,
+                number_of_pages: totalPages || numberOfPages,
+                paper_size: paperSize || 'A4',
+                total_pages: totalPages,
+                files_count: uploadedFiles.length,
+              },
+              dimensions: {
+                length: length || null,
+                width: width || null,
+                height: height || null,
+                unit: unit
+              },
+              colors: selectedColors,
+              design_files: imageUrl ? [imageUrl] : []
+            }
+          ],
         total_amount: safeTotalPrice,
         final_amount: safeTotalPrice,
         delivery_type: deliveryType,

@@ -292,116 +292,94 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
             service_id = result.scalar()
             db.commit()
         
-        # 2. إضافة المراحل
-        
-        # المرحلة 1: رفع الملفات وعدد النسخ
-        workflow1_config = {
-            "required": True,
-            "multiple": True,
-            "accept": "application/pdf,.pdf,.doc,.docx",
-            "analyze_pages": True,
-            "show_quantity": True
-        }
-        
-        db.execute(text("""
-            INSERT INTO service_workflows 
-            (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-             step_type, step_config, display_order, is_active)
-            VALUES 
-            (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-             :step_type, :step_config::jsonb, :display_order, :is_active)
-        """), {
-            "service_id": service_id,
-            "step_number": 1,
-            "step_name_ar": "رفع الملفات وعدد النسخ",
-            "step_name_en": "Upload Files and Quantity",
-            "step_description_ar": "قم برفع ملفات المحاضرات (PDF أو Word) وحدد عدد النسخ المطلوبة",
-            "step_type": "files",
-            "step_config": json.dumps(workflow1_config),
-            "display_order": 1,
-            "is_active": True
-        })
-        
-        # المرحلة 2: إعدادات الطباعة
-        workflow2_config = {
-            "required": True,
-            "paper_sizes": ["A4", "B5"],
-            "paper_size": "A4",
-            "quality_options": {
-                "color": {
-                    "standard": "طباعة عادية",
-                    "laser": "دقة عالية (ليزرية)"
+        # 2. إضافة المراحل المخصصة لخدمة طباعة المحاضرات
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملفات وعدد النسخ",
+                "step_name_en": "Upload Files and Quantity",
+                "step_description_ar": "قم برفع ملفات المحاضرات (PDF أو Word) وحدد عدد النسخ المطلوبة",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": True,
+                    "accept": "application/pdf,.pdf,.doc,.docx",
+                    "analyze_pages": True,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "إعدادات الطباعة",
+                "step_name_en": "Print Settings",
+                "step_description_ar": "اختر قياس الورق، نوع الطباعة، الجودة، وعدد الوجوه",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "paper_sizes": ["A4", "B5"],
+                    "paper_size": "A4",
+                    "quality_options": {
+                        "color": {
+                            "standard": "طباعة عادية",
+                            "laser": "دقة عالية (ليزرية)"
+                        }
+                    },
+                    "hide_dimensions": True  # إخفاء الأبعاد
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False,
+                    "hide_work_type": True  # إخفاء نوع العمل
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional", "load_from_account"]  # استيراد من الحساب
+                }
+            },
+            {
+                "step_number": 5,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
                 }
             }
-        }
+        ]
         
-        db.execute(text("""
-            INSERT INTO service_workflows 
-            (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-             step_type, step_config, display_order, is_active)
-            VALUES 
-            (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-             :step_type, :step_config::jsonb, :display_order, :is_active)
-        """), {
-            "service_id": service_id,
-            "step_number": 2,
-            "step_name_ar": "إعدادات الطباعة",
-            "step_name_en": "Print Settings",
-            "step_description_ar": "اختر قياس الورق، نوع الطباعة، الجودة، وعدد الوجوه",
-            "step_type": "print_options",
-            "step_config": json.dumps(workflow2_config),
-            "display_order": 2,
-            "is_active": True
-        })
-        
-        # المرحلة 3: معلومات العميل ونوع الاستلام
-        workflow3_config = {
-            "required": True,
-            "fields": ["whatsapp_optional"]
-        }
-        
-        db.execute(text("""
-            INSERT INTO service_workflows 
-            (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-             step_type, step_config, display_order, is_active)
-            VALUES 
-            (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-             :step_type, :step_config::jsonb, :display_order, :is_active)
-        """), {
-            "service_id": service_id,
-            "step_number": 3,
-            "step_name_ar": "معلومات العميل والاستلام",
-            "step_name_en": "Customer Info and Delivery",
-            "step_description_ar": "أدخل معلوماتك واختر نوع الاستلام",
-            "step_type": "customer_info",
-            "step_config": json.dumps(workflow3_config),
-            "display_order": 3,
-            "is_active": True
-        })
-        
-        # المرحلة 4: الفاتورة (الملخص)
-        workflow4_config = {
-            "required": True
-        }
-        
-        db.execute(text("""
-            INSERT INTO service_workflows 
-            (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-             step_type, step_config, display_order, is_active)
-            VALUES 
-            (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-             :step_type, :step_config::jsonb, :display_order, :is_active)
-        """), {
-            "service_id": service_id,
-            "step_number": 4,
-            "step_name_ar": "الفاتورة والملخص",
-            "step_name_en": "Invoice and Summary",
-            "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
-            "step_type": "invoice",
-            "step_config": json.dumps(workflow4_config),
-            "display_order": 4,
-            "is_active": True
-        })
+        for workflow in workflows:
+            db.execute(text("""
+                INSERT INTO service_workflows 
+                (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                 step_type, step_config, display_order, is_active)
+                VALUES 
+                (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                 :step_type, :step_config::jsonb, :display_order, :is_active)
+            """), {
+                "service_id": service_id,
+                "step_number": workflow["step_number"],
+                "step_name_ar": workflow["step_name_ar"],
+                "step_name_en": workflow["step_name_en"],
+                "step_description_ar": workflow["step_description_ar"],
+                "step_type": workflow["step_type"],
+                "step_config": json.dumps(workflow["step_config"]),
+                "display_order": workflow["step_number"],
+                "is_active": True
+            })
         
         db.commit()
         
@@ -409,7 +387,7 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
             "success": True,
             "message": "تم إعداد خدمة طباعة المحاضرات بنجاح",
             "service_id": service_id,
-            "workflows_count": 4
+            "workflows_count": len(workflows)
         }
     except Exception as e:
         db.rollback()

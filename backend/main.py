@@ -266,7 +266,7 @@ async def _setup_lecture_printing_service():
             conn.commit()
             print(f"✅ تم إنشاء خدمة طباعة المحاضرات (ID: {service_id})")
         
-        # إضافة المراحل
+        # إضافة المراحل المخصصة لخدمة طباعة المحاضرات
         workflows = [
             {
                 "step_number": 1,
@@ -297,22 +297,34 @@ async def _setup_lecture_printing_service():
                             "standard": "طباعة عادية",
                             "laser": "دقة عالية (ليزرية)"
                         }
-                    }
+                    },
+                    "hide_dimensions": True  # إخفاء الأبعاد
                 }
             },
             {
                 "step_number": 3,
-                "step_name_ar": "معلومات العميل والاستلام",
-                "step_name_en": "Customer Info and Delivery",
-                "step_description_ar": "أدخل معلوماتك واختر نوع الاستلام",
-                "step_type": "customer_info",
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
                 "step_config": {
-                    "required": True,
-                    "fields": ["whatsapp_optional"]
+                    "required": False,
+                    "hide_work_type": True  # إخفاء نوع العمل
                 }
             },
             {
                 "step_number": 4,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional", "load_from_account"]  # استيراد من الحساب
+                }
+            },
+            {
+                "step_number": 5,
                 "step_name_ar": "الفاتورة والملخص",
                 "step_name_en": "Invoice and Summary",
                 "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",

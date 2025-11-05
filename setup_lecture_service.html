@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>إعداد خدمة طباعة المحاضرات</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            direction: rtl;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>إعداد خدمة طباعة المحاضرات</h1>
+    <p>انقر على الزر أدناه لإضافة خدمة طباعة المحاضرات مع مراحلها إلى قاعدة البيانات.</p>
+    
+    <button onclick="setupService()">إعداد الخدمة</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function setupService() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>جاري الإعداد...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/workflows/setup-lecture-printing', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>✅ تم بنجاح!</h3>
+                        <p>${data.message}</p>
+                        <p><strong>Service ID:</strong> ${data.service_id}</p>
+                        <p><strong>عدد المراحل:</strong> ${data.workflows_count}</p>
+                        <p>يمكنك الآن رؤية الخدمة في قسم الخدمات!</p>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<h3>❌ خطأ</h3><p>${data.message || 'حدث خطأ'}</p>`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<h3>❌ خطأ في الاتصال</h3><p>${error.message}</p><p>تأكد من أن الخادم يعمل على http://localhost:8000</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
+

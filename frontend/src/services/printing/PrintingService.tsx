@@ -130,7 +130,7 @@ export const PrintingService: ServiceHandler = {
                         checked={paperSize === size}
                         onChange={(e) => setPaperSize(e.target.value)}
                       />
-                      <span>{size === 'booklet' ? 'Booklet (A5)' : size}</span>
+                      <span>{size === 'B5' || size === 'booklet' ? 'B5 (Booklet)' : size}</span>
                     </label>
                   ))}
                 </div>

@@ -11,12 +11,11 @@ export const LecturePrintingService: ServiceHandler = {
   
   matches: (serviceName: string, _serviceId?: number) => {
     // تطابق على اسم الخدمة
-    // يمكن استخدام serviceId في المستقبل إذا لزم الأمر
     return serviceName.includes('محاضرات') || 
            serviceName.toLowerCase().includes('lecture')
   },
   
-  // استخدام نفس منطق خدمة الطباعة العامة مع تخصيص بسيط
+  // استخدام نفس منطق خدمة الطباعة العامة - يدعم جميع المراحل المطلوبة
   renderStep: PrintingService.renderStep,
   
   prepareOrderData: PrintingService.prepareOrderData,

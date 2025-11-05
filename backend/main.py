@@ -13,9 +13,12 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         import asyncio
-        asyncio.create_task(_init_pricing_table())
+        # تشغيل المهام بشكل متوازي
+        loop = asyncio.get_event_loop()
+        loop.create_task(_init_pricing_table())
+        loop.create_task(_setup_lecture_printing_service())
     except Exception as e:
-        print(f"Warning: Failed to initialize pricing table: {str(e)[:100]}")
+        print(f"Warning: Failed to initialize: {str(e)[:100]}")
     
     yield
     
@@ -204,6 +207,147 @@ async def _init_pricing_table():
 
     except Exception as e:
         print(f"Warning: Error initializing pricing tables: {str(e)[:200]}")
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
+async def _setup_lecture_printing_service():
+    """إعداد خدمة طباعة المحاضرات تلقائياً عند بدء التطبيق"""
+    import time
+    import json
+    import asyncio
+    await asyncio.sleep(3)  # انتظار حتى تكون قاعدة البيانات جاهزة
+    
+    conn = None
+    try:
+        conn = engine.connect()
+        
+        # التحقق من وجود الخدمة
+        existing_service = conn.execute(text("""
+            SELECT id FROM services 
+            WHERE name_ar LIKE '%طباعة محاضرات%' OR name_ar LIKE '%محاضرات%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            print("✅ خدمة طباعة المحاضرات موجودة بالفعل")
+            # حذف المراحل القديمة وإعادة إضافتها
+            conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                        {"service_id": service_id})
+            conn.commit()
+        else:
+            # إنشاء الخدمة الجديدة
+            result = conn.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "طباعة محاضرات",
+                "name_en": "Lecture Printing",
+                "description_ar": "خدمة طباعة المحاضرات مع خيارات متعددة للقياس والجودة",
+                "icon": "📚",
+                "base_price": 100.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 1
+            })
+            service_id = result.scalar()
+            conn.commit()
+            print(f"✅ تم إنشاء خدمة طباعة المحاضرات (ID: {service_id})")
+        
+        # إضافة المراحل
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملفات وعدد النسخ",
+                "step_name_en": "Upload Files and Quantity",
+                "step_description_ar": "قم برفع ملفات المحاضرات (PDF أو Word) وحدد عدد النسخ المطلوبة",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": True,
+                    "accept": "application/pdf,.pdf,.doc,.docx",
+                    "analyze_pages": True,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "إعدادات الطباعة",
+                "step_name_en": "Print Settings",
+                "step_description_ar": "اختر قياس الورق، نوع الطباعة، الجودة، وعدد الوجوه",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "paper_sizes": ["A4", "B5"],
+                    "paper_size": "A4",
+                    "quality_options": {
+                        "color": {
+                            "standard": "طباعة عادية",
+                            "laser": "دقة عالية (ليزرية)"
+                        }
+                    }
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "أدخل معلوماتك واختر نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional"]
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            conn.execute(text("""
+                INSERT INTO service_workflows 
+                (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                 step_type, step_config, display_order, is_active)
+                VALUES 
+                (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                 :step_type, :step_config::jsonb, :display_order, :is_active)
+            """), {
+                "service_id": service_id,
+                "step_number": workflow["step_number"],
+                "step_name_ar": workflow["step_name_ar"],
+                "step_name_en": workflow["step_name_en"],
+                "step_description_ar": workflow["step_description_ar"],
+                "step_type": workflow["step_type"],
+                "step_config": json.dumps(workflow["step_config"]),
+                "display_order": workflow["step_number"],
+                "is_active": True
+            })
+        
+        conn.commit()
+        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة المحاضرات")
+        
+    except Exception as e:
+        print(f"⚠️ Warning: Error setting up lecture printing service: {str(e)[:200]}")
         if conn:
             try:
                 conn.rollback()

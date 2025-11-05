@@ -381,7 +381,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         checked={paperSize === size}
                         onChange={(e) => setPaperSize(e.target.value)}
                       />
-                      <span>{size}</span>
+                      <span>{size === 'B5' || size === 'booklet' ? 'B5 (Booklet)' : size}</span>
                     </label>
                   ))}
                 </div>

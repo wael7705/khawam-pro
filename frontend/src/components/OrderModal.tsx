@@ -1260,43 +1260,61 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   // Load workflow steps when modal opens and serviceId is available
   useEffect(() => {
     const loadWorkflow = async () => {
+      console.log('🔄 loadWorkflow called - isOpen:', isOpen, 'serviceId:', serviceId, 'serviceName:', serviceName)
+      
       if (isOpen && serviceId) {
         try {
           setLoadingWorkflow(true)
+          console.log('📡 Fetching workflow for serviceId:', serviceId)
           const response = await workflowsAPI.getServiceWorkflow(serviceId)
-          if (response.data.success && response.data.workflows.length > 0) {
-            setWorkflowSteps(response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number))
+          console.log('📡 Workflow API response:', response.data)
+          
+          if (response.data.success && response.data.workflows && response.data.workflows.length > 0) {
+            const sortedWorkflows = response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
+            console.log('✅ Loaded workflows:', sortedWorkflows.length, sortedWorkflows)
+            setWorkflowSteps(sortedWorkflows)
             // Reset to first step
             setStep(1)
           } else {
+            console.log('⚠️ No workflows found in response')
             // Fallback to default steps if no workflow defined
             setWorkflowSteps([])
           }
         } catch (error) {
-          console.error('Error loading workflow:', error)
+          console.error('❌ Error loading workflow:', error)
           // Fallback to default steps
           setWorkflowSteps([])
         } finally {
           setLoadingWorkflow(false)
         }
       } else if (isOpen && !serviceId) {
+        console.log('📡 No serviceId, trying to find service by name:', serviceName)
         // Try to get serviceId from serviceName
         try {
           const services = await servicesAPI.getAll()
+          console.log('📡 All services:', services.data)
           const service = services.data.find((s: any) => s.name_ar === serviceName)
+          console.log('📡 Found service:', service)
+          
           if (service) {
             const response = await workflowsAPI.getServiceWorkflow(service.id)
-            if (response.data.success && response.data.workflows.length > 0) {
-              setWorkflowSteps(response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number))
+            console.log('📡 Workflow API response (by name):', response.data)
+            
+            if (response.data.success && response.data.workflows && response.data.workflows.length > 0) {
+              const sortedWorkflows = response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
+              console.log('✅ Loaded workflows (by name):', sortedWorkflows.length, sortedWorkflows)
+              setWorkflowSteps(sortedWorkflows)
               setStep(1)
             } else {
+              console.log('⚠️ No workflows found (by name)')
               setWorkflowSteps([])
             }
           } else {
+            console.log('⚠️ Service not found by name')
             setWorkflowSteps([])
           }
         } catch (error) {
-          console.error('Error loading service or workflow:', error)
+          console.error('❌ Error loading service or workflow:', error)
           setWorkflowSteps([])
         }
       }

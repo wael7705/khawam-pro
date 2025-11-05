@@ -5,6 +5,7 @@ import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } fro
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import { findServiceHandler } from '../services/serviceRegistry'
+import { getUserData } from '../lib/auth'
 import './OrderModal.css'
 
 interface OrderModalProps {
@@ -459,6 +460,94 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 </div>
               </div>
             )}
+            
+            {/* عدد الوجوه */}
+            <div className="form-group">
+              <label>عدد الوجوه <span className="required">*</span></label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printSides"
+                    value="single"
+                    checked={printSides === 'single'}
+                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                  />
+                  <span>وجه واحد</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printSides"
+                    value="double"
+                    checked={printSides === 'double'}
+                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                  />
+                  <span>وجهين</span>
+                </label>
+              </div>
+              {printSides === 'double' && (
+                <small className="form-hint" style={{ color: '#667eea', marginTop: '8px', display: 'block' }}>
+                  ملاحظة: طباعة وجهين = السعر الأساسي × 2
+                </small>
+              )}
+            </div>
+            
+            {/* إخفاء الأبعاد إذا كان hide_dimensions = true */}
+            {!stepConfig.hide_dimensions && (
+              <>
+                <div className="form-group">
+                  <label>الطول {stepConfig.required ? <span className="required">*</span> : ''}</label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={length}
+                      onChange={(e) => setLength(e.target.value)}
+                      className="form-input"
+                      placeholder="0"
+                      required={stepConfig.required}
+                      style={{ flex: 1 }}
+                    />
+                    <select 
+                      value={unit} 
+                      onChange={(e) => setUnit(e.target.value)} 
+                      className="form-input"
+                      style={{ width: '80px' }}
+                    >
+                      <option value="cm">سم (cm)</option>
+                      <option value="m">متر (m)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>العرض {stepConfig.required ? <span className="required">*</span> : ''}</label>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={width}
+                      onChange={(e) => setWidth(e.target.value)}
+                      className="form-input"
+                      placeholder="0"
+                      required={stepConfig.required}
+                      style={{ flex: 1 }}
+                    />
+                    <select 
+                      value={unit} 
+                      onChange={(e) => setUnit(e.target.value)} 
+                      className="form-input"
+                      style={{ width: '80px' }}
+                    >
+                      <option value="cm">سم (cm)</option>
+                      <option value="m">متر (m)</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )
 
@@ -542,7 +631,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   className="form-input"
                   placeholder="09xxxxxxxx"
                 />
-                <small className="form-hint">يمكن استخدام رقم آخر للتواصل</small>
+                <small className="form-hint">يمكن استخدام رقم آخر للتواصل عبر واتساب</small>
               </div>
             )}
             <div className="form-group">
@@ -792,16 +881,29 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
             <div className="form-group">
-              <label>ملاحظات {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+              <label>ملاحظات إضافية {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="form-input"
-                placeholder="أضف أي ملاحظات إضافية..."
+                placeholder="أضف أي ملاحظات إضافية حول طلبك..."
                 rows={5}
                 required={stepConfig.required}
               />
             </div>
+            {/* لا نعرض نوع العمل إذا كان hide_work_type = true */}
+            {!stepConfig.hide_work_type && (
+              <div className="form-group">
+                <label>نوع العمل / الغرض <span className="optional">(اختياري)</span></label>
+                <textarea
+                  value={workType}
+                  onChange={(e) => setWorkType(e.target.value)}
+                  className="form-input"
+                  rows={4}
+                  placeholder="اذكر سبب حاجتك لهذه الخدمة..."
+                />
+              </div>
+            )}
           </div>
         )
 
@@ -1156,6 +1258,27 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
     loadWorkflow()
   }, [isOpen, serviceId, serviceName])
+
+  // استيراد بيانات المستخدم عند فتح مرحلة معلومات العميل
+  useEffect(() => {
+    if (isOpen && workflowSteps.length > 0) {
+      const customerInfoStep = workflowSteps.find((s: any) => s.step_type === 'customer_info')
+      if (customerInfoStep && step === customerInfoStep.step_number) {
+        const stepConfig = customerInfoStep.step_config || {}
+        if (stepConfig.fields?.includes('load_from_account')) {
+          const userData = getUserData()
+          if (userData) {
+            if (userData.name && !customerName) {
+              setCustomerName(userData.name)
+            }
+            if (userData.phone && !customerWhatsApp) {
+              setCustomerWhatsApp(userData.phone)
+            }
+          }
+        }
+      }
+    }
+  }, [step, workflowSteps, isOpen])
 
   // Load saved form state and delivery address from localStorage when modal opens
   // Use useLayoutEffect to restore state synchronously before render

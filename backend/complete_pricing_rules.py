@@ -123,6 +123,50 @@ def complete_pricing_rules():
                 },
                 "display_order": 6
             },
+            # قواعد الفليكس حسب القياس (متر مربع)
+            {
+                "name_ar": "طباعة فليكس - خارجي",
+                "name_en": "Flex Printing - Outdoor",
+                "description_ar": "طباعة فليكس خارجي حسب القياس (متر مربع)",
+                "description_en": "Outdoor flex printing by area (square meters)",
+                "calculation_type": "area",
+                "base_price": 5000.0,  # سعر المتر المربع
+                "unit": "متر مربع",
+                "specifications": {
+                    "material_type": "flex",
+                    "location": "outdoor"
+                },
+                "display_order": 7
+            },
+            {
+                "name_ar": "طباعة فليكس - داخلي",
+                "name_en": "Flex Printing - Indoor",
+                "description_ar": "طباعة فليكس داخلي حسب القياس (متر مربع)",
+                "description_en": "Indoor flex printing by area (square meters)",
+                "calculation_type": "area",
+                "base_price": 4000.0,  # سعر المتر المربع
+                "unit": "متر مربع",
+                "specifications": {
+                    "material_type": "flex",
+                    "location": "indoor"
+                },
+                "display_order": 8
+            },
+            {
+                "name_ar": "طباعة فليكس - مقاوم للماء",
+                "name_en": "Flex Printing - Waterproof",
+                "description_ar": "طباعة فليكس مقاوم للماء حسب القياس (متر مربع)",
+                "description_en": "Waterproof flex printing by area (square meters)",
+                "calculation_type": "area",
+                "base_price": 6000.0,  # سعر المتر المربع
+                "unit": "متر مربع",
+                "specifications": {
+                    "material_type": "flex",
+                    "location": "outdoor",
+                    "waterproof": True
+                },
+                "display_order": 9
+            },
         ]
         
         created_count = 0

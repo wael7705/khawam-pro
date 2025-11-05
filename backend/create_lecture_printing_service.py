@@ -1,160 +1,146 @@
 """
-إنشاء خدمة طباعة المحاضرات مع workflow كامل
+إنشاء خدمة طباعة محاضرات مع workflow بخمس مراحل
 """
-from sqlalchemy import text
-from database import engine
+import os
+import sys
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("Error: DATABASE_URL not found in environment")
+    sys.exit(1)
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
 
 def create_lecture_printing_service():
-    """إنشاء خدمة طباعة المحاضرات و workflow"""
-    conn = engine.connect()
-    
+    """إنشاء خدمة طباعة محاضرات مع workflow"""
+    db = SessionLocal()
     try:
         # 1. إنشاء الخدمة
-        print("📝 إنشاء خدمة طباعة المحاضرات...")
+        print("\nCreating lecture printing service...")
+        service_result = db.execute(text("""
+            INSERT INTO services (name_en, name_ar, description_ar, description_en, icon, base_price, is_active, is_visible, display_order)
+            VALUES ('Lecture Printing Service', 'طباعة محاضرات', 'طباعة المحاضرات والملخصات الدراسية', 'Printing lectures and study materials', '📚', 0, true, true, 1)
+            ON CONFLICT DO NOTHING
+            RETURNING id
+        """))
         
-        # التحقق من وجود الخدمة
-        existing = conn.execute(text("""
-            SELECT id FROM services WHERE name_ar = 'طباعة المحاضرات'
-        """)).fetchone()
-        
-        if existing:
-            service_id = existing[0]
-            print(f"✅ الخدمة موجودة بالفعل (ID: {service_id})")
+        service_row = service_result.fetchone()
+        if service_row:
+            service_id = service_row[0]
+            print(f"Success: Service created with ID: {service_id}")
         else:
-            # إنشاء الخدمة
-            result = conn.execute(text("""
-                INSERT INTO services (name_ar, name_en, description_ar, description_en, 
-                                     icon, base_price, is_active, is_visible, display_order)
-                VALUES ('طباعة المحاضرات', 'Lecture Printing', 
-                       'خدمة طباعة المحاضرات والملفات التعليمية', 
-                       'Lecture and educational files printing service',
-                       '📄', 0, true, true, 1)
-                RETURNING id
-            """))
-            service_id = result.fetchone()[0]
-            conn.commit()
-            print(f"✅ تم إنشاء الخدمة (ID: {service_id})")
+            # جلب الخدمة الموجودة
+            existing_service = db.execute(text("""
+                SELECT id FROM services WHERE name_ar = 'طباعة محاضرات' LIMIT 1
+            """)).fetchone()
+            if existing_service:
+                service_id = existing_service[0]
+                print(f"Service already exists with ID: {service_id}")
+            else:
+                print("Error: Failed to create service")
+                db.rollback()
+                return
         
-        # 2. حذف workflow القديم إن وجد
-        conn.execute(text("""
+        db.commit()
+        
+        # 2. إنشاء workflow بخمس مراحل
+        print("\nCreating workflow with 5 steps...")
+        
+        # حذف workflow القديم إذا كان موجوداً
+        db.execute(text("""
             DELETE FROM service_workflows WHERE service_id = :service_id
         """), {"service_id": service_id})
-        conn.commit()
-        print("🗑️ تم حذف workflow القديم إن وجد")
         
-        # 3. إنشاء workflow steps
-        import json
+        # المرحلة 1: رفع الملفات وعدد النسخ
+        db.execute(text("""
+            INSERT INTO service_workflows (service_id, step_number, step_type, step_name_ar, step_description_ar, step_config)
+            VALUES (:service_id, 1, 'files', 'رفع الملفات وعدد النسخ', 'قم برفع ملفات PDF أو Word للمحاضرات واختر عدد النسخ', 
+                   '{"accept": "application/pdf,.pdf,.doc,.docx", "multiple": true, "analyze_pages": true, "show_quantity": true}'::jsonb)
+        """), {"service_id": service_id})
         
-        workflow_steps = [
-            {
-                "step_number": 1,
-                "step_name_ar": "الكمية ورفع الملفات",
-                "step_name_en": "Quantity and Files Upload",
-                "step_description_ar": "أدخل الكمية وارفع ملفات المحاضرة. سيتم تحليل عدد الصفحات تلقائياً",
-                "step_type": "files",
-                "step_config": {
-                    "required": True,
-                    "accept": "application/pdf,.pdf",
-                    "multiple": True,
-                    "analyze_pages": True,
-                    "show_quantity": True
-                }
-            },
-            {
-                "step_number": 2,
-                "step_name_ar": "خيارات الطباعة",
-                "step_name_en": "Print Options",
-                "step_description_ar": "اختر نوع الطباعة وجودتها وقياس الورق",
-                "step_type": "print_options",
-                "step_config": {
-                    "required": True,
-                    "paper_sizes": ["A4", "A5"],
-                    "print_types": ["bw", "color"],
-                    "quality_options": {
-                        "color": ["standard", "laser"]
-                    }
-                }
-            },
-            {
-                "step_number": 3,
-                "step_name_ar": "عدد الوجوه",
-                "step_name_en": "Print Sides",
-                "step_description_ar": "اختر إذا كنت تريد طباعة وجه واحد أم وجهين",
-                "step_type": "print_sides",
-                "step_config": {
-                    "required": True,
-                    "options": ["single", "double"]
-                }
-            },
-            {
-                "step_number": 4,
-                "step_name_ar": "معلومات التواصل",
-                "step_name_en": "Contact Information",
-                "step_type": "customer_info",
-                "step_config": {
-                    "required": True,
-                    "fields": ["name", "phone", "whatsapp_optional"]
-                }
-            },
-            {
-                "step_number": 5,
-                "step_name_ar": "طريقة الاستلام",
-                "step_name_en": "Delivery Method",
-                "step_type": "delivery",
-                "step_config": {
-                    "required": True,
-                    "options": ["self", "delivery"],
-                    "require_location": True
-                }
-            },
-            {
-                "step_number": 6,
-                "step_name_ar": "الفاتورة والتأكيد",
-                "step_name_en": "Invoice and Confirmation",
-                "step_type": "invoice",
-                "step_config": {
-                    "show_summary": True,
-                    "show_total": True
-                }
-            }
-        ]
+        # المرحلة 2: إعدادات الطباعة
+        db.execute(text("""
+            INSERT INTO service_workflows (service_id, step_number, step_type, step_name_ar, step_description_ar, step_config)
+            VALUES (:service_id, 2, 'print_options', 'إعدادات الطباعة', 'اختر قياس الورقة ونوع الطباعة', 
+                   '{"fields": ["paper_size", "print_color", "print_quality", "print_sides"]}'::jsonb)
+        """), {"service_id": service_id})
         
-        for step in workflow_steps:
-            conn.execute(text("""
-                INSERT INTO service_workflows 
-                (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-                 step_description_en, step_type, step_config, display_order, is_active)
-                VALUES 
-                (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-                 :step_description_en, :step_type, :step_config::jsonb, :display_order, :is_active)
-            """), {
-                "service_id": service_id,
-                "step_number": step["step_number"],
-                "step_name_ar": step["step_name_ar"],
-                "step_name_en": step["step_name_en"],
-                "step_description_ar": step.get("step_description_ar"),
-                "step_description_en": step.get("step_description_en"),
-                "step_type": step["step_type"],
-                "step_config": json.dumps(step["step_config"]),
-                "display_order": step["step_number"],
-                "is_active": True
-            })
+        # المرحلة 3: معلومات العميل والتوصيل
+        db.execute(text("""
+            INSERT INTO service_workflows (service_id, step_number, step_type, step_name_ar, step_description_ar, step_config)
+            VALUES (:service_id, 3, 'customer_info', 'معلومات العميل', 'أدخل معلوماتك واختر طريقة الاستلام', 
+                   '{"fields": ["whatsapp_optional"], "required": true}'::jsonb)
+        """), {"service_id": service_id})
         
-        conn.commit()
-        print(f"✅ تم إنشاء {len(workflow_steps)} مرحلة workflow")
-        print(f"✅ خدمة طباعة المحاضرات جاهزة (Service ID: {service_id})")
+        # المرحلة 4: الفاتورة
+        db.execute(text("""
+            INSERT INTO service_workflows (service_id, step_number, step_type, step_name_ar, step_description_ar, step_config)
+            VALUES (:service_id, 4, 'invoice', 'الفاتورة', 'مراجعة الطلب والتأكيد', '{}'::jsonb)
+        """), {"service_id": service_id})
         
-        return service_id
+        # المرحلة 5: الملاحظات (اختياري)
+        db.execute(text("""
+            INSERT INTO service_workflows (service_id, step_number, step_type, step_name_ar, step_description_ar, step_config)
+            VALUES (:service_id, 5, 'notes', 'ملاحظات', 'أضف أي ملاحظات إضافية (اختياري)', '{"required": false}'::jsonb)
+        """), {"service_id": service_id})
+        
+        db.commit()
+        print("Success: Workflow created with 5 steps")
+        
+        # 3. التحقق من ظهور الخدمة
+        print("\nVerifying service visibility...")
+        verification = db.execute(text("""
+            SELECT id, name_ar, is_visible, is_active, display_order 
+            FROM services 
+            WHERE name_ar = 'طباعة محاضرات'
+        """)).fetchone()
+        
+        if verification:
+            service_id, name_ar, is_visible, is_active, display_order = verification
+            print(f"Service found:")
+            print(f"   ID: {service_id}")
+            print(f"   Name: {name_ar}")
+            print(f"   Visible: {is_visible}")
+            print(f"   Active: {is_active}")
+            print(f"   Display Order: {display_order}")
+            
+            if not is_visible or not is_active:
+                print("\nWarning: Service is not visible or not active!")
+                print("   Fixing...")
+                db.execute(text("""
+                    UPDATE services 
+                    SET is_visible = true, is_active = true 
+                    WHERE id = :id
+                """), {"id": service_id})
+                db.commit()
+                print("Fixed: Service is now visible and active")
+        else:
+            print("Error: Service not found after creation!")
+        
+        print("\n" + "="*60)
+        print("Success: Lecture printing service created!")
+        print(f"   Service ID: {service_id}")
+        print("   Steps:")
+        print("   1. Upload files and number of copies")
+        print("   2. Print settings")
+        print("   3. Customer info and delivery")
+        print("   4. Invoice")
+        print("   5. Notes")
+        print("="*60)
         
     except Exception as e:
-        conn.rollback()
-        print(f"❌ خطأ: {e}")
+        db.rollback()
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
-        raise
     finally:
-        conn.close()
+        db.close()
 
 if __name__ == "__main__":
     create_lecture_printing_service()
-

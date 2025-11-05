@@ -11,8 +11,12 @@ export const LecturePrintingService: ServiceHandler = {
   name: 'طباعة محاضرات',
   
   matches: (serviceName: string, _serviceId?: number) => {
-    return serviceName.includes('محاضرات') || 
-           serviceName.toLowerCase().includes('lecture')
+    const matches = serviceName.includes('محاضرات') || 
+                    serviceName.toLowerCase().includes('lecture')
+    if (matches) {
+      console.log('✅ LecturePrintingService matched:', serviceName)
+    }
+    return matches
   },
   
   renderStep: (_stepNumber: number, stepType: string, stepConfig: any, serviceData: any, handlers: any) => {

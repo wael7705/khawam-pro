@@ -28,9 +28,10 @@ export interface ServiceHandler {
 }
 
 // تسجيل الخدمات
+// ملاحظة: LecturePrintingService يجب أن يكون أولاً لأنه أكثر تحديداً
 const registeredServices: ServiceHandler[] = [
-  PrintingService,
-  LecturePrintingService
+  LecturePrintingService,  // يجب أن يكون أولاً لأنه يطابق على "محاضرات"
+  PrintingService
 ]
 
 /**

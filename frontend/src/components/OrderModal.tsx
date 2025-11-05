@@ -57,6 +57,19 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   
   // Service Handler - منطق الخدمة المحددة
   const serviceHandler = findServiceHandler(serviceName, serviceId)
+  
+  // Debug: للتأكد من أن ServiceHandler يتم العثور عليه
+  useEffect(() => {
+    if (isOpen && serviceName) {
+      console.log('🔍 OrderModal - Service Name:', serviceName, 'Service ID:', serviceId)
+      console.log('🔍 OrderModal - Found Service Handler:', serviceHandler ? serviceHandler.name : 'NULL')
+      if (serviceHandler) {
+        console.log('✅ Using custom service handler:', serviceHandler.id)
+      } else {
+        console.log('⚠️ No custom service handler found, using default rendering')
+      }
+    }
+  }, [isOpen, serviceName, serviceId, serviceHandler])
 
   // Helper function to render step content based on step_type
   const renderStepContent = (currentStep: number) => {
@@ -115,6 +128,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         handleFileUpload: handleImageUpload  // استخدام handleImageUpload الذي يدعم PDF و Word
       }
       
+      console.log('🎨 Calling serviceHandler.renderStep for:', serviceHandler.name, 'Step:', currentStep, 'Type:', stepType)
+      
       const rendered = serviceHandler.renderStep(
         currentStep,
         stepType,
@@ -123,9 +138,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         handlers
       )
       
+      console.log('🎨 ServiceHandler returned:', rendered !== null && rendered !== undefined ? 'JSX Element' : 'NULL/UNDEFINED')
+      
       // إذا كانت الخدمة تعيد JSX element، استخدمه مباشرة
       if (rendered !== null && rendered !== undefined) {
+        console.log('✅ Using custom service handler rendering')
         return rendered
+      } else {
+        console.log('⚠️ Service handler returned null/undefined, falling back to default rendering')
       }
     }
 
@@ -1670,33 +1690,33 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     setIsSubmitting(true)
     
     // Validation checks before try block
-    const safeQuantity = Number(quantity) || 1
-    let safeTotalPrice = Number(totalPrice)
-    
-    // إذا كان السعر 0 أو غير محسوب، نحسبه من القواعد المالية
-    if (!safeTotalPrice || safeTotalPrice === 0) {
+      const safeQuantity = Number(quantity) || 1
+      let safeTotalPrice = Number(totalPrice)
+      
+      // إذا كان السعر 0 أو غير محسوب، نحسبه من القواعد المالية
+      if (!safeTotalPrice || safeTotalPrice === 0) {
       try {
         safeTotalPrice = await calculatePrice() || 0
       } catch (calcError) {
         console.error('Error calculating price:', calcError)
         safeTotalPrice = 0
       }
-    }
-    
-    // التحقق من أن السعر صحيح من القواعد المالية
-    if (!safeTotalPrice || safeTotalPrice === 0) {
-      showError('لا يمكن إنشاء الطلب: السعر = 0. يرجى إضافة قاعدة سعر مناسبة في القواعد المالية.')
-      setIsSubmitting(false)
-      return
-    }
-    
-    const unitPrice = safeTotalPrice / safeQuantity
-    
-    // التأكد من أن unitPrice ليس NaN
-    if (isNaN(unitPrice) || unitPrice <= 0) {
-      showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية والكمية.')
-      setIsSubmitting(false)
-      return
+      }
+      
+      // التحقق من أن السعر صحيح من القواعد المالية
+      if (!safeTotalPrice || safeTotalPrice === 0) {
+        showError('لا يمكن إنشاء الطلب: السعر = 0. يرجى إضافة قاعدة سعر مناسبة في القواعد المالية.')
+        setIsSubmitting(false)
+        return
+      }
+      
+      const unitPrice = safeTotalPrice / safeQuantity
+      
+      // التأكد من أن unitPrice ليس NaN
+      if (isNaN(unitPrice) || unitPrice <= 0) {
+        showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية والكمية.')
+        setIsSubmitting(false)
+        return
     }
     
     try {
@@ -1800,19 +1820,19 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               design_files: imageUrl ? [imageUrl] : []
             }
           ],
-          total_amount: safeTotalPrice,
-          final_amount: safeTotalPrice,
-          delivery_type: deliveryType,
-          delivery_address: deliveryType === 'delivery' 
-            ? (deliveryAddress?.street || shopName || null)
-            : null,
-          delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude 
-            ? deliveryAddress.latitude 
-            : null,
-          delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude 
-            ? deliveryAddress.longitude 
-            : null,
-          notes: notes || workType || null
+        total_amount: safeTotalPrice,
+        final_amount: safeTotalPrice,
+        delivery_type: deliveryType,
+        delivery_address: deliveryType === 'delivery' 
+          ? (deliveryAddress?.street || shopName || null)
+          : null,
+        delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude 
+          ? deliveryAddress.latitude 
+          : null,
+        delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude 
+          ? deliveryAddress.longitude 
+          : null,
+        notes: notes || workType || null
         }
       }
 

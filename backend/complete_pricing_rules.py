@@ -4,6 +4,7 @@
 """
 import os
 import sys
+import json
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -12,7 +13,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    print("❌ DATABASE_URL not found in environment")
+    print("Error: DATABASE_URL not found in environment")
     sys.exit(1)
 
 engine = create_engine(DATABASE_URL)
@@ -22,7 +23,7 @@ def complete_pricing_rules():
     """إكمال القواعد المالية للطباعة"""
     db = SessionLocal()
     try:
-        print("\n📊 Starting pricing rules completion...")
+        print("\nStarting pricing rules completion...")
         
         # قواعد الطباعة المطلوبة
         # ملاحظة: السعر الأساسي = سعر صفحة وجه واحد
@@ -200,15 +201,15 @@ def complete_pricing_rules():
                     """), {
                         "id": rule_id,
                         "base_price": rule["base_price"],
-                        "specifications": str(rule["specifications"]).replace("'", '"'),
+                        "specifications": json.dumps(rule["specifications"], ensure_ascii=False),
                         "unit": rule["unit"],
                         "display_order": rule["display_order"]
                     })
                     updated_count += 1
-                    print(f"✅ Updated: {rule['name_ar']} (ID: {rule_id}) - Price: {rule['base_price']}")
+                    print(f"Updated: {rule['name_ar']} (ID: {rule_id}) - Price: {rule['base_price']}")
                 else:
                     skipped_count += 1
-                    print(f"⏭️  Skipped: {rule['name_ar']} (already exists)")
+                    print(f"Skipped: {rule['name_ar']} (already exists)")
             else:
                 # إنشاء قاعدة جديدة
                 result = db.execute(text("""
@@ -226,33 +227,33 @@ def complete_pricing_rules():
                     "description_en": rule["description_en"],
                     "calculation_type": rule["calculation_type"],
                     "base_price": rule["base_price"],
-                    "specifications": str(rule["specifications"]).replace("'", '"'),
+                    "specifications": json.dumps(rule["specifications"], ensure_ascii=False),
                     "unit": rule["unit"],
                     "display_order": rule["display_order"]
                 })
                 
                 rule_id = result.fetchone()[0]
                 created_count += 1
-                print(f"✅ Created: {rule['name_ar']} (ID: {rule_id}) - Price: {rule['base_price']}")
+                print(f"Created: {rule['name_ar']} (ID: {rule_id}) - Price: {rule['base_price']}")
         
         db.commit()
         
         print("\n" + "="*60)
-        print("📊 Pricing Rules Summary:")
-        print(f"   ✅ Created: {created_count}")
-        print(f"   🔄 Updated: {updated_count}")
-        print(f"   ⏭️  Skipped: {skipped_count}")
-        print(f"   📋 Total: {len(pricing_rules)}")
+        print("Pricing Rules Summary:")
+        print(f"   Created: {created_count}")
+        print(f"   Updated: {updated_count}")
+        print(f"   Skipped: {skipped_count}")
+        print(f"   Total: {len(pricing_rules)}")
         print("="*60)
-        print("\n💡 Important Notes:")
+        print("\nImportant Notes:")
         print("   - Base price = single side price")
-        print("   - Double side = base price × 2 (calculated automatically)")
+        print("   - Double side = base price x 2 (calculated automatically)")
         print("   - No need for separate rules for single/double sides")
-        print("\n✅ Pricing rules completed successfully!")
+        print("\nPricing rules completed successfully!")
         
     except Exception as e:
         db.rollback()
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
     finally:

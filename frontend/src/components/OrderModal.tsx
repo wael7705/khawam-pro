@@ -5,6 +5,7 @@ import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } fro
 import api from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
+import ImageColorAnalyzer from './ImageColorAnalyzer'
 import { findServiceHandler } from '../services/serviceRegistry'
 import { getUserData } from '../lib/auth'
 import './OrderModal.css'

@@ -1636,6 +1636,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               if (formState.numberOfPages !== undefined) setNumberOfPages(formState.numberOfPages)
               if (formState.paperSize !== undefined) setPaperSize(formState.paperSize)
               if (formState.totalPages !== undefined) setTotalPages(formState.totalPages)
+              if (formState.paperType !== undefined) setPaperType(formState.paperType)
               
               // Restore delivery type
               if (formState.deliveryType === 'delivery') {

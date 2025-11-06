@@ -536,24 +536,42 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                     "hide_pages": True,
                     "hide_print_type": True,
                     "field_labels": {
-                        "length": "الارتفاع",
-                        "width": "العرض"
+                        "width": "العرض",
+                        "height": "الارتفاع"
                     }
                 }
             },
             {
                 "step_number": 3,
+                "step_name_ar": "نوع الطباعة",
+                "step_name_en": "Print Type",
+                "step_description_ar": "اختر نوع الطباعة (ملون إجباري)",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "force_color": True,
+                    "quality_options": {
+                        "standard": "طباعة عادية",
+                        "uv": "دقة عالية (UV)"
+                    },
+                    "hide_paper_size": True,
+                    "hide_print_sides": True
+                }
+            },
+            {
+                "step_number": 4,
                 "step_name_ar": "اختيار الألوان",
                 "step_name_en": "Color Selection",
                 "step_description_ar": "اختر الألوان المطلوبة للتصميم",
                 "step_type": "colors",
                 "step_config": {
                     "required": False,
-                    "maxColors": 6
+                    "maxColors": 6,
+                    "enable_image_color_analysis": True
                 }
             },
             {
-                "step_number": 4,
+                "step_number": 5,
                 "step_name_ar": "ملاحظات إضافية",
                 "step_name_en": "Additional Notes",
                 "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
@@ -564,7 +582,7 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                 }
             },
             {
-                "step_number": 5,
+                "step_number": 6,
                 "step_name_ar": "معلومات العميل والاستلام",
                 "step_name_en": "Customer Info and Delivery",
                 "step_description_ar": "معلوماتك واختيار نوع الاستلام",
@@ -575,7 +593,7 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                 }
             },
             {
-                "step_number": 6,
+                "step_number": 7,
                 "step_name_ar": "الفاتورة والملخص",
                 "step_name_en": "Invoice and Summary",
                 "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",

@@ -904,13 +904,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   type="button"
                   onClick={() => {
                     localStorage.setItem('orderFormState', JSON.stringify({
-                      step,
+                      step: step, // حفظ المرحلة الحالية
                       quantity,
                       length,
                       width,
                       height,
                       unit,
                       selectedColors,
+                      autoExtractedColors,
                       workType,
                       notes,
                       customerName,
@@ -924,6 +925,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       paperSize,
                       numberOfPages,
                       totalPages,
+                      paperType,
+                      serviceName,
                       uploadedFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type }))
                     }))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
@@ -982,22 +985,34 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   type="button"
                   onClick={() => {
                     localStorage.setItem('orderFormState', JSON.stringify({
-                      step,
+                      step: step, // حفظ المرحلة الحالية
                       quantity,
                       length,
                       width,
                       height,
                       unit,
                       selectedColors,
+                      autoExtractedColors,
                       workType,
                       notes,
                       customerName,
                       customerWhatsApp,
+                      customerPhoneExtra,
                       shopName,
                       deliveryType,
                       printColor,
+                      printQuality,
                       printSides,
-                      numberOfPages
+                      paperSize,
+                      numberOfPages,
+                      totalPages,
+                      paperType,
+                      serviceName,
+                      uploadedFiles: uploadedFiles.map(f => ({ 
+                        name: f.name, 
+                        size: f.size, 
+                        type: f.type 
+                      }))
                     }))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
                     localStorage.setItem('orderModalService', serviceName)
@@ -1429,22 +1444,34 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   type="button"
                   onClick={() => {
                     localStorage.setItem('orderFormState', JSON.stringify({
-                      step,
+                      step: step, // حفظ المرحلة الحالية
                       quantity,
                       length,
                       width,
                       height,
                       unit,
                       selectedColors,
+                      autoExtractedColors,
                       workType,
                       notes,
                       customerName,
                       customerWhatsApp,
+                      customerPhoneExtra,
                       shopName,
                       deliveryType,
                       printColor,
+                      printQuality,
                       printSides,
-                      numberOfPages
+                      paperSize,
+                      numberOfPages,
+                      totalPages,
+                      paperType,
+                      serviceName,
+                      uploadedFiles: uploadedFiles.map(f => ({ 
+                        name: f.name, 
+                        size: f.size, 
+                        type: f.type 
+                      }))
                     }))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
                     localStorage.setItem('orderModalService', serviceName)
@@ -1964,23 +1991,38 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     if (type === 'self') {
       setAddressConfirmed(false)
     } else if (type === 'delivery') {
-      // Save current form state including current step
+      // Save current form state including current step and all fields
+      // IMPORTANT: Save the CURRENT step number so we return to the same step
       localStorage.setItem('orderFormState', JSON.stringify({
-        step,
+        step: step, // حفظ المرحلة الحالية
         quantity,
         length,
         width,
         height,
         unit,
         selectedColors,
+        autoExtractedColors, // حفظ الألوان المستخرجة تلقائياً
         workType,
         notes,
         customerName,
         customerWhatsApp,
+        customerPhoneExtra,
         shopName,
         deliveryType: 'delivery',
         serviceName,
-        totalPrice
+        totalPrice,
+        printColor,
+        printQuality,
+        printSides,
+        paperSize,
+        numberOfPages,
+        totalPages,
+        paperType,
+        uploadedFiles: uploadedFiles.map(f => ({ 
+          name: f.name, 
+          size: f.size, 
+          type: f.type 
+        }))
       }))
       // Navigate to location picker
       navigate('/location-picker', { 

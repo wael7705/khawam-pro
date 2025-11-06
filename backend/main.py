@@ -339,13 +339,14 @@ async def _setup_lecture_printing_service():
         
         for workflow in workflows:
             try:
+                step_config_json = json.dumps(workflow["step_config"])
                 result = conn.execute(text("""
                     INSERT INTO service_workflows 
                     (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
                      step_type, step_config, display_order, is_active)
                     VALUES 
                     (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-                     :step_type, :step_config::jsonb, :display_order, :is_active)
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
                 """), {
                     "service_id": service_id,
                     "step_number": workflow["step_number"],
@@ -353,13 +354,15 @@ async def _setup_lecture_printing_service():
                     "step_name_en": workflow["step_name_en"],
                     "step_description_ar": workflow["step_description_ar"],
                     "step_type": workflow["step_type"],
-                    "step_config": json.dumps(workflow["step_config"]),
+                    "step_config": step_config_json,
                     "display_order": workflow["step_number"],
                     "is_active": True
                 })
                 print(f"  ✅ Added step {workflow['step_number']}: {workflow['step_name_ar']} ({workflow['step_type']})")
             except Exception as step_error:
-                print(f"  ❌ Error adding step {workflow['step_number']}: {str(step_error)[:100]}")
+                print(f"  ❌ Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
         
         conn.commit()
         print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة المحاضرات (Service ID: {service_id})")

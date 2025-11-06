@@ -400,13 +400,16 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
         for workflow in workflows:
             try:
                 print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                step_config_json = json.dumps(workflow["step_config"])
+                print(f"  📝 [SETUP] Step config JSON: {step_config_json[:100]}...")
+                
                 db.execute(text("""
                     INSERT INTO service_workflows 
                     (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
                      step_type, step_config, display_order, is_active)
                     VALUES 
                     (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-                     :step_type, :step_config::jsonb, :display_order, :is_active)
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
                 """), {
                     "service_id": service_id,
                     "step_number": workflow["step_number"],
@@ -414,13 +417,15 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
                     "step_name_en": workflow["step_name_en"],
                     "step_description_ar": workflow["step_description_ar"],
                     "step_type": workflow["step_type"],
-                    "step_config": json.dumps(workflow["step_config"]),
+                    "step_config": step_config_json,
                     "display_order": workflow["step_number"],
                     "is_active": True
                 })
                 print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
             except Exception as step_error:
                 print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
                 raise
         
         db.commit()

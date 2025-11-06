@@ -532,9 +532,13 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                 "step_type": "dimensions",
                 "step_config": {
                     "required": True,
-                    "fields": ["length", "width"],
+                    "fields": ["width", "height"],
                     "hide_pages": True,
-                    "hide_print_type": True
+                    "hide_print_type": True,
+                    "field_labels": {
+                        "length": "الارتفاع",
+                        "width": "العرض"
+                    }
                 }
             },
             {

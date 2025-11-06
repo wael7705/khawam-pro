@@ -1,0 +1,93 @@
+.image-color-analyzer {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.analyzer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.analyzer-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.analyzing-badge {
+  margin-right: auto;
+  padding: 4px 12px;
+  background: #3182ce;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.extracted-colors {
+  margin-top: 12px;
+}
+
+.extracted-colors-label {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.extracted-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.extracted-color-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.extracted-color-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-color: #3182ce;
+}
+
+.extracted-color-item .color-code {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  color: #1a202c;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.extracted-colors-hint {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: #718096;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .extracted-colors-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+

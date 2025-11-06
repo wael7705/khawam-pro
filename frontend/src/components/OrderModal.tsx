@@ -269,7 +269,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             )}
             {fields.includes('length') && (
               <div className="form-group">
-                <label>الطول {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <label>
+                  {stepConfig.field_labels?.length || stepConfig.field_labels?.length === 'الارتفاع' ? 'الارتفاع' : 'الطول'} 
+                  {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}
+                </label>
                 <input
                   type="number"
                   value={length}
@@ -282,7 +285,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             )}
             {fields.includes('width') && (
               <div className="form-group">
-                <label>العرض {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <label>
+                  {stepConfig.field_labels?.width || 'العرض'} 
+                  {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}
+                </label>
                 <input
                   type="number"
                   value={width}
@@ -295,7 +301,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             )}
             {fields.includes('height') && !stepConfig.hide_height && (
               <div className="form-group">
-                <label>الارتفاع {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <label>
+                  {stepConfig.field_labels?.height || 'الارتفاع'} 
+                  {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}
+                </label>
                 <input
                   type="number"
                   value={height}
@@ -348,9 +357,31 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       case 'colors':
         return (
           <div className="modal-body">
-            <h3>{workflowStep.step_name_ar}</h3>
+            <h3>
+              {workflowStep.step_name_ar}
+              {!stepConfig.required && (
+                <span className="optional" style={{ marginRight: '10px', fontSize: '0.9rem', fontWeight: 'normal' }}>
+                  (اختياري)
+                </span>
+              )}
+            </h3>
             {workflowStep.step_description_ar && (
               <p className="step-description">{workflowStep.step_description_ar}</p>
+            )}
+            {stepConfig.enable_image_color_analysis && uploadedFiles.length > 0 && (
+              <ImageColorAnalyzer 
+                files={uploadedFiles}
+                onColorsExtracted={(colors) => {
+                  // إضافة الألوان المستخرجة إلى الألوان المختارة
+                  const newColors = [...selectedColors]
+                  colors.forEach((color: string) => {
+                    if (!newColors.includes(color) && newColors.length < (stepConfig.maxColors || 6)) {
+                      newColors.push(color)
+                    }
+                  })
+                  setSelectedColors(newColors)
+                }}
+              />
             )}
             <ColorPicker
               selectedColors={selectedColors}
@@ -482,61 +513,116 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             ) : null}
             
-            {/* نوع الطباعة */}
-            <div className="form-group">
-              <label>نوع الطباعة <span className="required">*</span></label>
-              <div className="delivery-options">
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    name="printColor"
-                    value="bw"
-                    checked={printColor === 'bw'}
-                    onChange={(e) => {
-                      setPrintColor(e.target.value as 'bw' | 'color')
-                      setPrintQuality('standard') // Reset quality when switching to BW
-                    }}
-                  />
-                  <span>أبيض وأسود</span>
-                </label>
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    name="printColor"
-                    value="color"
-                    checked={printColor === 'color'}
-                    onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
-                  />
-                  <span>ملون</span>
-                </label>
-              </div>
-            </div>
-            
-            {/* خيارات الجودة للملون فقط */}
-            {printColor === 'color' && stepConfig.quality_options?.color && (
+            {/* نوع الطباعة - إذا كان force_color = true، لا نعرض خيار أبيض/ملون */}
+            {!stepConfig.force_color && (
               <div className="form-group">
-                <label>جودة الطباعة <span className="required">*</span></label>
+                <label>نوع الطباعة <span className="required">*</span></label>
                 <div className="delivery-options">
                   <label className="radio-option">
                     <input
                       type="radio"
-                      name="printQuality"
-                      value="standard"
-                      checked={printQuality === 'standard'}
-                      onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'laser')}
+                      name="printColor"
+                      value="bw"
+                      checked={printColor === 'bw'}
+                      onChange={(e) => {
+                        setPrintColor(e.target.value as 'bw' | 'color')
+                        setPrintQuality('standard') // Reset quality when switching to BW
+                      }}
                     />
-                    <span>طباعة عادية</span>
+                    <span>أبيض وأسود</span>
                   </label>
                   <label className="radio-option">
                     <input
                       type="radio"
-                      name="printQuality"
-                      value="laser"
-                      checked={printQuality === 'laser'}
-                      onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'laser')}
+                      name="printColor"
+                      value="color"
+                      checked={printColor === 'color'}
+                      onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
                     />
-                    <span>دقة عالية (ليزرية)</span>
+                    <span>ملون</span>
                   </label>
+                </div>
+              </div>
+            )}
+            
+            {/* إذا كان force_color = true، نضبط printColor تلقائياً على 'color' */}
+            {stepConfig.force_color && (
+              useEffect(() => {
+                if (printColor !== 'color') {
+                  setPrintColor('color')
+                }
+              }, [stepConfig.force_color])
+            )}
+            
+            {/* خيارات الجودة - للملون فقط أو إذا كان force_color = true */}
+            {(printColor === 'color' || stepConfig.force_color) && stepConfig.quality_options && (
+              <div className="form-group">
+                <label>نوع الطباعة <span className="required">*</span></label>
+                <div className="delivery-options">
+                  {stepConfig.quality_options.standard && (
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printQuality"
+                        value="standard"
+                        checked={printQuality === 'standard'}
+                        onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                      />
+                      <span>{stepConfig.quality_options.standard}</span>
+                    </label>
+                  )}
+                  {stepConfig.quality_options.uv && (
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printQuality"
+                        value="uv"
+                        checked={printQuality === 'uv'}
+                        onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                      />
+                      <span>{stepConfig.quality_options.uv}</span>
+                    </label>
+                  )}
+                  {stepConfig.quality_options.laser && (
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printQuality"
+                        value="laser"
+                        checked={printQuality === 'laser'}
+                        onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                      />
+                      <span>{stepConfig.quality_options.laser}</span>
+                    </label>
+                  )}
+                  {stepConfig.quality_options.color && typeof stepConfig.quality_options.color === 'object' && (
+                    <>
+                      {stepConfig.quality_options.color.standard && (
+                        <label className="radio-option">
+                          <input
+                            type="radio"
+                            name="printQuality"
+                            value="standard"
+                            checked={printQuality === 'standard'}
+                            onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                          />
+                          <span>{stepConfig.quality_options.color.standard}</span>
+                        </label>
+                      )}
+                      {stepConfig.quality_options.color.laser && (
+                        <label className="radio-option">
+                          <input
+                            type="radio"
+                            name="printQuality"
+                            value="laser"
+                            checked={printQuality === 'laser'}
+                            onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                          />
+                          <span>{stepConfig.quality_options.color.laser}</span>
+                        </label>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}

@@ -380,20 +380,49 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             {workflowStep.step_description_ar && (
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
-            {stepConfig.enable_image_color_analysis && uploadedFiles.length > 0 && (
-              <ImageColorAnalyzer 
-                files={uploadedFiles}
-                onColorsExtracted={(colors) => {
-                  // إضافة الألوان المستخرجة إلى الألوان المختارة
-                  const newColors = [...selectedColors]
-                  colors.forEach((color: string) => {
-                    if (!newColors.includes(color) && newColors.length < (stepConfig.maxColors || 6)) {
-                      newColors.push(color)
-                    }
-                  })
-                  setSelectedColors(newColors)
-                }}
-              />
+            {/* عرض الألوان المستخرجة تلقائياً من الصورة المرفوعة في المرحلة الأولى */}
+            {autoExtractedColors.length > 0 && (
+              <div style={{ marginBottom: '20px', padding: '15px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                <p style={{ margin: '0 0 10px 0', fontWeight: 600, color: '#0369a1' }}>
+                  الألوان المستخرجة من الصورة المرفوعة:
+                </p>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {autoExtractedColors.map((color, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        width: '50px',
+                        height: '50px',
+                        backgroundColor: color,
+                        borderRadius: '8px',
+                        border: selectedColors.includes(color) ? '3px solid #10b981' : '2px solid #e5e7eb',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      title={color}
+                      onClick={() => {
+                        if (selectedColors.includes(color)) {
+                          setSelectedColors(selectedColors.filter(c => c !== color))
+                        } else {
+                          if (selectedColors.length < (stepConfig.maxColors || 6)) {
+                            setSelectedColors([...selectedColors, color])
+                          }
+                        }
+                      }}
+                    >
+                      {selectedColors.includes(color) && (
+                        <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>✓</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p style={{ margin: '10px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                  اضغط على أي لون لإضافته أو إزالته من الألوان المختارة
+                </p>
+              </div>
             )}
             <ColorPicker
               selectedColors={selectedColors}

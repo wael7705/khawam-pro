@@ -343,8 +343,10 @@ export const LecturePrintingService: ServiceHandler = {
                   type="button"
                   onClick={() => {
                     // حفظ الحالة الكاملة والعودة بعد اختيار العنوان
+                    // الحصول على المرحلة الحالية من serviceData
+                    const currentStep = serviceData.step || 4 // المرحلة الحالية (معلومات العميل)
                     const formState = {
-                      step: serviceData.step || 4, // المرحلة الحالية (معلومات العميل)
+                      step: currentStep, // حفظ المرحلة الحالية بدقة
                       quantity: serviceData.quantity || 1,
                       totalPages: serviceData.totalPages || 0,
                       paperSize: serviceData.paperSize || 'A4',
@@ -355,6 +357,8 @@ export const LecturePrintingService: ServiceHandler = {
                       customerName: serviceData.customerName || '',
                       customerWhatsApp: serviceData.customerWhatsApp || '',
                       customerPhoneExtra: serviceData.customerPhoneExtra || '',
+                      selectedColors: serviceData.selectedColors || [],
+                      autoExtractedColors: serviceData.autoExtractedColors || [],
                       deliveryType: 'delivery',
                       serviceName: 'طباعة محاضرات',
                       uploadedFiles: serviceData.uploadedFiles?.map((f: File) => ({ 

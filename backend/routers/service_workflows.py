@@ -537,7 +537,7 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                     "hide_print_type": True,
                     "field_labels": {
                         "width": "العرض",
-                        "height": "الارتفاع"
+                        "height": "الطول"
                     }
                 }
             },

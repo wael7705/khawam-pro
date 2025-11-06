@@ -32,6 +32,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [height, setHeight] = useState('')
   const [unit, setUnit] = useState('cm')
   const [selectedColors, setSelectedColors] = useState<string[]>([])
+  const [autoExtractedColors, setAutoExtractedColors] = useState<string[]>([]) // الألوان المستخرجة تلقائياً من الصورة
   const [workType, setWorkType] = useState('')
   const [notes, setNotes] = useState('')
   const [customerName, setCustomerName] = useState('')
@@ -1685,6 +1686,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               if (formState.height !== undefined) setHeight(formState.height)
               if (formState.unit !== undefined) setUnit(formState.unit)
               if (formState.selectedColors !== undefined) setSelectedColors(formState.selectedColors)
+              if (formState.autoExtractedColors !== undefined) setAutoExtractedColors(formState.autoExtractedColors)
               if (formState.workType !== undefined) setWorkType(formState.workType)
               if (formState.notes !== undefined) setNotes(formState.notes)
               if (formState.customerName !== undefined) setCustomerName(formState.customerName)

@@ -559,34 +559,34 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             
             {/* نوع الطباعة - إذا كان force_color = true، لا نعرض خيار أبيض/ملون */}
             {!stepConfig.force_color && (
-              <div className="form-group">
-                <label>نوع الطباعة <span className="required">*</span></label>
-                <div className="delivery-options">
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="printColor"
-                      value="bw"
-                      checked={printColor === 'bw'}
-                      onChange={(e) => {
-                        setPrintColor(e.target.value as 'bw' | 'color')
-                        setPrintQuality('standard') // Reset quality when switching to BW
-                      }}
-                    />
-                    <span>أبيض وأسود</span>
-                  </label>
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="printColor"
-                      value="color"
-                      checked={printColor === 'color'}
-                      onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
-                    />
-                    <span>ملون</span>
-                  </label>
-                </div>
+            <div className="form-group">
+              <label>نوع الطباعة <span className="required">*</span></label>
+              <div className="delivery-options">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printColor"
+                    value="bw"
+                    checked={printColor === 'bw'}
+                    onChange={(e) => {
+                      setPrintColor(e.target.value as 'bw' | 'color')
+                      setPrintQuality('standard') // Reset quality when switching to BW
+                    }}
+                  />
+                  <span>أبيض وأسود</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="printColor"
+                    value="color"
+                    checked={printColor === 'color'}
+                    onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')}
+                  />
+                  <span>ملون</span>
+                </label>
               </div>
+            </div>
             )}
             
             {/* خيارات الجودة - للملون فقط أو إذا كان force_color = true */}
@@ -595,16 +595,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <label>نوع الطباعة <span className="required">*</span></label>
                 <div className="delivery-options">
                   {stepConfig.quality_options.standard && (
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printQuality"
-                        value="standard"
-                        checked={printQuality === 'standard'}
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="printQuality"
+                      value="standard"
+                      checked={printQuality === 'standard'}
                         onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
-                      />
+                    />
                       <span>{stepConfig.quality_options.standard}</span>
-                    </label>
+                  </label>
                   )}
                   {stepConfig.quality_options.uv && (
                     <label className="radio-option">
@@ -619,16 +619,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     </label>
                   )}
                   {stepConfig.quality_options.laser && (
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printQuality"
-                        value="laser"
-                        checked={printQuality === 'laser'}
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="printQuality"
+                      value="laser"
+                      checked={printQuality === 'laser'}
                         onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
-                      />
+                    />
                       <span>{stepConfig.quality_options.laser}</span>
-                    </label>
+                  </label>
                   )}
                   {stepConfig.quality_options.color && typeof stepConfig.quality_options.color === 'object' && (
                     <>
@@ -1121,8 +1121,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                                  paperType === 'perforated' ? 'فينيل مثقب' :
                                  paperType}
                               </span>
-                            </div>
-                          )}
+                </div>
+              )}
               <div className="invoice-item">
                 <span>نوع الطباعة:</span>
                 <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>
@@ -1570,7 +1570,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               console.log('⚠️ Flex printing workflows count mismatch. Expected 7, found:', sortedWorkflows.length)
               console.log('🔧 Re-setting up flex printing service workflows...')
               try {
-                const setupResponse = await api.post('/workflows/setup-flex-printing')
+                const setupResponse = await workflowsAPI.setupFlexPrinting()
                 console.log('🔧 Setup response:', setupResponse.data)
                 
                 if (setupResponse.data.success) {
@@ -1592,8 +1592,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               }
             } else {
               setWorkflowSteps(sortedWorkflows)
-              // Reset to first step
-              setStep(1)
+            // Reset to first step
+            setStep(1)
             }
           } else {
             console.log('⚠️ No workflows found in response')
@@ -1623,7 +1623,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             } else if (isFlexPrinting) {
               console.log('🔧 Setting up flex printing service workflows...')
               try {
-                const setupResponse = await api.post('/workflows/setup-flex-printing')
+                const setupResponse = await workflowsAPI.setupFlexPrinting()
                 console.log('🔧 Setup response:', setupResponse.data)
                 
                 if (setupResponse.data.success) {
@@ -1641,9 +1641,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 console.error('❌ Error setting up workflows:', setupError)
                 showError('فشل إعداد مراحل الخدمة')
               }
-            } else {
-              // Fallback to default steps if no workflow defined
-              setWorkflowSteps([])
+          } else {
+            // Fallback to default steps if no workflow defined
+            setWorkflowSteps([])
             }
           }
         } catch (error) {
@@ -1677,7 +1677,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 console.log('⚠️ Flex printing workflows count mismatch. Expected 7, found:', sortedWorkflows.length)
                 console.log('🔧 Re-setting up flex printing service workflows...')
                 try {
-                  const setupResponse = await api.post('/workflows/setup-flex-printing')
+                  const setupResponse = await workflowsAPI.setupFlexPrinting()
                   console.log('🔧 Setup response:', setupResponse.data)
                   
                   if (setupResponse.data.success) {
@@ -1687,7 +1687,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       const reloadedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
                       console.log('✅ Loaded workflows after re-setup:', reloadedWorkflows.length, reloadedWorkflows)
                       setWorkflowSteps(reloadedWorkflows)
-                      setStep(1)
+              setStep(1)
                       showSuccess('تم تحديث مراحل الخدمة بنجاح')
                     }
                   }
@@ -1726,8 +1726,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   console.error('❌ Error setting up workflows:', setupError)
                   showError('فشل إعداد مراحل الخدمة')
                 }
-              } else {
-                setWorkflowSteps([])
+            } else {
+              setWorkflowSteps([])
               }
             }
           } else {

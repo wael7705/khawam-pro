@@ -38,7 +38,21 @@ class ServiceWorkflowUpdate(BaseModel):
 @router.get("/service/{service_id}/workflow")
 async def get_service_workflow(service_id: int, db: Session = Depends(get_db)):
     """الحصول على جميع مراحل خدمة معينة"""
+    print("=" * 80)
+    print(f"📥 [GET_WORKFLOW] Request received for service_id={service_id}")
+    print("=" * 80)
+    
     try:
+        # الحصول على اسم الخدمة أولاً
+        service_info = db.execute(text("""
+            SELECT id, name_ar, name_en FROM services WHERE id = :service_id
+        """), {"service_id": service_id}).fetchone()
+        
+        if service_info:
+            print(f"🔍 [GET_WORKFLOW] Service found: ID={service_info[0]}, Name={service_info[1]}")
+        else:
+            print(f"⚠️ [GET_WORKFLOW] Service with ID={service_id} NOT FOUND!")
+        
         result = db.execute(text("""
             SELECT 
                 id, service_id, step_number, step_name_ar, step_name_en,
@@ -67,13 +81,23 @@ async def get_service_workflow(service_id: int, db: Session = Depends(get_db)):
                 "created_at": str(row[11]) if row[11] else None,
                 "updated_at": str(row[12]) if row[12] else None,
             })
+            print(f"  ✅ Step {row[2]}: {row[3]} (type: {row[7]})")
+        
+        print(f"📊 [GET_WORKFLOW] Found {len(workflows)} workflows in database")
+        print("=" * 80)
+        print(f"📤 [GET_WORKFLOW] Returning {len(workflows)} workflows")
+        print("=" * 80)
         
         return {
             "success": True,
             "workflows": workflows
         }
     except Exception as e:
-        print(f"Error getting service workflow: {e}")
+        print("=" * 80)
+        print(f"❌ [GET_WORKFLOW] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
         return {
             "success": False,
             "error": str(e),

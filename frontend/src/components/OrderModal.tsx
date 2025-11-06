@@ -649,37 +649,39 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             )}
             
-            {/* عدد الوجوه */}
-            <div className="form-group">
-              <label>عدد الوجوه <span className="required">*</span></label>
-              <div className="delivery-options">
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    name="printSides"
-                    value="single"
-                    checked={printSides === 'single'}
-                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                  />
-                  <span>وجه واحد</span>
-                </label>
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    name="printSides"
-                    value="double"
-                    checked={printSides === 'double'}
-                    onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                  />
-                  <span>وجهين</span>
-                </label>
+            {/* عدد الوجوه - إخفاء إذا كان hide_print_sides = true */}
+            {!stepConfig.hide_print_sides && (
+              <div className="form-group">
+                <label>عدد الوجوه <span className="required">*</span></label>
+                <div className="delivery-options">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="printSides"
+                      value="single"
+                      checked={printSides === 'single'}
+                      onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                    />
+                    <span>وجه واحد</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name="printSides"
+                      value="double"
+                      checked={printSides === 'double'}
+                      onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                    />
+                    <span>وجهين</span>
+                  </label>
+                </div>
+                {printSides === 'double' && (
+                  <small className="form-hint" style={{ color: '#667eea', marginTop: '8px', display: 'block' }}>
+                    ملاحظة: طباعة وجهين = السعر الأساسي × 2
+                  </small>
+                )}
               </div>
-              {printSides === 'double' && (
-                <small className="form-hint" style={{ color: '#667eea', marginTop: '8px', display: 'block' }}>
-                  ملاحظة: طباعة وجهين = السعر الأساسي × 2
-                </small>
-              )}
-            </div>
+            )}
             
             {/* إخفاء الأبعاد إذا كان hide_dimensions = true */}
             {!stepConfig.hide_dimensions && (

@@ -545,17 +545,18 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                 "step_number": 3,
                 "step_name_ar": "نوع الطباعة",
                 "step_name_en": "Print Type",
-                "step_description_ar": "اختر نوع الطباعة (ملون إجباري)",
+                "step_description_ar": "اختر نوع الطباعة وجودتها",
                 "step_type": "print_options",
                 "step_config": {
                     "required": True,
                     "force_color": True,
                     "quality_options": {
-                        "standard": "طباعة عادية",
+                        "standard": "دقة عادية",
                         "uv": "دقة عالية (UV)"
                     },
                     "hide_paper_size": True,
-                    "hide_print_sides": True
+                    "hide_print_sides": True,
+                    "hide_print_color_choice": True
                 }
             },
             {

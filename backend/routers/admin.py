@@ -355,12 +355,19 @@ async def update_service(service_id: int, service: ServiceUpdate, db: Session = 
 
 @router.delete("/services/{service_id}")
 async def delete_service(service_id: int, db: Session = Depends(get_db)):
-    """Delete a service"""
+    """Delete a service and its workflows"""
     try:
+        from sqlalchemy import text
+        
         service = db.query(Service).filter(Service.id == service_id).first()
         if not service:
             raise HTTPException(status_code=404, detail="Service not found")
         
+        # حذف المراحل المرتبطة بالخدمة أولاً
+        db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                  {"service_id": service_id})
+        
+        # حذف الخدمة
         db.delete(service)
         db.commit()
         

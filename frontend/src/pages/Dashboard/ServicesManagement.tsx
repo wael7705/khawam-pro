@@ -42,9 +42,17 @@ export default function ServicesManagement() {
     ))
   }
 
-  const deleteService = (id: number) => {
-    if (confirm('هل أنت متأكد من حذف هذه الخدمة؟')) {
-      setServices(services.filter(s => s.id !== id))
+  const deleteService = async (id: number) => {
+    if (confirm('هل أنت متأكد من حذف هذه الخدمة؟ سيتم حذفها نهائياً من قاعدة البيانات.')) {
+      try {
+        await adminAPI.services.delete(id)
+        // إعادة تحميل الخدمات من السيرفر
+        await loadServices()
+        alert('تم حذف الخدمة بنجاح')
+      } catch (error: any) {
+        console.error('Error deleting service:', error)
+        alert('فشل حذف الخدمة: ' + (error.response?.data?.detail || error.message || 'خطأ غير معروف'))
+      }
     }
   }
 

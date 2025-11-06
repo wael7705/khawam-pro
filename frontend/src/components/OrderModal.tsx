@@ -682,6 +682,40 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             )}
             
+            {/* نوع الفينيل - إذا كان show_vinyl_type = true */}
+            {stepConfig.show_vinyl_type && stepConfig.vinyl_types && stepConfig.vinyl_types.length > 0 && (
+              <div className="form-group">
+                <label>نوع الفينيل <span className="required">*</span></label>
+                <select 
+                  value={paperType} 
+                  onChange={(e) => setPaperType(e.target.value)} 
+                  className="form-input"
+                  required={stepConfig.required}
+                >
+                  <option value="">اختر نوع الفينيل</option>
+                  {stepConfig.vinyl_types.map((type: any) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            {/* ملاحظات إضافية - إذا كان show_notes_in_print_options = true */}
+            {stepConfig.show_notes_in_print_options && (
+              <div className="form-group">
+                <label>ملاحظات إضافية <span className="optional">(اختياري)</span></label>
+                <textarea
+                  value={notes || ''}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="form-input"
+                  placeholder="أضف أي ملاحظات إضافية حول طلبك..."
+                  rows={5}
+                />
+              </div>
+            )}
+            
             {/* عدد الوجوه - إخفاء إذا كان hide_print_sides = true */}
             {!stepConfig.hide_print_sides && (
               <div className="form-group">

@@ -1098,13 +1098,31 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <span>{paperSize}</span>
                 </div>
               )}
-              {/* عرض نوع الورق المخصص (paperType) إذا كان موجوداً */}
-              {paperType && (
-                <div className="invoice-item">
-                  <span>نوع الورق:</span>
-                  <span>{paperType}</span>
-                </div>
-              )}
+                          {/* عرض نوع الورق المخصص (paperType) إذا كان موجوداً */}
+                          {paperType && (
+                            <div className="invoice-item">
+                              <span>نوع الورق:</span>
+                              <span>
+                                {paperType === 'normal' ? 'ورق عادي' :
+                                 paperType === 'photo' ? 'ورق PHOTO' :
+                                 paperType === 'tracing' ? 'ورق كالك' :
+                                 paperType === 'bond' ? 'ورق بوند' :
+                                 paperType === 'vellum' ? 'ورق فيلوم' :
+                                 paperType}
+                              </span>
+                            </div>
+                          )}
+                          {/* عرض نوع الفينيل إذا كان موجوداً */}
+                          {paperType && (serviceName.includes('فينيل') || serviceName.toLowerCase().includes('vinyl')) && (
+                            <div className="invoice-item">
+                              <span>نوع الفينيل:</span>
+                              <span>
+                                {paperType === 'normal' ? 'فينيل عادي' :
+                                 paperType === 'perforated' ? 'فينيل مثقب' :
+                                 paperType}
+                              </span>
+                            </div>
+                          )}
               <div className="invoice-item">
                 <span>نوع الطباعة:</span>
                 <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>

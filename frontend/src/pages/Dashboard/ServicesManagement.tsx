@@ -63,10 +63,28 @@ export default function ServicesManagement() {
           <h1>إدارة الخدمات</h1>
           <p>عرض وإدارة جميع الخدمات</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
-          <Plus size={20} />
-          إضافة خدمة
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+            <Plus size={20} />
+            إضافة خدمة
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={async () => {
+              if (confirm('هل أنت متأكد من حذف جميع الخدمات المكررة؟ سيتم الاحتفاظ بالخدمة الأصلية أو التي لديها مراحل صحيحة.')) {
+                try {
+                  const response = await adminAPI.services.cleanupDuplicates()
+                  alert(response.data.message || 'تم حذف الخدمات المكررة بنجاح')
+                  await loadServices()
+                } catch (error: any) {
+                  alert('فشل حذف الخدمات المكررة: ' + (error.response?.data?.detail || error.message))
+                }
+              }
+            }}
+          >
+            حذف الخدمات المكررة
+          </button>
+        </div>
       </div>
 
       {loading ? (

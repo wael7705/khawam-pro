@@ -382,6 +382,81 @@ async def delete_service(service_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/services/cleanup-duplicates")
+async def cleanup_duplicate_services(db: Session = Depends(get_db)):
+    """حذف الخدمات المكررة - يبقي الأصلية أو التي لديها مراحل صحيحة"""
+    try:
+        from sqlalchemy import text
+        
+        # البحث عن الخدمات المكررة (نفس الاسم)
+        duplicates = db.execute(text("""
+            SELECT name_ar, COUNT(*) as count, array_agg(id ORDER BY id) as ids
+            FROM services
+            GROUP BY name_ar
+            HAVING COUNT(*) > 1
+        """)).fetchall()
+        
+        deleted_count = 0
+        kept_services = []
+        
+        for dup in duplicates:
+            name_ar = dup[0]
+            service_ids = dup[2]  # array of IDs
+            
+            if len(service_ids) > 1:
+                # التحقق من المراحل لكل خدمة
+                services_with_workflows = []
+                for service_id in service_ids:
+                    workflow_count = db.execute(text("""
+                        SELECT COUNT(*) FROM service_workflows 
+                        WHERE service_id = :service_id AND is_active = true
+                    """), {"service_id": service_id}).scalar()
+                    
+                    services_with_workflows.append({
+                        "id": service_id,
+                        "workflow_count": workflow_count
+                    })
+                
+                # ترتيب حسب عدد المراحل (الأكثر أولاً)، ثم حسب ID (الأقدم أولاً)
+                services_with_workflows.sort(key=lambda x: (-x["workflow_count"], x["id"]))
+                
+                # الاحتفاظ بالخدمة الأولى (الأفضل)
+                keep_id = services_with_workflows[0]["id"]
+                kept_services.append(keep_id)
+                
+                # حذف الباقي
+                for service_info in services_with_workflows[1:]:
+                    delete_id = service_info["id"]
+                    
+                    # حذف المراحل أولاً
+                    db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                             {"service_id": delete_id})
+                    
+                    # حذف الخدمة
+                    service_to_delete = db.query(Service).filter(Service.id == delete_id).first()
+                    if service_to_delete:
+                        db.delete(service_to_delete)
+                        deleted_count += 1
+                        print(f"🗑️ Deleted duplicate service: ID={delete_id}, Name={name_ar}")
+        
+        db.commit()
+        
+        # إبطال cache الخدمات
+        from cache import invalidate_cache
+        invalidate_cache('services')
+        
+        return {
+            "success": True,
+            "message": f"تم حذف {deleted_count} خدمة مكررة",
+            "deleted_count": deleted_count,
+            "kept_services": kept_services
+        }
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف الخدمات المكررة: {str(e)}")
+
 # ============================================
 # Portfolio Works Management Endpoints
 # ============================================

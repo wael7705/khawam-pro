@@ -137,6 +137,7 @@ export const adminAPI = {
     create: (data: any) => api.post('/admin/services', data),
     update: (id: number, data: any) => api.put(`/admin/services/${id}`, data),
     delete: (id: number) => api.delete(`/admin/services/${id}`),
+    cleanupDuplicates: () => api.post('/admin/services/cleanup-duplicates'),
   },
   
   // Portfolio Works

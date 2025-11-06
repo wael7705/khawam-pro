@@ -240,12 +240,9 @@ async def _setup_lecture_printing_service():
         
         if existing_service:
             service_id = existing_service[0]
-            print(f"✅ خدمة طباعة المحاضرات موجودة بالفعل (ID: {service_id})")
-            # حذف المراحل القديمة وإعادة إضافتها
-            deleted = conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
-                        {"service_id": service_id})
-            conn.commit()
-            print(f"🗑️ تم حذف المراحل القديمة: {deleted.rowcount} مرحلة")
+            print(f"✅ خدمة طباعة المحاضرات موجودة بالفعل (ID: {service_id}) - لا حاجة لإعادة إنشائها")
+            # لا نقوم بأي شيء - الخدمة موجودة بالفعل
+            return
         else:
             # إنشاء الخدمة الجديدة
             result = conn.execute(text("""

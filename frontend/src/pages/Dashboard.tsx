@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Package, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard } from 'lucide-react'
 import DashboardHome from './Dashboard/DashboardHome'
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
-import ProductsManagement from './Dashboard/ProductsManagement'
+
 import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
 import CustomersManagement from './Dashboard/CustomersManagement'
@@ -40,7 +40,6 @@ export default function Dashboard() {
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard', adminOnly: true },
     { id: 'orders', name: 'الطلبات', icon: ShoppingCartIcon, path: '/dashboard/orders', adminOnly: false },
     { id: 'customers', name: 'العملاء', icon: Users, path: '/dashboard/customers', adminOnly: true },
-    { id: 'products', name: 'المنتجات', icon: Package, path: '/dashboard/products', adminOnly: true },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services', adminOnly: true },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works', adminOnly: true },
     { id: 'pricing', name: 'إدارة مالية', icon: DollarSign, path: '/dashboard/pricing', adminOnly: true },
@@ -71,7 +70,7 @@ export default function Dashboard() {
     }
     if (path.startsWith('/dashboard/orders')) return 'orders'
     if (path.startsWith('/dashboard/customers')) return 'customers'
-    if (path.startsWith('/dashboard/products')) return 'products'
+
     if (path.startsWith('/dashboard/services')) return 'services'
     if (path.startsWith('/dashboard/works')) return 'works'
     if (path.startsWith('/dashboard/pricing')) return 'pricing'
@@ -158,7 +157,7 @@ export default function Dashboard() {
             <Route path="/orders" element={<OrdersManagement />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
             {isAdmin() && <Route path="/customers" element={<CustomersManagement />} />}
-            {isAdmin() && <Route path="/products" element={<ProductsManagement />} />}
+
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}
             {isAdmin() && <Route path="/works" element={<WorksManagement />} />}
             {isAdmin() && <Route path="/pricing" element={<PricingManagement />} />}

@@ -456,3 +456,186 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
 
+@router.post("/setup-flex-printing")
+async def setup_flex_printing_service(db: Session = Depends(get_db)):
+    """إعداد خدمة طباعة الفليكس مع مراحلها"""
+    print("=" * 80)
+    print("🔧 [SETUP] Starting flex printing service setup...")
+    print("=" * 80)
+    
+    try:
+        import json
+        
+        # 1. التحقق من وجود الخدمة أو إنشائها
+        print("🔍 [SETUP] Searching for existing flex printing service...")
+        existing_service = db.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%فليكس%' OR name_ar LIKE '%flex%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            service_name = existing_service[1] if len(existing_service) > 1 else "N/A"
+            print(f"✅ [SETUP] Found existing service: ID={service_id}, Name={service_name}")
+            
+            # حذف المراحل القديمة
+            deleted_count = db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                      {"service_id": service_id}).rowcount
+            db.commit()
+            print(f"🗑️ [SETUP] Deleted {deleted_count} old workflows")
+        else:
+            print("📝 [SETUP] Service not found, creating new service...")
+            # إنشاء الخدمة الجديدة
+            result = db.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "طباعة فليكس",
+                "name_en": "Flex Printing",
+                "description_ar": "طباعة فليكس حسب القياس (متر مربع)",
+                "icon": "🖨️",
+                "base_price": 50.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 2
+            })
+            service_id = result.scalar()
+            db.commit()
+            print(f"✅ [SETUP] Created new service with ID: {service_id}")
+        
+        # 2. إضافة المراحل المخصصة لخدمة طباعة الفليكس
+        print(f"📋 [SETUP] Adding workflows for service_id={service_id}...")
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملفات",
+                "step_name_en": "Upload Files",
+                "step_description_ar": "قم برفع ملفات التصميم (AI, PDF, PSD, PNG, JPG)",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript",
+                    "analyze_pages": False,
+                    "show_quantity": False
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "الأبعاد",
+                "step_name_en": "Dimensions",
+                "step_description_ar": "حدد أبعاد الطباعة ووحدة القياس",
+                "step_type": "dimensions",
+                "step_config": {
+                    "required": True,
+                    "fields": ["length", "width"],
+                    "hide_pages": True,
+                    "hide_print_type": True
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "اختيار الألوان",
+                "step_name_en": "Color Selection",
+                "step_description_ar": "اختر الألوان المطلوبة للتصميم",
+                "step_type": "colors",
+                "step_config": {
+                    "required": False,
+                    "maxColors": 6
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False,
+                    "hide_work_type": False
+                }
+            },
+            {
+                "step_number": 5,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional"]
+                }
+            },
+            {
+                "step_number": 6,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                step_config_json = json.dumps(workflow["step_config"])
+                db.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
+            except Exception as step_error:
+                print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        db.commit()
+        print(f"✅ [SETUP] Committed {len(workflows)} workflows to database")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify_count = db.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"🔍 [SETUP] Verification: {verify_count} workflows found in database for service_id={service_id}")
+        
+        print("=" * 80)
+        print(f"✅ [SETUP] Setup completed successfully! Service ID: {service_id}, Workflows: {verify_count}")
+        print("=" * 80)
+        
+        return {
+            "success": True,
+            "message": "تم إعداد خدمة طباعة الفليكس بنجاح",
+            "service_id": service_id,
+            "workflows_count": verify_count
+        }
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ [SETUP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
+

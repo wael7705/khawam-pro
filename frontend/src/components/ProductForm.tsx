@@ -147,7 +147,7 @@ export default function ProductForm({ product, onCancel, onSuccess }: ProductFor
         <div className="upload-area">
           <input 
             type="file" 
-            accept="image/*" 
+            accept=".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript" 
             className="hidden" 
             id="product-image"
             onChange={(e) => setImage(e.target.files?.[0] || null)}

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
+import api from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import { findServiceHandler } from '../services/serviceRegistry'
@@ -195,7 +196,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={stepConfig.accept || "application/pdf,.pdf"}
+                  accept={stepConfig.accept || ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript"}
                   onChange={handleImageUpload}
                   className="hidden"
                   multiple={stepConfig.multiple || false}
@@ -223,8 +224,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   </div>
                 ) : (
                   <div className="upload-placeholder">
-                    <p>اضغط لرفع {stepConfig.multiple ? 'ملفات PDF' : 'ملف PDF'}</p>
-                    <small>PDF فقط</small>
+                    <p>اضغط لرفع {stepConfig.multiple ? 'الملفات' : 'الملف'}</p>
+                    <small>
+                      {stepConfig.accept?.includes('.ai') || stepConfig.accept?.includes('postscript') 
+                        ? 'AI, PDF, PSD, PNG, JPG' 
+                        : stepConfig.accept?.includes('.doc') 
+                        ? 'PDF, Word' 
+                        : 'PDF'}
+                    </small>
                   </div>
                 )}
               </div>
@@ -299,14 +306,41 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             )}
             <div className="form-group">
-              <label>وحدة القياس</label>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
+              <label>وحدة القياس {stepConfig.required ? <span className="required">*</span> : ''}</label>
+              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input" required={stepConfig.required}>
                 <option value="cm">سم (cm)</option>
                 <option value="mm">ملم (mm)</option>
                 <option value="in">إنش (in)</option>
                 <option value="m">متر (m)</option>
               </select>
             </div>
+            {/* إخفاء عدد الصفحات ونوع الطباعة إذا كان hide_pages أو hide_print_type = true */}
+            {!stepConfig.hide_pages && (
+              <div className="form-group">
+                <label>عدد الصفحات {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={numberOfPages}
+                  onChange={(e) => setNumberOfPages(parseInt(e.target.value) || 1)}
+                  className="form-input"
+                  required={stepConfig.required}
+                />
+              </div>
+            )}
+            {!stepConfig.hide_print_type && (
+              <div className="form-group">
+                <label>نوع الطباعة</label>
+                <select 
+                  value={printColor} 
+                  onChange={(e) => setPrintColor(e.target.value as 'bw' | 'color')} 
+                  className="form-input"
+                >
+                  <option value="bw">أبيض</option>
+                  <option value="color">ملون</option>
+                </select>
+              </div>
+            )}
           </div>
         )
 
@@ -980,7 +1014,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept=".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript"
                   onChange={handleImageUpload}
                   className="hidden"
                 />
@@ -1262,8 +1296,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const loadWorkflow = async () => {
       console.log('🔄 loadWorkflow called - isOpen:', isOpen, 'serviceId:', serviceId, 'serviceName:', serviceName)
       
-      // التحقق إذا كانت هذه خدمة "طباعة محاضرات"
+      // التحقق إذا كانت هذه خدمة "طباعة محاضرات" أو "طباعة فليكس"
       const isLecturePrinting = serviceName.includes('محاضرات') || serviceName.toLowerCase().includes('lecture')
+      const isFlexPrinting = serviceName.includes('فليكس') || serviceName.toLowerCase().includes('flex')
       
       if (isOpen && serviceId) {
         try {
@@ -1281,11 +1316,32 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           } else {
             console.log('⚠️ No workflows found in response')
             
-            // إذا كانت خدمة "طباعة محاضرات" ولم تكن المراحل موجودة، قم بإنشائها
+            // إذا كانت خدمة "طباعة محاضرات" أو "طباعة فليكس" ولم تكن المراحل موجودة، قم بإنشائها
             if (isLecturePrinting) {
               console.log('🔧 Setting up lecture printing service workflows...')
               try {
                 const setupResponse = await workflowsAPI.setupLecturePrinting()
+                console.log('🔧 Setup response:', setupResponse.data)
+                
+                if (setupResponse.data.success) {
+                  // إعادة تحميل المراحل بعد الإعداد
+                  const reloadResponse = await workflowsAPI.getServiceWorkflow(serviceId)
+                  if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
+                    const sortedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
+                    console.log('✅ Loaded workflows after setup:', sortedWorkflows.length, sortedWorkflows)
+                    setWorkflowSteps(sortedWorkflows)
+                    setStep(1)
+                    showSuccess('تم إعداد مراحل الخدمة بنجاح')
+                  }
+                }
+              } catch (setupError) {
+                console.error('❌ Error setting up workflows:', setupError)
+                showError('فشل إعداد مراحل الخدمة')
+              }
+            } else if (isFlexPrinting) {
+              console.log('🔧 Setting up flex printing service workflows...')
+              try {
+                const setupResponse = await api.post('/workflows/setup-flex-printing')
                 console.log('🔧 Setup response:', setupResponse.data)
                 
                 if (setupResponse.data.success) {
@@ -1336,7 +1392,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             } else {
               console.log('⚠️ No workflows found (by name)')
               
-              // إذا كانت خدمة "طباعة محاضرات" ولم تكن المراحل موجودة، قم بإنشائها
+              // إذا كانت خدمة "طباعة محاضرات" أو "طباعة فليكس" ولم تكن المراحل موجودة، قم بإنشائها
               if (isLecturePrinting) {
                 console.log('🔧 Setting up lecture printing service workflows...')
                 try {

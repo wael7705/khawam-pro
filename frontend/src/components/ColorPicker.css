@@ -93,12 +93,8 @@
 
 .preset-colors-row {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(10, 1fr);
   gap: 8px;
-}
-
-.preset-colors-row:last-child {
-  grid-template-columns: repeat(6, 1fr);
 }
 
 .preset-color-swatch {
@@ -283,27 +279,88 @@
   opacity: 0.6;
 }
 
-/* Responsive */
+/* Responsive - تحسين العرض على الشاشات الصغيرة */
 @media (max-width: 768px) {
+  .color-picker-advanced {
+    padding: 16px;
+    gap: 16px;
+  }
+
   .color-picker-controls {
     flex-direction: column;
+    gap: 16px;
   }
 
   .hue-slider-container {
     width: 100%;
-    height: 30px;
+    height: 40px;
+    order: 2;
   }
 
   .hue-slider {
     writing-mode: horizontal-tb;
+    direction: ltr;
+  }
+
+  .saturation-lightness-picker {
+    width: 100%;
+    height: 250px;
+    order: 1;
   }
 
   .preset-colors-row {
-    grid-template-columns: repeat(6, 1fr) !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 6px;
   }
 
-  .preset-colors-row:last-child {
-    grid-template-columns: repeat(3, 1fr) !important;
+  .preset-color-swatch {
+    min-height: 40px;
+  }
+
+  .color-value-inputs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .color-input-group {
+    width: 100%;
+  }
+
+  .hex-input-wrapper {
+    width: 100%;
+  }
+
+  .hex-input {
+    flex: 1;
+  }
+
+  .rgb-inputs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rgb-input {
+    flex: 1;
+  }
+
+  .add-color-btn {
+    width: 100%;
+    order: 3;
+  }
+}
+
+@media (max-width: 480px) {
+  .preset-colors-row {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+  
+  .preset-color-swatch {
+    min-height: 35px;
+  }
+  
+  .saturation-lightness-picker {
+    height: 200px;
   }
 }
 

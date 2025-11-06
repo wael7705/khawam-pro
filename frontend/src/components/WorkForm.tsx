@@ -155,7 +155,7 @@ export default function WorkForm({ work, onCancel, onSuccess }: WorkFormProps) {
         <div className="upload-area">
           <input 
             type="file" 
-            accept="image/*" 
+            accept=".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript" 
             className="hidden" 
             id="work-main-image"
             onChange={(e) => setMainImage(e.target.files?.[0] || null)}

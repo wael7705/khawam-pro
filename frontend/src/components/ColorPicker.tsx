@@ -20,16 +20,10 @@ export default function ColorPicker({
   const [isPickerActive, setIsPickerActive] = useState(false)
   const saturationRef = useRef<HTMLDivElement>(null)
 
-  // Preset colors grid (3 rows of 12 colors each + 1 row of 6 light colors)
+  // Preset colors - صف واحد فقط للألوان الأساسية
   const presetColors = [
-    // Row 1: Bright colors
-    ['#FF1493', '#FF00FF', '#9400D3', '#0000FF', '#00BFFF', '#00FFFF', 
-     '#00FF7F', '#ADFF2F', '#9ACD32', '#FFFF00', '#FFA500', '#FF0000'],
-    // Row 2: Darker colors
-    ['#FF4500', '#8B008B', '#191970', '#008B8B', '#006400', '#556B2F',
-     '#800000', '#C0C0C0', '#808080', '#696969', '#000000', '#FFB6C1'],
-    // Row 3: Light pastel colors
-    ['#FFF8DC', '#FFE4E1', '#FFFACD', '#F0FFF0', '#E6E6FA', '#F5F5DC']
+    // الألوان الأساسية فقط: أحمر، برتقالي، أصفر، أخضر، أزرق، بنفسجي، وردي، أسود، رمادي، أبيض
+    ['#FF0000', '#FFA500', '#FFFF00', '#00FF00', '#0000FF', '#8000FF', '#FF00FF', '#000000', '#808080', '#FFFFFF']
   ]
 
   // Convert HSL to RGB
@@ -113,17 +107,26 @@ export default function ColorPicker({
     setHue(parseInt(e.target.value))
   }
 
-  // Handle saturation/lightness picker
+  // Handle saturation/lightness picker - إصلاح حساب اللون بشكل صحيح
   const handleSaturationClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!saturationRef.current) return
     const rect = saturationRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const s = Math.max(0, Math.min(100, (x / rect.width) * 100))
-    const l = Math.max(0, Math.min(100, 100 - (y / rect.height) * 100))
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left))
+    const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top))
+    
+    // حساب Saturation من اليسار إلى اليمين (0-100%)
+    const s = Math.round((x / rect.width) * 100)
+    // حساب Lightness من الأسفل إلى الأعلى (0-100%)
+    // في HSL، 0% lightness = أسود (أسفل)، 100% lightness = أبيض (أعلى)
+    const l = Math.round(100 - (y / rect.height) * 100)
+    
     setSaturation(s)
     setLightness(l)
     setIsPickerActive(true)
+    
+    // تحديث اللون مباشرة
+    const [r, g, b] = hslToRgb(hue, s, l)
+    setCurrentColor(rgbToHex(r, g, b))
   }
 
   // Handle hex input

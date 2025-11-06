@@ -46,9 +46,9 @@ export default function Services() {
     } catch (error) {
       console.error('Error loading services:', error)
       setServices([
-        { id: 1, name_ar: 'طباعة البوسترات', name_en: 'Poster Printing', base_price: 2000 },
-        { id: 2, name_ar: 'طباعة الفليكس', name_en: 'Flex Printing', base_price: 3000 },
-        { id: 3, name_ar: 'البانرات الإعلانية', name_en: 'Advertising Banners', base_price: 5000 },
+        { id: 1, name_ar: 'طباعة البوسترات', name_en: 'Poster Printing', base_price: 0 },
+        { id: 2, name_ar: 'طباعة الفليكس', name_en: 'Flex Printing', base_price: 0 },
+        { id: 3, name_ar: 'البانرات الإعلانية', name_en: 'Advertising Banners', base_price: 0 },
       ])
     } finally {
       setLoading(false)
@@ -75,7 +75,6 @@ export default function Services() {
                 <div className="service-icon">{service.icon || '📄'}</div>
                 <h3>{service.name_ar}</h3>
                 {service.description_ar && <p>{service.description_ar}</p>}
-                <div className="service-price">من {service.base_price} ل.س</div>
                 <button
                   className="btn btn-primary"
                   onClick={() => handleOrder(service)}

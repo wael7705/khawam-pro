@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ordersAPI, pricingAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
+import { ordersAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
 import api from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
@@ -42,17 +42,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [deliveryType, setDeliveryType] = useState('self')
   const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
   const [addressConfirmed, setAddressConfirmed] = useState(false)
-  const [totalPrice, setTotalPrice] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hasRestoredState = useRef(false)
   
-  // Pricing system states
-  const [pricingRule, setPricingRule] = useState<any>(null)
-  const [calculationType, setCalculationType] = useState<'piece' | 'area' | 'page'>('piece')
+  // Print options states (no pricing)
   const [printColor, setPrintColor] = useState<'bw' | 'color'>('bw')
   const [printSides, setPrintSides] = useState<'single' | 'double'>('single')
   const [numberOfPages, setNumberOfPages] = useState<number>(1)
-  const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
   const [paperSize, setPaperSize] = useState<string>('A4')
   const [printQuality, setPrintQuality] = useState<'standard' | 'laser'>('standard')
   const [paperType, setPaperType] = useState<string>('')
@@ -742,11 +738,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     <span>وجهين</span>
                   </label>
                 </div>
-                {printSides === 'double' && (
-                  <small className="form-hint" style={{ color: '#667eea', marginTop: '8px', display: 'block' }}>
-                    ملاحظة: طباعة وجهين = السعر الأساسي × 2
-                  </small>
-                )}
               </div>
             )}
             
@@ -1175,11 +1166,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <span>{deliveryAddress.street || 'تم تحديد الموقع'}</span>
                 </div>
               )}
-              <div className="invoice-divider"></div>
-              <div className="invoice-item total">
-                <span>المجموع الكلي:</span>
-                <span>{totalPrice > 0 ? totalPrice.toLocaleString() : 'يتم الحساب...'} ل.س</span>
-              </div>
             </div>
             <div style={{ marginTop: '20px', padding: '15px', background: '#e3f2fd', borderRadius: '8px', color: '#1565c0' }}>
               <p style={{ margin: 0, fontWeight: 600 }}>
@@ -1804,7 +1790,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               if (formState.customerWhatsApp !== undefined) setCustomerWhatsApp(formState.customerWhatsApp)
               if (formState.customerPhoneExtra !== undefined) setCustomerPhoneExtra(formState.customerPhoneExtra)
               if (formState.shopName !== undefined) setShopName(formState.shopName)
-              if (formState.totalPrice !== undefined) setTotalPrice(formState.totalPrice)
               if (formState.printColor !== undefined) setPrintColor(formState.printColor)
               if (formState.printQuality !== undefined) setPrintQuality(formState.printQuality)
               if (formState.printSides !== undefined) setPrintSides(formState.printSides)
@@ -2062,7 +2047,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         shopName,
         deliveryType: 'delivery',
         serviceName,
-        totalPrice,
         printColor,
         printQuality,
         printSides,
@@ -2091,149 +2075,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
   }
 
-  const calculatePrice = async () => {
-    try {
-      setIsCalculatingPrice(true)
-      
-      // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص
-      if (serviceHandler) {
-        const serviceData = {
-          uploadedFiles,
-          quantity,
-          totalPages,
-          paperSize,
-          printColor,
-          printQuality,
-          printSides,
-          notes
-        }
-        
-        const calculatedPrice = await serviceHandler.calculatePrice(serviceData)
-        setTotalPrice(calculatedPrice)
-        
-        if (calculatedPrice === 0) {
-          showError('لم يتم العثور على قاعدة سعر مناسبة. يرجى التحقق من القواعد المالية.')
-        }
-        
-        return calculatedPrice
-      }
-      
-      // المنطق الافتراضي (للخدمات غير المسجلة)
-      // تحديد نوع الحساب بناءً على اسم الخدمة والأبعاد
-      let calcType: 'piece' | 'area' | 'page' = 'piece'
-      let qty = Number(quantity) || 1
-      
-      // إذا كان اسم الخدمة يحتوي على "طباعة" أو "محاضرات"، استخدم حساب الصفحات
-      if (serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) {
-        calcType = 'page'
-        // حساب إجمالي الصفحات: عدد الصفحات × عدد النسخ
-        const pagesPerCopy = totalPages > 0 ? totalPages : numberOfPages
-        qty = pagesPerCopy * quantity
-      } else if (length && width) {
-        // حساب المساحة بالمتر المربع
-      const l = parseFloat(String(length)) || 0
-      const w = parseFloat(String(width)) || 0
-      const h = parseFloat(String(height)) || 0
-      
-      if (h > 0 && l > 0 && w > 0) {
-          // جسم ثلاثي الأبعاد - حساب المساحة الإجمالية
-          const area = ((l * w * 2) + (l * h * 2) + (w * h * 2)) / 10000 // تحويل من سم² إلى م²
-          calcType = 'area'
-          qty = area
-      } else if (l > 0 && w > 0) {
-        // بوستر ثنائي الأبعاد
-          const area = (l * w) / 10000 // تحويل من سم² إلى م²
-          calcType = 'area'
-          qty = area
-        }
-      }
-      
-      setCalculationType(calcType)
-      
-      // بناء المواصفات
-      const specifications: any = {
-        color: printColor,
-        sides: printSides,
-      }
-      
-      if (length && width) {
-        specifications.length = length
-        specifications.width = width
-        if (height) specifications.height = height
-        specifications.unit = unit
-      }
-      
-      if (calcType === 'page') {
-        specifications.paper_size = paperSize || 'A4'
-        specifications.print_quality = printQuality || 'standard'
-        specifications.number_of_pages = totalPages > 0 ? totalPages : numberOfPages
-        specifications.total_pages = qty
-        specifications.files_count = uploadedFiles.length
-      }
-      
-      // حساب السعر باستخدام API - يجب أن يأتي من القواعد المالية فقط
-      try {
-        const response = await pricingAPI.calculatePrice({
-          calculation_type: calcType,
-          quantity: qty,
-          specifications: specifications,
-        })
-        
-        if (response.data.success && response.data.total_price !== undefined) {
-          const calculatedPrice = response.data.total_price || 0
-          setTotalPrice(calculatedPrice)
-          setPricingRule(response.data)
-          
-          // إذا كان السعر 0، يعني لم يتم العثور على قاعدة سعر
-          if (calculatedPrice === 0) {
-            console.warn('No pricing rule matched - price is 0')
-            showError('لم يتم العثور على قاعدة سعر مناسبة. يرجى التحقق من القواعد المالية.')
-          }
-          
-          return calculatedPrice
-        } else {
-          // إذا لم تنجح العملية، السعر = 0
-          console.warn('Price calculation failed:', response.data)
-          setTotalPrice(0)
-          setPricingRule(null)
-          showError(response.data?.message || 'لم يتم العثور على قاعدة سعر مناسبة')
-          return 0
-        }
-      } catch (apiError: any) {
-        console.error('Error calculating price from API:', apiError)
-        // في حالة الخطأ، السعر = 0
-        setTotalPrice(0)
-        setPricingRule(null)
-        
-        // عرض رسالة خطأ للمستخدم
-        const errorMessage = apiError.response?.data?.message || apiError.message || 'خطأ في حساب السعر'
-        showError(errorMessage)
-        return 0
-      }
-      
-    } catch (error) {
-      console.error('Error calculating price:', error)
-      // لا نستخدم حساب يدوي - السعر يجب أن يأتي من القواعد المالية فقط
-      setTotalPrice(0)
-      setPricingRule(null)
-      showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية.')
-      return 0
-    } finally {
-      setIsCalculatingPrice(false)
-    }
-  }
-
-  // تحديث السعر عند تغيير الأبعاد أو الكمية أو الخيارات
-  useEffect(() => {
-    if (step >= 2) {
-      calculatePrice().catch(err => console.error('Error calculating price:', err))
-    }
-  }, [length, width, height, quantity, step, printColor, printSides, numberOfPages, serviceName])
-
-  const handleNext = async () => {
-    if (step === 5) {
-      await calculatePrice()
-    }
+  const handleNext = () => {
     setStep(step + 1)
   }
 
@@ -2254,35 +2096,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
     setIsSubmitting(true)
     
-    // Validation checks before try block
-      const safeQuantity = Number(quantity) || 1
-      let safeTotalPrice = Number(totalPrice)
-      
-      // إذا كان السعر 0 أو غير محسوب، نحسبه من القواعد المالية
-      if (!safeTotalPrice || safeTotalPrice === 0) {
-      try {
-        safeTotalPrice = await calculatePrice() || 0
-      } catch (calcError) {
-        console.error('Error calculating price:', calcError)
-        safeTotalPrice = 0
-      }
-      }
-      
-      // التحقق من أن السعر صحيح من القواعد المالية
-      if (!safeTotalPrice || safeTotalPrice === 0) {
-        showError('لا يمكن إنشاء الطلب: السعر = 0. يرجى إضافة قاعدة سعر مناسبة في القواعد المالية.')
-        setIsSubmitting(false)
-        return
-      }
-      
-      const unitPrice = safeTotalPrice / safeQuantity
-      
-      // التأكد من أن unitPrice ليس NaN
-      if (isNaN(unitPrice) || unitPrice <= 0) {
-        showError('خطأ في حساب السعر. يرجى التحقق من القواعد المالية والكمية.')
-        setIsSubmitting(false)
-        return
-    }
+    // No price calculation - prices are stored in pricing rules for record keeping only
+    const safeQuantity = Number(quantity) || 1
+    const safeTotalPrice = 0 // No price calculation - for record keeping only
+    const unitPrice = 0 // No price calculation - for record keeping only
     
     try {
       // Upload image if exists
@@ -2431,7 +2248,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setDeliveryType('self')
         setDeliveryAddress(null)
         setAddressConfirmed(false)
-        setTotalPrice(0)
         onClose()
       } else {
         showError('فشل إرسال الطلب. يرجى المحاولة مرة أخرى')

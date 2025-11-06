@@ -17,6 +17,7 @@ async def lifespan(app: FastAPI):
         loop = asyncio.get_event_loop()
         loop.create_task(_init_pricing_table())
         loop.create_task(_setup_lecture_printing_service())
+        loop.create_task(_ensure_default_services())
     except Exception as e:
         print(f"Warning: Failed to initialize: {str(e)[:100]}")
     
@@ -372,6 +373,128 @@ async def _setup_lecture_printing_service():
         
     except Exception as e:
         print(f"❌ Error setting up lecture printing service: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
+async def _ensure_default_services():
+    """التأكد من وجود الخدمات الأساسية في قاعدة البيانات"""
+    import time
+    import asyncio
+    await asyncio.sleep(8)  # انتظار حتى تكون قاعدة البيانات جاهزة
+    
+    conn = None
+    try:
+        print("🔄 Ensuring default services exist...")
+        conn = engine.connect()
+        
+        from sqlalchemy import text
+        
+        default_services = [
+            {
+                "name_ar": "طباعة محاضرات",
+                "name_en": "Lecture Printing",
+                "description_ar": "خدمة طباعة المحاضرات مع خيارات متعددة للقياس والجودة",
+                "icon": "📚",
+                "display_order": 1
+            },
+            {
+                "name_ar": "طباعة فليكس",
+                "name_en": "Flex Printing",
+                "description_ar": "طباعة فليكس حسب القياس (متر مربع)",
+                "icon": "🖨️",
+                "display_order": 2
+            },
+            {
+                "name_ar": "طباعة فينيل",
+                "name_en": "Vinyl Printing",
+                "description_ar": "طباعة فينيل لاصق بجميع الأنواع",
+                "icon": "🎨",
+                "display_order": 3
+            },
+            {
+                "name_ar": "طباعة كلك بولستر",
+                "name_en": "Sticker Printing",
+                "description_ar": "طباعة ملصقات لاصقة بجميع الأشكال والأحجام",
+                "icon": "🏷️",
+                "display_order": 4
+            },
+            {
+                "name_ar": "طباعة البوسترات",
+                "name_en": "Poster Printing",
+                "description_ar": "طباعة بوسترات عالية الجودة بجميع المقاسات",
+                "icon": "📄",
+                "display_order": 5
+            },
+            {
+                "name_ar": "البانرات الإعلانية",
+                "name_en": "Advertising Banners",
+                "description_ar": "طباعة بانرات إعلانية بجميع المقاسات",
+                "icon": "📢",
+                "display_order": 6
+            }
+        ]
+        
+        created_count = 0
+        updated_count = 0
+        
+        for service in default_services:
+            # التحقق من وجود الخدمة
+            existing = conn.execute(text("""
+                SELECT id, is_visible, is_active FROM services 
+                WHERE name_ar = :name_ar
+            """), {"name_ar": service["name_ar"]}).fetchone()
+            
+            if existing:
+                # تحديث الخدمة الموجودة
+                if not existing[1] or not existing[2]:  # is_visible or is_active is False
+                    conn.execute(text("""
+                        UPDATE services
+                        SET is_visible = true, is_active = true, 
+                            display_order = :display_order,
+                            icon = :icon,
+                            description_ar = :description_ar
+                        WHERE id = :id
+                    """), {
+                        "id": existing[0],
+                        "display_order": service["display_order"],
+                        "icon": service["icon"],
+                        "description_ar": service["description_ar"]
+                    })
+                    updated_count += 1
+                    print(f"  ✅ Updated service: {service['name_ar']}")
+            else:
+                # إنشاء خدمة جديدة
+                conn.execute(text("""
+                    INSERT INTO services 
+                    (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                    VALUES 
+                    (:name_ar, :name_en, :description_ar, :icon, 0, true, true, :display_order)
+                """), {
+                    "name_ar": service["name_ar"],
+                    "name_en": service["name_en"],
+                    "description_ar": service["description_ar"],
+                    "icon": service["icon"],
+                    "display_order": service["display_order"]
+                })
+                created_count += 1
+                print(f"  ✅ Created service: {service['name_ar']}")
+        
+        conn.commit()
+        print(f"✅ Ensured default services: {created_count} created, {updated_count} updated")
+        
+    except Exception as e:
+        print(f"❌ Error ensuring default services: {str(e)}")
         import traceback
         traceback.print_exc()
         if conn:

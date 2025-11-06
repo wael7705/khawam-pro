@@ -57,6 +57,12 @@ def invalidate_cache(pattern: str = None) -> None:
         else:
             _cache.clear()
 
+def clear_cache(key: str) -> None:
+    """مسح cache لمفتاح محدد"""
+    with _cache_lock:
+        if key in _cache:
+            del _cache[key]
+
 def cache_response(ttl: int = None, prefix: str = None):
     """Decorator لـ cache استجابات API"""
     def decorator(func):

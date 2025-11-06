@@ -241,6 +241,7 @@ export const pricingHierarchicalAPI = {
 // Service Workflows API
 export const workflowsAPI = {
   getServiceWorkflow: (serviceId: number) => api.get(`/workflows/service/${serviceId}/workflow`),
+  setupLecturePrinting: () => api.post('/workflows/setup-lecture-printing'),
   getWorkflow: (workflowId: number) => api.get(`/workflows/workflow/${workflowId}`),
   createWorkflow: (data: any) => api.post('/workflows/workflow', data),
   updateWorkflow: (workflowId: number, data: any) => api.put(`/workflows/workflow/${workflowId}`, data),

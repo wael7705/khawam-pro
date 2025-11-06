@@ -1262,6 +1262,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const loadWorkflow = async () => {
       console.log('🔄 loadWorkflow called - isOpen:', isOpen, 'serviceId:', serviceId, 'serviceName:', serviceName)
       
+      // التحقق إذا كانت هذه خدمة "طباعة محاضرات"
+      const isLecturePrinting = serviceName.includes('محاضرات') || serviceName.toLowerCase().includes('lecture')
+      
       if (isOpen && serviceId) {
         try {
           setLoadingWorkflow(true)
@@ -1277,8 +1280,33 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             setStep(1)
           } else {
             console.log('⚠️ No workflows found in response')
-            // Fallback to default steps if no workflow defined
-            setWorkflowSteps([])
+            
+            // إذا كانت خدمة "طباعة محاضرات" ولم تكن المراحل موجودة، قم بإنشائها
+            if (isLecturePrinting) {
+              console.log('🔧 Setting up lecture printing service workflows...')
+              try {
+                const setupResponse = await workflowsAPI.setupLecturePrinting()
+                console.log('🔧 Setup response:', setupResponse.data)
+                
+                if (setupResponse.data.success) {
+                  // إعادة تحميل المراحل بعد الإعداد
+                  const reloadResponse = await workflowsAPI.getServiceWorkflow(serviceId)
+                  if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
+                    const sortedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
+                    console.log('✅ Loaded workflows after setup:', sortedWorkflows.length, sortedWorkflows)
+                    setWorkflowSteps(sortedWorkflows)
+                    setStep(1)
+                    showSuccess('تم إعداد مراحل الخدمة بنجاح')
+                  }
+                }
+              } catch (setupError) {
+                console.error('❌ Error setting up workflows:', setupError)
+                showError('فشل إعداد مراحل الخدمة')
+              }
+            } else {
+              // Fallback to default steps if no workflow defined
+              setWorkflowSteps([])
+            }
           }
         } catch (error) {
           console.error('❌ Error loading workflow:', error)
@@ -1307,7 +1335,32 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               setStep(1)
             } else {
               console.log('⚠️ No workflows found (by name)')
-              setWorkflowSteps([])
+              
+              // إذا كانت خدمة "طباعة محاضرات" ولم تكن المراحل موجودة، قم بإنشائها
+              if (isLecturePrinting) {
+                console.log('🔧 Setting up lecture printing service workflows...')
+                try {
+                  const setupResponse = await workflowsAPI.setupLecturePrinting()
+                  console.log('🔧 Setup response:', setupResponse.data)
+                  
+                  if (setupResponse.data.success) {
+                    // إعادة تحميل المراحل بعد الإعداد
+                    const reloadResponse = await workflowsAPI.getServiceWorkflow(service.id)
+                    if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
+                      const sortedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
+                      console.log('✅ Loaded workflows after setup:', sortedWorkflows.length, sortedWorkflows)
+                      setWorkflowSteps(sortedWorkflows)
+                      setStep(1)
+                      showSuccess('تم إعداد مراحل الخدمة بنجاح')
+                    }
+                  }
+                } catch (setupError) {
+                  console.error('❌ Error setting up workflows:', setupError)
+                  showError('فشل إعداد مراحل الخدمة')
+                }
+              } else {
+                setWorkflowSteps([])
+              }
             }
           } else {
             console.log('⚠️ Service not found by name')

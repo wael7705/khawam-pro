@@ -255,23 +255,33 @@ async def delete_workflow(workflow_id: int, db: Session = Depends(get_db)):
 @router.post("/setup-lecture-printing")
 async def setup_lecture_printing_service(db: Session = Depends(get_db)):
     """إعداد خدمة طباعة المحاضرات مع مراحلها"""
+    print("=" * 80)
+    print("🔧 [SETUP] Starting lecture printing service setup...")
+    print("=" * 80)
+    
     try:
         import json
         
         # 1. التحقق من وجود الخدمة أو إنشائها
+        print("🔍 [SETUP] Searching for existing service...")
         existing_service = db.execute(text("""
-            SELECT id FROM services 
+            SELECT id, name_ar FROM services 
             WHERE name_ar LIKE '%طباعة محاضرات%' OR name_ar LIKE '%محاضرات%'
             LIMIT 1
         """)).fetchone()
         
         if existing_service:
             service_id = existing_service[0]
+            service_name = existing_service[1] if len(existing_service) > 1 else "N/A"
+            print(f"✅ [SETUP] Found existing service: ID={service_id}, Name={service_name}")
+            
             # حذف المراحل القديمة
-            db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
-                      {"service_id": service_id})
+            deleted_count = db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                      {"service_id": service_id}).rowcount
             db.commit()
+            print(f"🗑️ [SETUP] Deleted {deleted_count} old workflows")
         else:
+            print("📝 [SETUP] Service not found, creating new service...")
             # إنشاء الخدمة الجديدة
             result = db.execute(text("""
                 INSERT INTO services 
@@ -291,8 +301,10 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
             })
             service_id = result.scalar()
             db.commit()
+            print(f"✅ [SETUP] Created new service with ID: {service_id}")
         
         # 2. إضافة المراحل المخصصة لخدمة طباعة المحاضرات
+        print(f"📋 [SETUP] Adding workflows for service_id={service_id}...")
         workflows = [
             {
                 "step_number": 1,
@@ -362,34 +374,56 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
         ]
         
         for workflow in workflows:
-            db.execute(text("""
-                INSERT INTO service_workflows 
-                (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
-                 step_type, step_config, display_order, is_active)
-                VALUES 
-                (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-                 :step_type, :step_config::jsonb, :display_order, :is_active)
-            """), {
-                "service_id": service_id,
-                "step_number": workflow["step_number"],
-                "step_name_ar": workflow["step_name_ar"],
-                "step_name_en": workflow["step_name_en"],
-                "step_description_ar": workflow["step_description_ar"],
-                "step_type": workflow["step_type"],
-                "step_config": json.dumps(workflow["step_config"]),
-                "display_order": workflow["step_number"],
-                "is_active": True
-            })
+            try:
+                print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                db.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, :step_config::jsonb, :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": json.dumps(workflow["step_config"]),
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
+            except Exception as step_error:
+                print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                raise
         
         db.commit()
+        print(f"✅ [SETUP] Committed {len(workflows)} workflows to database")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify_count = db.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"🔍 [SETUP] Verification: {verify_count} workflows found in database for service_id={service_id}")
+        
+        print("=" * 80)
+        print(f"✅ [SETUP] Setup completed successfully! Service ID: {service_id}, Workflows: {verify_count}")
+        print("=" * 80)
         
         return {
             "success": True,
             "message": "تم إعداد خدمة طباعة المحاضرات بنجاح",
             "service_id": service_id,
-            "workflows_count": len(workflows)
+            "workflows_count": verify_count
         }
     except Exception as e:
+        print("=" * 80)
+        print(f"❌ [SETUP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
 

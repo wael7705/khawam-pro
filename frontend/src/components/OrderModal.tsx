@@ -1555,8 +1555,38 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             if (response.data.success && response.data.workflows && response.data.workflows.length > 0) {
               const sortedWorkflows = response.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
               console.log('✅ Loaded workflows (by name):', sortedWorkflows.length, sortedWorkflows)
-              setWorkflowSteps(sortedWorkflows)
-              setStep(1)
+              
+              // التحقق من عدد المراحل - إذا كانت خدمة فليكس ويجب أن تكون 7 مراحل
+              const needsReSetup = isFlexPrinting && sortedWorkflows.length !== 7
+              
+              if (needsReSetup) {
+                console.log('⚠️ Flex printing workflows count mismatch. Expected 7, found:', sortedWorkflows.length)
+                console.log('🔧 Re-setting up flex printing service workflows...')
+                try {
+                  const setupResponse = await api.post('/workflows/setup-flex-printing')
+                  console.log('🔧 Setup response:', setupResponse.data)
+                  
+                  if (setupResponse.data.success) {
+                    // إعادة تحميل المراحل بعد الإعداد
+                    const reloadResponse = await workflowsAPI.getServiceWorkflow(service.id)
+                    if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
+                      const reloadedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
+                      console.log('✅ Loaded workflows after re-setup:', reloadedWorkflows.length, reloadedWorkflows)
+                      setWorkflowSteps(reloadedWorkflows)
+                      setStep(1)
+                      showSuccess('تم تحديث مراحل الخدمة بنجاح')
+                    }
+                  }
+                } catch (setupError) {
+                  console.error('❌ Error re-setting up workflows:', setupError)
+                  // استخدم المراحل الموجودة رغم أنها قديمة
+                  setWorkflowSteps(sortedWorkflows)
+                  setStep(1)
+                }
+              } else {
+                setWorkflowSteps(sortedWorkflows)
+                setStep(1)
+              }
             } else {
               console.log('⚠️ No workflows found (by name)')
               

@@ -53,6 +53,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [isCalculatingPrice, setIsCalculatingPrice] = useState(false)
   const [paperSize, setPaperSize] = useState<string>('A4')
   const [printQuality, setPrintQuality] = useState<'standard' | 'laser'>('standard')
+  const [paperType, setPaperType] = useState<string>('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   
@@ -292,7 +293,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 />
               </div>
             )}
-            {fields.includes('height') && (
+            {fields.includes('height') && !stepConfig.hide_height && (
               <div className="form-group">
                 <label>الارتفاع {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}</label>
                 <input
@@ -537,6 +538,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     <span>دقة عالية (ليزرية)</span>
                   </label>
                 </div>
+              </div>
+            )}
+            
+            {/* نوع الورق - إذا كان show_paper_type = true */}
+            {stepConfig.show_paper_type && stepConfig.paper_types && stepConfig.paper_types.length > 0 && (
+              <div className="form-group">
+                <label>نوع الورق <span className="required">*</span></label>
+                <select 
+                  value={paperType} 
+                  onChange={(e) => setPaperType(e.target.value)} 
+                  className="form-input"
+                  required={stepConfig.required}
+                >
+                  <option value="">اختر نوع الورق</option>
+                  {stepConfig.paper_types.map((type: any) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
             

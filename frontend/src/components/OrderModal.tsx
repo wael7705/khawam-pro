@@ -2148,7 +2148,35 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
     } catch (error: any) {
       console.error('Error creating order:', error)
-      const errorMessage = error.response?.data?.detail || error.message || 'حدث خطأ في إرسال الطلب'
+      console.error('Error response:', error.response)
+      console.error('Order data sent:', orderData)
+      
+      // عرض تفاصيل الخطأ بشكل أفضل
+      let errorMessage = 'حدث خطأ في إرسال الطلب'
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data
+        } else if (error.response.data.detail) {
+          if (typeof error.response.data.detail === 'string') {
+            errorMessage = error.response.data.detail
+          } else if (Array.isArray(error.response.data.detail)) {
+            // Pydantic validation errors
+            const errors = error.response.data.detail.map((e: any) => {
+              const field = e.loc?.join('.') || 'field'
+              const msg = e.msg || 'validation error'
+              return `${field}: ${msg}`
+            }).join(', ')
+            errorMessage = `خطأ في التحقق من البيانات: ${errors}`
+          } else {
+            errorMessage = JSON.stringify(error.response.data.detail)
+          }
+        } else {
+          errorMessage = JSON.stringify(error.response.data)
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       showError(`خطأ: ${errorMessage}`)
     } finally {
       setIsSubmitting(false)

@@ -342,10 +342,37 @@ export const LecturePrintingService: ServiceHandler = {
                 <button
                   type="button"
                   onClick={() => {
-                    // حفظ الحالة والعودة بعد اختيار العنوان
+                    // حفظ الحالة الكاملة والعودة بعد اختيار العنوان
+                    const formState = {
+                      step: serviceData.step || 4, // المرحلة الحالية (معلومات العميل)
+                      quantity: serviceData.quantity || 1,
+                      totalPages: serviceData.totalPages || 0,
+                      paperSize: serviceData.paperSize || 'A4',
+                      printColor: serviceData.printColor || 'bw',
+                      printQuality: serviceData.printQuality || 'standard',
+                      printSides: serviceData.printSides || 'single',
+                      notes: serviceData.notes || '',
+                      customerName: serviceData.customerName || '',
+                      customerWhatsApp: serviceData.customerWhatsApp || '',
+                      customerPhoneExtra: serviceData.customerPhoneExtra || '',
+                      deliveryType: 'delivery',
+                      serviceName: 'طباعة محاضرات',
+                      uploadedFiles: serviceData.uploadedFiles?.map((f: File) => ({ 
+                        name: f.name, 
+                        size: f.size, 
+                        type: f.type 
+                      })) || []
+                    }
+                    localStorage.setItem('orderFormState', JSON.stringify(formState))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
                     localStorage.setItem('orderModalService', 'طباعة محاضرات')
-                    navigate('/location-picker')
+                    navigate('/location-picker', {
+                      state: {
+                        from: window.location.pathname,
+                        returnTo: 'order-modal',
+                        serviceName: 'طباعة محاضرات'
+                      }
+                    })
                   }}
                   className="btn btn-secondary"
                   style={{ marginTop: '10px' }}
@@ -375,13 +402,18 @@ export const LecturePrintingService: ServiceHandler = {
       notes
     } = serviceData
     
+    // التأكد من أن quantity و total_amount صحيحين
+    const safeQuantity = Number(quantity) || 1
+    const safeTotalAmount = Number(baseOrderData.total_amount) || 0
+    const unitPrice = safeQuantity > 0 ? safeTotalAmount / safeQuantity : safeTotalAmount
+    
     const specifications: any = {
-      paper_size: paperSize,
-      print_color: printColor,
-      print_quality: printQuality,
-      print_sides: printSides,
-      number_of_pages: totalPages,
-      total_pages: totalPages * quantity,
+      paper_size: paperSize || 'A4',
+      print_color: printColor || 'bw',
+      print_quality: printQuality || 'standard',
+      print_sides: printSides || 'single',
+      number_of_pages: totalPages || 0,
+      total_pages: (totalPages || 0) * safeQuantity,
       files_count: uploadedFiles?.length || 0
     }
     
@@ -392,10 +424,10 @@ export const LecturePrintingService: ServiceHandler = {
     return {
       ...baseOrderData,
       items: [{
-        service_name: baseOrderData.service_name,
-        quantity: quantity,
-        unit_price: baseOrderData.total_amount / quantity,
-        total_price: baseOrderData.total_amount,
+        service_name: baseOrderData.service_name || 'طباعة محاضرات',
+        quantity: safeQuantity,
+        unit_price: unitPrice,
+        total_price: safeTotalAmount,
         specifications: specifications,
         design_files: uploadedFiles || []
       }]

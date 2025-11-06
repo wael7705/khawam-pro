@@ -1775,6 +1775,105 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         analyzePDFPages([fileArray[0]])
       }
     }
+    
+    // إذا كان enable_image_color_analysis مفعّل، استخرج الألوان من الصور المرفوعة
+    if (stepConfig.enable_image_color_analysis) {
+      const imageFiles = fileArray.filter(f => f.type.startsWith('image/'))
+      if (imageFiles.length > 0) {
+        // استخراج الألوان من الصور
+        extractColorsFromImages(imageFiles)
+      }
+    }
+  }
+  
+  // استخراج الألوان من الصور المرفوعة
+  const extractColorsFromImages = async (files: File[]) => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const allColors: string[] = []
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue
+
+      try {
+        const imageUrl = URL.createObjectURL(file)
+        const img = new Image()
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve
+          img.onerror = reject
+          img.src = imageUrl
+        })
+
+        // تقليل حجم الصورة للتحليل السريع
+        const maxSize = 200
+        const scale = Math.min(maxSize / img.width, maxSize / img.height)
+        canvas.width = img.width * scale
+        canvas.height = img.height * scale
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        // استخراج بيانات البكسل
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const pixels = imageData.data
+
+        // تجميع الألوان حسب التكرار
+        const colorMap = new Map<string, number>()
+
+        // أخذ عينة من البكسل (كل 40 بكسل لتسريع العملية)
+        for (let i = 0; i < pixels.length; i += 40) {
+          const r = pixels[i]
+          const g = pixels[i + 1]
+          const b = pixels[i + 2]
+          const a = pixels[i + 3]
+
+          // تجاهل البكسل الشفاف
+          if (a < 128) continue
+
+          // تجميع الألوان المتشابهة (في نطاق ±10 لكل قناة)
+          const roundedR = Math.round(r / 10) * 10
+          const roundedG = Math.round(g / 10) * 10
+          const roundedB = Math.round(b / 10) * 10
+          const roundedHex = `#${[roundedR, roundedG, roundedB].map(x => {
+            const hex = Math.min(255, Math.max(0, x)).toString(16)
+            return hex.length === 1 ? '0' + hex : hex
+          }).join('').toUpperCase()}`
+
+          colorMap.set(roundedHex, (colorMap.get(roundedHex) || 0) + 1)
+        }
+
+        // ترتيب الألوان حسب التكرار واختيار الأكثر شيوعاً
+        const sortedColors = Array.from(colorMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([color]) => color)
+
+        allColors.push(...sortedColors)
+
+        URL.revokeObjectURL(imageUrl)
+      } catch (error) {
+        console.error('Error extracting colors from image:', error)
+      }
+    }
+
+    // إزالة الألوان المكررة واختيار الأكثر شيوعاً
+    const uniqueColors = Array.from(new Set(allColors)).slice(0, 6)
+    setAutoExtractedColors(uniqueColors)
+    
+    // إضافة الألوان المستخرجة تلقائياً إلى الألوان المختارة
+    if (uniqueColors.length > 0) {
+      setSelectedColors(prev => {
+        const newColors = [...prev]
+        uniqueColors.forEach(color => {
+          if (!newColors.includes(color) && newColors.length < 6) {
+            newColors.push(color)
+          }
+        })
+        return newColors
+      })
+    }
   }
 
   const analyzePDFPages = async (files: File[]) => {

@@ -73,6 +73,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
   }, [isOpen, serviceName, serviceId, serviceHandler])
 
+  // إذا كان force_color = true، نضبط printColor تلقائياً على 'color'
+  useEffect(() => {
+    if (workflowSteps.length > 0) {
+      const printOptionsStep = workflowSteps.find((s: any) => s.step_type === 'print_options')
+      if (printOptionsStep?.step_config?.force_color && printColor !== 'color') {
+        setPrintColor('color')
+      }
+    }
+  }, [workflowSteps, printColor])
+
   // Helper function to render step content based on step_type
   const renderStepContent = (currentStep: number) => {
     console.log('📋 renderStepContent called - Step:', currentStep, 'WorkflowSteps:', workflowSteps.length)
@@ -545,15 +555,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             )}
             
-            {/* إذا كان force_color = true، نضبط printColor تلقائياً على 'color' */}
-            {stepConfig.force_color && (
-              useEffect(() => {
-                if (printColor !== 'color') {
-                  setPrintColor('color')
-                }
-              }, [stepConfig.force_color])
-            )}
-            
             {/* خيارات الجودة - للملون فقط أو إذا كان force_color = true */}
             {(printColor === 'color' || stepConfig.force_color) && stepConfig.quality_options && (
               <div className="form-group">
@@ -994,10 +995,29 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <span>{totalPages}</span>
                 </div>
               )}
-              {paperSize && (
+              {/* عرض الأبعاد إذا كانت موجودة */}
+              {(width || length || height) && (
                 <div className="invoice-item">
-                  <span>قياس الورق:</span>
+                  <span>الأبعاد:</span>
+                  <span>
+                    {width && `${width} ${unit}`}
+                    {width && (length || height) && ' × '}
+                    {(length || height) && `${length || height} ${unit}`}
+                  </span>
+                </div>
+              )}
+              {/* عرض نوع الورق فقط إذا كان موجوداً (ليس A4 افتراضي) */}
+              {paperSize && paperSize !== 'A4' && (
+                <div className="invoice-item">
+                  <span>نوع الورق:</span>
                   <span>{paperSize}</span>
+                </div>
+              )}
+              {/* عرض نوع الورق المخصص (paperType) إذا كان موجوداً */}
+              {paperType && (
+                <div className="invoice-item">
+                  <span>نوع الورق:</span>
+                  <span>{paperType}</span>
                 </div>
               )}
               <div className="invoice-item">
@@ -1007,7 +1027,17 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               {printColor === 'color' && (
                 <div className="invoice-item">
                   <span>جودة الطباعة:</span>
-                  <span>{printQuality === 'laser' ? 'دقة عالية (ليزرية)' : 'طباعة عادية'}</span>
+                  <span>
+                    {printQuality === 'uv' ? 'دقة عالية (UV)' : 
+                     printQuality === 'laser' ? 'دقة عالية (ليزرية)' : 
+                     'طباعة عادية'}
+                  </span>
+                </div>
+              )}
+              {selectedColors.length > 0 && (
+                <div className="invoice-item">
+                  <span>الألوان المختارة:</span>
+                  <span>{selectedColors.length} لون</span>
                 </div>
               )}
               <div className="invoice-item">

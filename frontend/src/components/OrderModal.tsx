@@ -144,7 +144,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         addressConfirmed,
         setAddressConfirmed,
         fileInputRef,
-        navigate
+        navigate,
+        selectedColors, setSelectedColors,
+        autoExtractedColors, setAutoExtractedColors,
+        step // إضافة step إلى serviceData
       }
       
       const handlers = {

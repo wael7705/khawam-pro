@@ -157,7 +157,7 @@ async def create_workflow(workflow: ServiceWorkflowCreate, db: Session = Depends
              step_description_en, step_type, step_config, display_order, is_active)
             VALUES 
             (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
-             :step_description_en, :step_type, :step_config::jsonb, :display_order, :is_active)
+             :step_description_en, :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
             RETURNING id
         """), {
             "service_id": workflow.service_id,
@@ -217,7 +217,7 @@ async def update_workflow(workflow_id: int, workflow: ServiceWorkflowUpdate, db:
             params["step_type"] = workflow.step_type
         
         if workflow.step_config is not None:
-            update_fields.append("step_config = :step_config::jsonb")
+            update_fields.append("step_config = CAST(:step_config AS jsonb)")
             params["step_config"] = json.dumps(workflow.step_config)
         
         if workflow.display_order is not None:

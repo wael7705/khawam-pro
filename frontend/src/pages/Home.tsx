@@ -134,7 +134,7 @@ function FeaturedWorksSection() {
                                 ? work.image_url
                                 : work.image_url.startsWith('http')
                                 ? work.image_url
-                                : https://khawam-pro-production.up.railway.app
+                                : `https://khawam-pro-production.up.railway.app${work.image_url.startsWith(`"/`") ? work.image_url : `"/`" + work.image_url}`
                             }
                             alt={work.title_ar || work.title}
                             onError={(e) => {

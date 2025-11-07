@@ -1,4 +1,4 @@
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -19,8 +19,8 @@ export default function Home() {
           transition={{ duration: 0.8 }}
         >
           <h1>KHAWAM PRINTING</h1>
-          <p>خدمات الطباعة والتصميم الاحترافية</p>
-          <Link to="/services" className="btn btn-primary">اكتشف خدماتنا</Link>
+          <p>????? ??????? ???????? ??????????</p>
+          <Link to="/services" className="btn btn-primary">????? ???????</Link>
         </motion.div>
         
         <motion.div 
@@ -46,9 +46,9 @@ export default function Home() {
       {/* Services Section */}
       <section className="section services-section">
         <div className="container">
-          <h2 className="section-title">خدماتنا</h2>
+          <h2 className="section-title">???????</h2>
           <div className="services-grid">
-            {['طباعة البوسترات', 'طباعة الفليكس', 'البانرات الإعلانية', 'الكروت الشخصية', 'الملصقات', 'التصميم الجرافيكي'].map((service, i) => (
+            {['????? ?????????', '????? ???????', '???????? ?????????', '?????? ???????', '????????', '??????? ?????????'].map((service, i) => (
               <motion.div 
                 key={service}
                 className="service-card"
@@ -100,9 +100,9 @@ function FeaturedWorksSection() {
   return (
     <section className="section featured-works-section">
       <div className="container">
-        <h2 className="section-title">أبرز أعمالنا</h2>
+        <h2 className="section-title">???? ???????</h2>
         {loading ? (
-          <div className="loading">جاري التحميل...</div>
+          <div className="loading">???? ???????...</div>
         ) : (
           <div className="works-carousel-wrapper">
             <button 
@@ -111,7 +111,7 @@ function FeaturedWorksSection() {
                 const container = document.querySelector('.works-carousel') as HTMLElement;
                 if (container) container.scrollBy({ left: -450, behavior: 'smooth' });
               }}
-              aria-label="تمرير لليسار"
+              aria-label="????? ??????"
             >
               <ChevronLeft size={24} />
             </button>
@@ -148,13 +148,13 @@ function FeaturedWorksSection() {
                         <div className={placeholder-mini }></div>
                       </div>
                       <div className="work-info-mini">
-                        <span className="work-category-mini">{work.category_ar || 'عام'}</span>
+                        <span className="work-category-mini">{work.category_ar || '???'}</span>
                         <h4>{work.title_ar || work.title}</h4>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="loading">لا توجد أعمال للعرض حاليا</div>
+                  <div className="loading">?? ???? ????? ????? ?????</div>
                 )}
               </div>
             </div>
@@ -165,7 +165,7 @@ function FeaturedWorksSection() {
                 const container = document.querySelector('.works-carousel') as HTMLElement;
                 if (container) container.scrollBy({ left: 450, behavior: 'smooth' });
               }}
-              aria-label="تمرير لليمين"
+              aria-label="????? ??????"
             >
               <ChevronRight size={24} />
             </button>

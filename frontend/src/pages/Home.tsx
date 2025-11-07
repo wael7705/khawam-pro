@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import ServicesCarousel from '../components/ServicesCarousel'
 import { portfolioAPI } from '../lib/api'
 import './Home.css'
 
@@ -35,12 +34,21 @@ export default function Home() {
       {/* Services Section */}
       <section className="section services-section">
         <div className="container">
-          <div className="services-section__header">
-            <span className="section-badge">خدمات متكاملة</span>
-            <h2 className="section-title">حلول متخصصة لكل نوع من أعمالك</h2>
-            <p className="section-subtitle">من الطباعة الرقمية السريعة إلى الحملات الإعلانية الخارجية، فريقنا جاهز لتحويل أفكارك إلى حقيقة ملموسة.</p>
+          <h2 className="section-title">خدماتنا</h2>
+          <div className="services-grid">
+            {['طباعة البوسترات', 'طباعة الفليكس', 'البانرات الإعلانية', 'الكروت الشخصية', 'الملصقات', 'التصميم الجرافيكي'].map((service, i) => (
+              <motion.div 
+                key={service}
+                className="service-card"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+              >
+                <div className="service-icon">📄</div>
+                <h3>{service}</h3>
+              </motion.div>
+            ))}
           </div>
-          <ServicesCarousel />
         </div>
       </section>
 

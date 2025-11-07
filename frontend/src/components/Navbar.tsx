@@ -40,6 +40,7 @@ export default function Navbar() {
           <div className="nav-links">
             <Link to="/">الرئيسية</Link>
             <Link to="/services">الخدمات</Link>
+            <Link to="/products">المنتجات</Link>
             <Link to="/portfolio">أعمالنا</Link>
             <Link to="/contact">تواصل</Link>
           </div>

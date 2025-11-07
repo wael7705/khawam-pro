@@ -1,85 +1,100 @@
+import { useState, useEffect } from 'react'
+import { servicesAPI } from '../lib/api'
+import OrderModal from '../components/OrderModal'
 import './Services.css'
-import ServicesCarousel from '../components/ServicesCarousel'
+
+interface Service {
+  id: number
+  name_ar: string
+  name_en: string
+  description_ar?: string
+  icon?: string
+  base_price: number
+}
 
 export default function Services() {
+  const [services, setServices] = useState<Service[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  useEffect(() => {
+    loadServices()
+  }, [])
+
+  // Check if we should reopen order modal after returning from location picker
+  useEffect(() => {
+    // Only check once when component mounts or services are loaded
+    const shouldReopen = localStorage.getItem('shouldReopenOrderModal')
+    const serviceName = localStorage.getItem('orderModalService')
+    
+    if (shouldReopen === 'true' && serviceName && services.length > 0 && !isModalOpen) {
+      // Find the service by name
+      const service = services.find(s => s.name_ar === serviceName)
+      if (service) {
+        setSelectedService(service)
+        setIsModalOpen(true)
+        // DON'T clear the flag here - let OrderModal handle it after restoring state
+      }
+    }
+  }, [services, isModalOpen])
+
+  const loadServices = async () => {
+    try {
+      const response = await servicesAPI.getAll()
+      setServices(response.data)
+    } catch (error) {
+      console.error('Error loading services:', error)
+      setServices([
+        { id: 1, name_ar: 'طباعة البوسترات', name_en: 'Poster Printing', base_price: 0 },
+        { id: 2, name_ar: 'طباعة الفليكس', name_en: 'Flex Printing', base_price: 0 },
+        { id: 3, name_ar: 'البانرات الإعلانية', name_en: 'Advertising Banners', base_price: 0 },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOrder = (service: Service) => {
+    setSelectedService(service)
+    setIsModalOpen(true)
+  }
+
   return (
-    <div className="services-landing">
-      <section className="services-hero">
-        <div className="services-hero__content">
-          <span className="hero-badge">خبرة 15 عاماً في الطباعة والدعاية</span>
-          <h1>حلول دعائية متكاملة تعكس هوية علامتك</h1>
-          <p>
-            فريق خوام يقدم لك رحلة متكاملة من التخطيط إلى التنفيذ. ندرس أهدافك، نصمم الرسالة المناسبة،
-            وننفذ كل ما يلزم لضمان ظهور علامتك بالشكل الأمثل سواء في الفضاء الرقمي أو على أرض الواقع.
-          </p>
-          <div className="hero-actions">
-            <a className="btn btn-primary" href="#services-showcase">اكتشف خدماتنا</a>
-            <a className="btn btn-secondary" href="/contact">استشارة مجانية</a>
+    <div className="services-page section">
+      <div className="container">
+        <h1 className="page-title">خدماتنا</h1>
+        <p className="page-subtitle">نقدم لكم أعرق وأحسن الخدمات</p>
+
+        {loading ? (
+          <div className="loading">جاري التحميل...</div>
+        ) : (
+          <div className="services-grid">
+            {services.map((service) => (
+              <div key={service.id} className="service-card">
+                <div className="service-icon">{service.icon || '📄'}</div>
+                <h3>{service.name_ar}</h3>
+                {service.description_ar && <p>{service.description_ar}</p>}
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleOrder(service)}
+                >
+                  اطلب الآن
+                </button>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="services-hero__media" aria-hidden="true">
-          <video
-            className="services-hero__video"
-            autoPlay
-            muted
-            loop
-            playsInline
-            poster="https://images.unsplash.com/photo-1522542550221-31fd19575a2d?auto=format&fit=crop&w=900&q=80"
-          >
-            <source src="https://storage.googleapis.com/khawam-static/printing-showreel.mp4" type="video/mp4" />
-          </video>
-          <div className="services-hero__overlay" />
-        </div>
-      </section>
-
-      <section id="services-showcase" className="services-showcase">
-        <div className="container">
-          <div className="services-showcase__intro">
-            <h2>كل ما تحتاجه لتطلق حملتك الدعائية بثقة</h2>
-            <p>3 محاور رئيسية نعمل من خلالها على تصميم قصص نجاح عملائنا.</p>
-          </div>
-          <div className="services-showcase__grid">
-            <div className="showcase-card">
-              <span>01</span>
-              <h3>استراتيجية العلامة</h3>
-              <p>
-                جلسات استكشاف لفهم أهدافك، الجمهور المستهدف، وقنوات التواصل المناسبة مع تقديم خارطة طريق واضحة للحملة.
-              </p>
-            </div>
-            <div className="showcase-card">
-              <span>02</span>
-              <h3>التصميم والإنتاج</h3>
-              <p>
-                فريق تصميم متخصص يصنع مواد إبداعية جاهزة للطباعة أو النشر الرقمي مع مراقبة جودة لكل مرحلة إنتاج.
-              </p>
-            </div>
-            <div className="showcase-card">
-              <span>03</span>
-              <h3>النشر والمتابعة</h3>
-              <p>
-                تنفيذ وتركيب في الموقع، إدارة القنوات الإعلانية، وقياس النتائج لضمان تحقيق أعلى عائد ممكن للحملة.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="services-carousel-wrapper">
-        <div className="container">
-          <ServicesCarousel />
-        </div>
-      </section>
-
-      <section className="services-cta">
-        <div className="container">
-          <h2>جاهز لبدء مشروعك القادم؟</h2>
-          <p>
-            احجز موعداً مع أحد مستشارينا لنبني خطة عمل مخصصة تناسب ميزانيتك وتطلعاتك.
-          </p>
-          <a className="btn btn-primary" href="/contact">ابدأ الآن</a>
-        </div>
-      </section>
+      {selectedService && (
+        <OrderModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          serviceName={selectedService.name_ar}
+          serviceId={selectedService.id}
+        />
+      )}
     </div>
   )
 }

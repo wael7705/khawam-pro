@@ -13,7 +13,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g pnpm
 
-# Copy backend requirements first (for better caching)
+# Install Python dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -21,7 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY frontend/package.json frontend/pnpm-lock.yaml ./frontend/
 WORKDIR /app/frontend
 RUN pnpm install --frozen-lockfile
-
 COPY frontend/ .
 RUN pnpm run build
 
@@ -33,10 +32,7 @@ COPY backend/ .
 RUN mkdir -p static && \
     cp -r frontend/dist/* static/ || true
 
-# Create uploads directory
-RUN mkdir -p uploads
-
-# Expose port (Railway will set PORT env variable)
+# Expose port
 EXPOSE 8000
 
 # Run the application

@@ -18,7 +18,6 @@ export default function Home() {
         >
           <h1>KHAWAM PRINTING</h1>
           <p>خدمات الطباعة والتصميم الاحترافية</p>
-          <Link to="/services" className="btn btn-primary">تصفح الخدمات</Link>
         </motion.div>
         
         <motion.div 

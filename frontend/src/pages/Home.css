@@ -45,11 +45,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.placeholder-image span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: clamp(3rem, 6vw, 4.5rem);
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  color: #ffffff;
+  text-shadow:
+    0 0 18px rgba(255, 255, 255, 0.5),
+    0 0 42px rgba(249, 115, 22, 0.55),
+    0 0 64px rgba(56, 189, 248, 0.35);
+  padding: 0 12px;
 }
 
 .services-promo {

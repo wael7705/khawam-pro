@@ -2,13 +2,13 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ordersAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
-import api from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
-import ImageColorAnalyzer from './ImageColorAnalyzer'
 import { findServiceHandler } from '../services/serviceRegistry'
 import { getUserData } from '../lib/auth'
 import './OrderModal.css'
+
+type PrintQuality = 'standard' | 'laser' | 'uv'
 
 interface OrderModalProps {
   isOpen: boolean
@@ -54,19 +54,47 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const hasRestoredState = useRef(false)
+  const addressToastShown = useRef(false)
+  const [successInfo, setSuccessInfo] = useState<{ orderNumber: string } | null>(null)
   
   // Print options states (no pricing)
   const [printColor, setPrintColor] = useState<'bw' | 'color'>('bw')
   const [printSides, setPrintSides] = useState<'single' | 'double'>('single')
   const [numberOfPages, setNumberOfPages] = useState<number>(1)
   const [paperSize, setPaperSize] = useState<string>('A4')
-  const [printQuality, setPrintQuality] = useState<'standard' | 'laser'>('standard')
+  const [printQuality, setPrintQuality] = useState<PrintQuality>('standard')
   const [paperType, setPaperType] = useState<string>('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Service Handler - منطق الخدمة المحددة
   const serviceHandler = findServiceHandler(serviceName, serviceId)
+
+  const applyWorkflowSteps = (steps: any[], currentServiceName: string) => {
+    setWorkflowSteps(steps)
+    let savedStep: number | null = null
+
+    try {
+      const savedState = localStorage.getItem('orderFormState')
+      if (savedState) {
+        const parsed = JSON.parse(savedState)
+        if (parsed.serviceName === currentServiceName && typeof parsed.step === 'number') {
+          savedStep = parsed.step
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Unable to parse saved form state step:', error)
+    }
+
+    if (savedStep && !Number.isNaN(savedStep)) {
+      const safeStep = Math.min(Math.max(savedStep, 1), steps.length || 1)
+      setStep(safeStep)
+    } else if (!hasRestoredState.current) {
+      setStep(1)
+    } else {
+      setStep(prev => Math.min(prev, steps.length || prev))
+    }
+  }
   
   // Debug: للتأكد من أن ServiceHandler يتم العثور عليه
   useEffect(() => {
@@ -630,7 +658,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       name="printQuality"
                       value="standard"
                       checked={printQuality === 'standard'}
-                        onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                        onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
                     />
                       <span>{stepConfig.quality_options.standard}</span>
                   </label>
@@ -642,7 +670,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         name="printQuality"
                         value="uv"
                         checked={printQuality === 'uv'}
-                        onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                        onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
                       />
                       <span>{stepConfig.quality_options.uv}</span>
                     </label>
@@ -654,7 +682,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       name="printQuality"
                       value="laser"
                       checked={printQuality === 'laser'}
-                        onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                        onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
                     />
                       <span>{stepConfig.quality_options.laser}</span>
                   </label>
@@ -668,7 +696,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                             name="printQuality"
                             value="standard"
                             checked={printQuality === 'standard'}
-                            onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                            onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
                           />
                           <span>{stepConfig.quality_options.color.standard}</span>
                         </label>
@@ -680,7 +708,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                             name="printQuality"
                             value="laser"
                             checked={printQuality === 'laser'}
-                            onChange={(e) => setPrintQuality(e.target.value as 'standard' | 'uv' | 'laser')}
+                            onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
                           />
                           <span>{stepConfig.quality_options.color.laser}</span>
                         </label>
@@ -1607,21 +1635,17 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
                     const reloadedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
                     console.log('✅ Loaded workflows after re-setup:', reloadedWorkflows.length, reloadedWorkflows)
-                    setWorkflowSteps(reloadedWorkflows)
-                    setStep(1)
+                    applyWorkflowSteps(reloadedWorkflows, serviceName)
                     showSuccess('تم تحديث مراحل الخدمة بنجاح')
                   }
                 }
               } catch (setupError) {
                 console.error('❌ Error re-setting up workflows:', setupError)
                 // استخدم المراحل الموجودة رغم أنها قديمة
-                setWorkflowSteps(sortedWorkflows)
-                setStep(1)
+                applyWorkflowSteps(sortedWorkflows, serviceName)
               }
             } else {
-              setWorkflowSteps(sortedWorkflows)
-            // Reset to first step
-            setStep(1)
+              applyWorkflowSteps(sortedWorkflows, serviceName)
             }
           } else {
             console.log('⚠️ No workflows found in response')
@@ -1639,8 +1663,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
                     const sortedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
                     console.log('✅ Loaded workflows after setup:', sortedWorkflows.length, sortedWorkflows)
-                    setWorkflowSteps(sortedWorkflows)
-                    setStep(1)
+                    applyWorkflowSteps(sortedWorkflows, serviceName)
                     showSuccess('تم إعداد مراحل الخدمة بنجاح')
                   }
                 }
@@ -1660,8 +1683,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
                     const sortedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
                     console.log('✅ Loaded workflows after setup:', sortedWorkflows.length, sortedWorkflows)
-                    setWorkflowSteps(sortedWorkflows)
-                    setStep(1)
+                    applyWorkflowSteps(sortedWorkflows, serviceName)
                     showSuccess('تم إعداد مراحل الخدمة بنجاح')
                   }
                 }
@@ -1714,16 +1736,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     if (reloadResponse.data.success && reloadResponse.data.workflows && reloadResponse.data.workflows.length > 0) {
                       const reloadedWorkflows = reloadResponse.data.workflows.sort((a: any, b: any) => a.step_number - b.step_number)
                       console.log('✅ Loaded workflows after re-setup:', reloadedWorkflows.length, reloadedWorkflows)
-                      setWorkflowSteps(reloadedWorkflows)
-              setStep(1)
+                      applyWorkflowSteps(reloadedWorkflows, serviceName)
                       showSuccess('تم تحديث مراحل الخدمة بنجاح')
                     }
                   }
                 } catch (setupError) {
                   console.error('❌ Error re-setting up workflows:', setupError)
                   // استخدم المراحل الموجودة رغم أنها قديمة
-                  setWorkflowSteps(sortedWorkflows)
-                  setStep(1)
+                  applyWorkflowSteps(sortedWorkflows, serviceName)
                 }
               } else {
                 setWorkflowSteps(sortedWorkflows)
@@ -1863,6 +1883,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             const address = JSON.parse(savedAddress)
             setDeliveryAddress(address)
             setAddressConfirmed(true)
+            if (!addressToastShown.current) {
+              showSuccess('تم تحديد العنوان بنجاح، يمكنك متابعة اختيار نوع الاستلام.')
+              addressToastShown.current = true
+            }
             // Only update shopName if it's not already set from formState
             const formStateStr = localStorage.getItem('orderFormState')
             if (formStateStr) {
@@ -2073,6 +2097,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     if (type === 'self') {
       setAddressConfirmed(false)
     } else if (type === 'delivery') {
+      addressToastShown.current = false
       // Save current form state including current step and all fields
       // IMPORTANT: Save the CURRENT step number so we return to the same step
       localStorage.setItem('orderFormState', JSON.stringify({
@@ -2145,6 +2170,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const safeQuantity = Number(quantity) || 1
     const safeTotalPrice = 0 // No price calculation - for record keeping only
     const unitPrice = 0 // No price calculation - for record keeping only
+    let orderData: any = null
     
     try {
       // Upload image if exists
@@ -2183,7 +2209,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
       
       // إذا كانت هناك خدمة مسجلة، استخدم منطقها الخاص لتحضير البيانات
-      let orderData: any
       if (serviceHandler) {
         const serviceData = {
           uploadedFiles,
@@ -2239,7 +2264,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 number_of_pages: totalPages || numberOfPages,
                 paper_size: paperSize || 'A4',
                 total_pages: totalPages,
-                files_count: uploadedFiles.length,
+                files_count: uploadedFiles.length
               },
               dimensions: {
                 length: length || null,
@@ -2251,26 +2276,27 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               design_files: imageUrl ? [imageUrl] : []
             }
           ],
-        total_amount: safeTotalPrice,
-        final_amount: safeTotalPrice,
-        delivery_type: deliveryType,
-        delivery_address: deliveryType === 'delivery' 
-          ? (deliveryAddress?.street || shopName || null)
-          : null,
-        delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude 
-          ? deliveryAddress.latitude 
-          : null,
-        delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude 
-          ? deliveryAddress.longitude 
-          : null,
-        notes: notes || workType || null
+          total_amount: safeTotalPrice,
+          final_amount: safeTotalPrice,
+          delivery_type: deliveryType,
+          delivery_address: deliveryType === 'delivery'
+            ? (deliveryAddress?.street || shopName || null)
+            : null,
+          delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude
+            ? deliveryAddress.latitude
+            : null,
+          delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude
+            ? deliveryAddress.longitude
+            : null,
+          notes: notes || workType || null
         }
       }
 
       const response = await ordersAPI.create(orderData)
       
       if (response.data.success) {
-        showSuccess(`تم إرسال الطلب بنجاح! رقم الطلب: ${response.data.order.order_number}`)
+        const orderNumber = response.data?.order?.order_number || 'غير متوفر'
+        setSuccessInfo({ orderNumber })
         // Clear saved form state and delivery address
         localStorage.removeItem('orderFormState')
         localStorage.removeItem('deliveryAddress')
@@ -2297,6 +2323,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setDeliveryType('self')
         setDeliveryAddress(null)
         setAddressConfirmed(false)
+        addressToastShown.current = false
         setClothingSource('customer')
         setClothingProduct('hoodie')
         setClothingColor('أبيض')
@@ -2307,7 +2334,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           shoulder_right: null,
           shoulder_left: null,
         })
-        onClose()
       } else {
         showError('فشل إرسال الطلب. يرجى المحاولة مرة أخرى')
       }
@@ -2348,7 +2374,41 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
   }
 
-  if (!isOpen) return null
+  const handleSuccessClose = (goToOrders = false) => {
+    setSuccessInfo(null)
+    onClose()
+    if (goToOrders) {
+      navigate('/orders')
+    }
+  }
+
+  if (!isOpen && !successInfo) return null
+
+  if (successInfo) {
+    return (
+      <div className="order-modal-overlay" onClick={() => handleSuccessClose()}>
+        <div className="order-modal success" onClick={(e) => e.stopPropagation()}>
+          <div className="success-icon">✅</div>
+          <h2>تم استلام طلبك بنجاح</h2>
+          <p className="success-order-number">
+            رقم الطلب: <strong>{successInfo.orderNumber}</strong>
+          </p>
+          <p className="success-message">
+            يمكنك مراجعة حالة طلبك من تبويب <strong>طلباتي</strong>. سنتواصل معك عبر واتساب لتحديد موعد التسليم
+            والتكلفة لضمان أفضل سعر مدروس لك.
+          </p>
+          <div className="success-actions">
+            <button className="btn btn-primary" onClick={() => handleSuccessClose(true)}>
+              الانتقال إلى طلباتي
+            </button>
+            <button className="btn btn-secondary" onClick={() => handleSuccessClose(false)}>
+              إغلاق
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="order-modal-overlay" onClick={onClose}>
@@ -2362,7 +2422,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
         {/* Progress Bar */}
         <div className="progress-bar">
-          {(workflowSteps.length > 0 ? workflowSteps : [1, 2, 3, 4, 5]).map((s, index) => {
+          {(workflowSteps.length > 0 ? workflowSteps : [1, 2, 3, 4, 5]).map((s) => {
             const stepNum = workflowSteps.length > 0 ? s.step_number : s
             const stepName = workflowSteps.length > 0 ? s.step_name_ar : `مرحلة ${s}`
             return (

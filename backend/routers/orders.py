@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Order, OrderItem, User
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from decimal import Decimal
 import uuid
 from datetime import datetime
+from collections import defaultdict
+import json
 
 router = APIRouter()
 
@@ -348,23 +350,89 @@ async def create_order(
 
 @router.get("/")
 async def get_orders(db: Session = Depends(get_db)):
-    """Get all orders (for authenticated users)"""
+    """Get all orders with their details and items"""
     try:
         orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+        order_ids = [order.id for order in orders]
+
+        items_map: Dict[int, List[OrderItem]] = defaultdict(list)
+        if order_ids:
+            items = db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).all()
+            for item in items:
+                items_map[item.order_id].append(item)
+
+        def serialize_decimal(value):
+            if value is None:
+                return None
+            try:
+                return float(value)
+            except Exception:
+                return value
+
+        orders_payload = []
+        for order in orders:
+            order_items_payload = []
+            for item in items_map.get(order.id, []):
+                specs = item.specifications
+                if isinstance(specs, str):
+                    try:
+                        specs = json.loads(specs)
+                    except Exception:
+                        specs = {"raw": specs}
+
+                design_files = item.design_files
+                if isinstance(design_files, str):
+                    try:
+                        design_files = json.loads(design_files)
+                    except Exception:
+                        design_files = [design_files]
+                if design_files is None:
+                    design_files = []
+                if isinstance(design_files, list):
+                    normalized_files = []
+                    for design_item in design_files:
+                        if isinstance(design_item, dict):
+                            normalized_files.append(design_item)
+                        else:
+                            normalized_files.append({"filename": str(design_item)})
+                    design_files = normalized_files
+
+                order_items_payload.append({
+                    "id": item.id,
+                    "service_name": getattr(item, "product_name", None),
+                    "quantity": item.quantity,
+                    "unit_price": serialize_decimal(item.unit_price),
+                    "total_price": serialize_decimal(item.total_price),
+                    "specifications": specs,
+                    "design_files": design_files,
+                    "status": item.status,
+                    "created_at": item.created_at.isoformat() if item.created_at else None
+                })
+
+            orders_payload.append({
+                "id": order.id,
+                "order_number": order.order_number,
+                "status": order.status,
+                "total_amount": serialize_decimal(order.total_amount),
+                "final_amount": serialize_decimal(order.final_amount),
+                "payment_status": order.payment_status,
+                "created_at": order.created_at.isoformat() if order.created_at else None,
+                "updated_at": order.updated_at.isoformat() if getattr(order, "updated_at", None) else None,
+                "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
+                "customer_whatsapp": order.customer_whatsapp,
+                "shop_name": order.shop_name,
+                "delivery_type": order.delivery_type,
+                "delivery_address": order.delivery_address,
+                "delivery_latitude": serialize_decimal(getattr(order, "delivery_latitude", None)),
+                "delivery_longitude": serialize_decimal(getattr(order, "delivery_longitude", None)),
+                "notes": order.notes,
+                "items": order_items_payload
+            })
+
         return {
             "success": True,
-            "orders": [
-                {
-                    "id": order.id,
-                    "order_number": order.order_number,
-                    "status": order.status,
-                    "total_amount": float(order.total_amount),
-                    "final_amount": float(order.final_amount),
-                    "payment_status": order.payment_status,
-                    "created_at": order.created_at.isoformat() if order.created_at else None
-                }
-                for order in orders
-            ]
+            "orders": orders_payload
         }
     except Exception as e:
         print(f"Error fetching orders: {e}")

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
-import L, { LatLngExpression } from 'leaflet'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './GoogleMap.css'
 
-const COORDINATES: LatLngExpression = [33.509361, 36.287889]
+const COORDINATES: [number, number] = [33.509361, 36.287889]
 const [LAT, LNG] = COORDINATES as [number, number]
 
 const MARKER_ICON = new L.Icon({
@@ -25,6 +25,9 @@ interface GoogleMapProps {
 export default function GoogleMap({ title = 'خوام للطباعة والتصميم', description }: GoogleMapProps) {
   const [isClient, setIsClient] = useState(false)
   const markerIcon = useMemo(() => MARKER_ICON, [])
+  const MapContainerAny = MapContainer as unknown as ComponentType<any>
+  const TileLayerAny = TileLayer as unknown as ComponentType<any>
+  const MarkerAny = Marker as unknown as ComponentType<any>
 
   useEffect(() => {
     setIsClient(true)
@@ -36,12 +39,12 @@ export default function GoogleMap({ title = 'خوام للطباعة والتص�
 
   return (
     <div className="google-map">
-      <MapContainer center={COORDINATES} zoom={16} scrollWheelZoom={false} className="google-map__canvas">
-        <TileLayer
+      <MapContainerAny center={COORDINATES} zoom={16} scrollWheelZoom={false} className="google-map__canvas">
+        <TileLayerAny
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={COORDINATES} icon={markerIcon}>
+        <MarkerAny position={COORDINATES} icon={markerIcon}>
           <Popup>
             <strong>{title}</strong>
             {description && <p>{description}</p>}
@@ -53,8 +56,8 @@ export default function GoogleMap({ title = 'خوام للطباعة والتص�
               فتح في خرائط جوجل
             </a>
           </Popup>
-        </Marker>
-      </MapContainer>
+        </MarkerAny>
+      </MapContainerAny>
     </div>
   )
 }

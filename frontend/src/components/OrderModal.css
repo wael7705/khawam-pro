@@ -25,6 +25,41 @@
   border: 3px solid rgba(249, 115, 22, 0.2);
 }
 
+.order-modal.success {
+  max-width: 520px;
+  padding: 40px 35px;
+  text-align: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #f8fafc;
+  border: 3px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 40px 90px rgba(15, 23, 42, 0.6);
+  max-height: none;
+}
+
+.success-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+
+.success-order-number {
+  font-size: 1.3rem;
+  margin: 10px 0 20px;
+  color: #38bdf8;
+}
+
+.success-message {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.success-actions {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -410,6 +445,10 @@
   .order-modal {
     max-width: 100%;
     max-height: 95vh;
+  }
+  
+  .order-modal.success {
+    padding: 30px 22px;
   }
   
   .color-palette {

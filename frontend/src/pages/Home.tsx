@@ -1,52 +1,11 @@
-﻿import { motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import ProductCard from '../components/ProductCard'
-import { productsAPI, portfolioAPI } from '../lib/api'
+import { portfolioAPI } from '../lib/api'
 import './Home.css'
 
-interface Product {
-  id: number
-  name: string
-  name_ar: string
-  price: number
-  image_url?: string
-}
-
 export default function Home() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadProducts()
-  }, [])
-
-  const loadProducts = async () => {
-    try {
-      const response = await productsAPI.getFeatured()
-      // تأكد أن البيانات مصفوفة
-      const data = response.data
-      if (Array.isArray(data)) {
-        setProducts(data)
-      } else if (data && Array.isArray(data.products)) {
-        setProducts(data.products)
-      } else {
-        setProducts([])
-      }
-    } catch (error) {
-      console.error('Error loading products:', error)
-      // Fallback data
-      setProducts([
-        { id: 1, name_ar: 'بوستر A4', name: 'A4 Poster', price: 2000, image_url: '' },
-        { id: 2, name_ar: 'فليكس خارجي', name: 'Outdoor Flex', price: 3000, image_url: '' },
-        { id: 3, name_ar: 'بانر احتفالي', name: 'Event Banner', price: 5000, image_url: '' },
-      ])
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="home">
       {/* Hero Section */}
@@ -59,7 +18,7 @@ export default function Home() {
         >
           <h1>KHAWAM PRINTING</h1>
           <p>خدمات الطباعة والتصميم الاحترافية</p>
-          <Link to="/products" className="btn btn-primary">تصفح المنتجات</Link>
+          <Link to="/services" className="btn btn-primary">تصفح الخدمات</Link>
         </motion.div>
         
         <motion.div 
@@ -70,55 +29,6 @@ export default function Home() {
         >
           <div className="placeholder-image"></div>
         </motion.div>
-      </section>
-
-      {/* Products Preview */}
-      <section className="section">
-        <div className="container">
-          <h2 className="section-title">المنتجات المميزة</h2>
-          {loading ? (
-            <div className="loading">جاري التحميل...</div>
-          ) : (
-            <div className="products-carousel-wrapper">
-              <button 
-                className="scroll-btn scroll-btn-left"
-                onClick={() => {
-                  const container = document.querySelector('.products-carousel') as HTMLElement;
-                  if (container) container.scrollBy({ left: -400, behavior: 'smooth' });
-                }}
-                aria-label="تمرير لليسار"
-              >
-                <ChevronLeft size={24} />
-              </button>
-              
-              <div className="products-carousel-container">
-                <div className="products-carousel">
-                  {products.length > 0 ? (
-                    products.map((product, index) => (
-                      <ProductCard key={product.id} product={product} index={index} />
-                    ))
-                  ) : (
-                    <div className="loading">لا توجد منتجات حالياً</div>
-                  )}
-                </div>
-              </div>
-              
-              <button 
-                className="scroll-btn scroll-btn-right"
-                onClick={() => {
-                  const container = document.querySelector('.products-carousel') as HTMLElement;
-                  if (container) container.scrollBy({ left: 400, behavior: 'smooth' });
-                }}
-                aria-label="تمرير لليمين"
-              >
-                <ChevronRight size={24} />
-              </button>
-            </div>
-          )}
-          <div className="text-center mt-40">
-            <Link to="/products" className="btn btn-secondary">عرض جميع المنتجات</Link>
-          </div>
-        </div>
       </section>
 
       {/* Services Section */}

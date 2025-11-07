@@ -56,19 +56,6 @@ api.interceptors.response.use(
   }
 )
 
-// Products API
-export const productsAPI = {
-  getAll: async () => {
-    const response = await api.get('/products/')
-    return { data: Array.isArray(response.data) ? response.data : (response.data.products || []) }
-  },
-  getById: (id: number) => api.get(`/products/${id}`),
-  getFeatured: async () => {
-    const response = await api.get('/products/?featured=true')
-    return { data: Array.isArray(response.data) ? response.data : (response.data.products || []) }
-  },
-}
-
 // Services API
 export const servicesAPI = {
   getAll: async () => {

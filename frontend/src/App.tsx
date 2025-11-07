@@ -12,6 +12,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import LocationPickerPage from './pages/LocationPickerPage'
 import RateOrderPage from './pages/RateOrderPage'
+import Orders from './pages/Orders'
 import Footer from './components/Footer'
 import { ToastContainer } from './components/Toast'
 import { subscribe, getToasts, removeToast } from './utils/toast'
@@ -21,9 +22,8 @@ import './App.css'
 function App() {
   const location = useLocation()
   const [toasts, setToasts] = useState<Toast[]>([])
-  const hideFooterPaths = []
   const hideAllPaths = ['/dashboard', '/location-picker', '/rate-order', '/login', '/register']
-  const shouldHideFooter = hideFooterPaths.includes(location.pathname)
+  const shouldHideFooter = location.pathname !== '/'
   const shouldHideAll = hideAllPaths.some(path => location.pathname.startsWith(path))
 
   useEffect(() => {
@@ -48,6 +48,7 @@ function App() {
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/work/:id" element={<WorkDetail />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/orders" element={<Orders />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/location-picker" element={<LocationPickerPage />} />
           <Route path="/rate-order/:id" element={<RateOrderPage />} />

@@ -42,6 +42,14 @@
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .services-promo {
@@ -85,39 +93,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
-}
-
-.services-promo__stats {
-  display: grid;
-  gap: 18px;
-  background: rgba(15, 23, 42, 0.4);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 20px;
-  padding: 28px 24px;
-  text-align: center;
-  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.35);
-}
-
-.services-promo__stats strong {
-  display: block;
-  font-size: 1.8rem;
-  color: #fff;
-}
-
-.services-promo__stats span {
-  color: rgba(226, 232, 240, 0.7);
-  font-size: 0.95rem;
-}
-
-.services-promo__stats div {
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.45);
-}
-
-.services-promo__stats div:last-of-type {
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .services-section {

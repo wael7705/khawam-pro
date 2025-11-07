@@ -27,7 +27,9 @@ export default function Home() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
         >
-          <div className="placeholder-image"></div>
+          <div className="placeholder-image">
+            <span>خوام</span>
+          </div>
         </motion.div>
       </section>
 
@@ -40,26 +42,11 @@ export default function Home() {
               <h2>نعمل معك من الفكرة وحتى استلام الطلب</h2>
               <p>
                 باقة خدمات خوام تجمع بين التصميم الإبداعي، الطباعة الاحترافية، والمتابعة الدقيقة للتسليم.
-                اختر الخدمة المناسبة وسيقوم فريقنا بإرشادك خطوة بخطوة للحصول على أفضل النتائج.
+                اختر الخدمة المناسبة وسيقوم فريقنا بمتابعة طلبك حتى الاستلام، فنحن لا نضع الأسعار هنا حرصاً على تقديم
+                أفضل سعر مدروس يلائم متطلباتك.
               </p>
               <div className="services-promo__actions">
-                <Link to="/services" className="btn btn-primary">اكتشف خدماتنا</Link>
                 <Link to="/contact" className="btn btn-secondary">احجز استشارة مجانية</Link>
-              </div>
-            </div>
-
-            <div className="services-promo__stats">
-              <div>
-                <strong>250+</strong>
-                <span>مشروع مكتمل سنوياً</span>
-              </div>
-              <div>
-                <strong>48 ساعة</strong>
-                <span>متوسط وقت التنفيذ</span>
-              </div>
-              <div>
-                <strong>4.9/5</strong>
-                <span>تقييم العملاء</span>
               </div>
             </div>
           </div>

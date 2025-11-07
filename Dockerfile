@@ -18,10 +18,9 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy and build Frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml ./frontend/
+COPY frontend/ ./frontend/
 WORKDIR /app/frontend
-RUN pnpm install --frozen-lockfile
-COPY frontend/ .
+RUN pnpm install
 RUN pnpm run build
 
 # Copy backend code

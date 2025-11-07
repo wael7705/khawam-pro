@@ -635,4 +635,5 @@ if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Use workers=1 for Railway (single process)
+    uvicorn.run(app, host="0.0.0.0", port=port, workers=1)

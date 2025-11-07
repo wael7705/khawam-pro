@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js and pnpm
+# Install Node.js and pnpm 8
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
-    npm install -g pnpm
+    npm install -g pnpm@8
 
 # Install Python dependencies
 COPY backend/requirements.txt .

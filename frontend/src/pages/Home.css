@@ -64,9 +64,9 @@
 }
 
 .services-promo {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.75));
+  background: var(--gray);
   padding: 70px 0;
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 .services-promo__content {
@@ -79,12 +79,12 @@
 .services-promo__text h2 {
   font-size: clamp(2rem, 3vw, 2.8rem);
   margin-bottom: 15px;
-  color: #fff;
+  color: var(--text);
 }
 
 .services-promo__text p {
   line-height: 1.8;
-  color: rgba(226, 232, 240, 0.75);
+  color: var(--text-secondary);
   margin-bottom: 24px;
 }
 
@@ -94,10 +94,43 @@
   gap: 8px;
   padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.12);
-  color: var(--secondary, #38bdf8);
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--secondary);
   font-weight: 600;
   margin-bottom: 18px;
+}
+
+.services-promo__stats {
+  display: grid;
+  gap: 18px;
+  background: var(--bg-alt, rgba(15, 23, 42, 0.06));
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 20px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.1);
+}
+
+.services-promo__stats strong {
+  display: block;
+  font-size: 1.8rem;
+  color: var(--text);
+}
+
+.services-promo__stats span {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.services-promo__stats div {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.services-promo__stats div:last-of-type {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .services-promo__actions {

@@ -17,6 +17,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy workspace files for pnpm
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
 # Copy and build Frontend
 COPY frontend/ ./frontend/
 WORKDIR /app/frontend

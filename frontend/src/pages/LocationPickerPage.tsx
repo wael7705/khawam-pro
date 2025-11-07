@@ -153,10 +153,7 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
         localStorage.setItem('shouldReopenOrderModal', 'true')
         localStorage.setItem('orderModalService', location.state.serviceName || '')
         navigate(location.state.from)
-      } else if (location.state?.from === 'product-order' || location.state?.from === '/products') {
         // Support for product order modal
-        localStorage.setItem('shouldReopenProductOrderModal', 'true')
-        navigate('/products')
       } else if (location.state?.from) {
         navigate(location.state.from)
       } else {

@@ -31,6 +31,41 @@ export default function Home() {
         </motion.div>
       </section>
 
+      {/* Services Promo */}
+      <section className="section services-promo">
+        <div className="container">
+          <div className="services-promo__content">
+            <div className="services-promo__text">
+              <span className="services-promo__badge">حلول متكاملة للطباعة والدعاية</span>
+              <h2>نعمل معك من الفكرة وحتى استلام الطلب</h2>
+              <p>
+                باقة خدمات خوام تجمع بين التصميم الإبداعي، الطباعة الاحترافية، والمتابعة الدقيقة للتسليم.
+                اختر الخدمة المناسبة وسيقوم فريقنا بإرشادك خطوة بخطوة للحصول على أفضل النتائج.
+              </p>
+              <div className="services-promo__actions">
+                <Link to="/services" className="btn btn-primary">اكتشف خدماتنا</Link>
+                <Link to="/contact" className="btn btn-secondary">احجز استشارة مجانية</Link>
+              </div>
+            </div>
+
+            <div className="services-promo__stats">
+              <div>
+                <strong>250+</strong>
+                <span>مشروع مكتمل سنوياً</span>
+              </div>
+              <div>
+                <strong>48 ساعة</strong>
+                <span>متوسط وقت التنفيذ</span>
+              </div>
+              <div>
+                <strong>4.9/5</strong>
+                <span>تقييم العملاء</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Services Section */}
       <section className="section services-section">
         <div className="container">

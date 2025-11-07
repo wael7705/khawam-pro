@@ -17,6 +17,7 @@ async def lifespan(app: FastAPI):
         loop = asyncio.get_event_loop()
         loop.create_task(_init_pricing_table())
         loop.create_task(_setup_lecture_printing_service())
+        loop.create_task(_setup_clothing_printing_service())
         loop.create_task(_ensure_default_services())
     except Exception as e:
         print(f"Warning: Failed to initialize: {str(e)[:100]}")
@@ -225,6 +226,7 @@ async def _setup_lecture_printing_service():
     import time
     import json
     import asyncio
+    import json
     await asyncio.sleep(5)  # انتظار أكثر حتى تكون قاعدة البيانات جاهزة
     
     conn = None
@@ -387,6 +389,165 @@ async def _setup_lecture_printing_service():
             except:
                 pass
 
+async def _setup_clothing_printing_service():
+    """إعداد خدمة الطباعة على الملابس تلقائياً عند بدء التطبيق"""
+    import asyncio
+    import json
+    await asyncio.sleep(6)
+
+    conn = None
+    try:
+        print("🔄 Starting clothing printing service setup...")
+        conn = engine.connect()
+
+        existing_service = conn.execute(text("""
+            SELECT id FROM services
+            WHERE name_ar LIKE '%طباعة على الملابس%' OR name_ar LIKE '%ملابس%'
+            LIMIT 1
+        """)).fetchone()
+
+        if existing_service:
+            service_id = existing_service[0]
+            print(f"✅ خدمة الطباعة على الملابس موجودة بالفعل (ID: {service_id})")
+        else:
+            result = conn.execute(text("""
+                INSERT INTO services
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "الطباعة على الملابس",
+                "name_en": "Clothing Printing",
+                "description_ar": "خدمة طباعة الشعارات والتصاميم على الملابس مع خيارات متعددة للمناطق والألوان",
+                "icon": "👕",
+                "base_price": 0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 2
+            })
+            service_id = result.scalar()
+            conn.commit()
+            print(f"✅ تم إنشاء خدمة الطباعة على الملابس (ID: {service_id})")
+
+        # إعادة بناء المراحل لضمان التحديث
+        conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), {"service_id": service_id})
+        conn.commit()
+
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "مصدر الملابس والاختيارات",
+                "step_name_en": "Clothing Source",
+                "step_description_ar": "حدد ما إذا كنت ستوفر الملابس بنفسك أو ستطلبها من منتجاتنا، ثم اختر المنتج واللون المناسب.",
+                "step_type": "clothing_source",
+                "step_config": {
+                    "required": True,
+                    "options": [
+                        {"id": "customer", "label": "الملابس من عندي"},
+                        {
+                            "id": "store",
+                            "label": "من منتجات خوام",
+                            "products": [
+                                {
+                                    "id": "hoodie",
+                                    "name": "كنزة هودي",
+                                    "colors": ["أبيض", "أسود", "رمادي"]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "الكمية ورفع التصاميم",
+                "step_name_en": "Quantity and Design Upload",
+                "step_description_ar": "أدخل الكمية المطلوبة وارفع الملفات لكل موضع من التصميم.",
+                "step_type": "clothing_designs",
+                "step_config": {
+                    "locations": [
+                        {"id": "logo", "label": "شعار"},
+                        {"id": "front", "label": "صدر"},
+                        {"id": "back", "label": "ظهر"},
+                        {"id": "shoulder_right", "label": "كتف أيمن"},
+                        {"id": "shoulder_left", "label": "كتف أيسر"}
+                    ],
+                    "accept": ".pdf,.psd,.ai,.png,.jpg,.jpeg"
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي تعليمات خاصة للألوان أو أماكن الطباعة.",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "استيراد بياناتك واختيار طريقة الاستلام المناسبة.",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["load_from_account", "whatsapp_optional"],
+                    "delivery_options": [
+                        {"id": "self", "label": "استلام ذاتي"},
+                        {"id": "delivery", "label": "توصيل"}
+                    ],
+                    "confirmation_message": "سنتواصل معك لتحديد المدة والتكلفة الأفضل لطلبك."
+                }
+            }
+        ]
+
+        for workflow in workflows:
+            try:
+                conn.execute(text("""
+                    INSERT INTO service_workflows
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar,
+                     step_type, step_config, display_order, is_active)
+                    VALUES
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, true)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": json.dumps(workflow["step_config"], ensure_ascii=False),
+                    "display_order": workflow["step_number"]
+                })
+                print(f"  ✅ Added clothing step {workflow['step_number']}: {workflow['step_name_ar']}")
+            except Exception as step_error:
+                print(f"  ❌ Error adding clothing step {workflow['step_number']}: {step_error}")
+                import traceback
+                traceback.print_exc()
+
+        conn.commit()
+        print(f"✅ تم تجهيز {len(workflows)} مرحلة لخدمة الطباعة على الملابس")
+
+    except Exception as e:
+        print(f"❌ Error setting up clothing printing service: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
 async def _ensure_default_services():
     """التأكد من وجود الخدمات الأساسية في قاعدة البيانات"""
     import time
@@ -409,39 +570,46 @@ async def _ensure_default_services():
                 "display_order": 1
             },
             {
+                "name_ar": "الطباعة على الملابس",
+                "name_en": "Clothing Printing",
+                "description_ar": "طباعة الشعارات والتصاميم على التيشرتات والملابس بخيارات متعددة",
+                "icon": "👕",
+                "display_order": 2
+            },
+            {
                 "name_ar": "طباعة فليكس",
                 "name_en": "Flex Printing",
                 "description_ar": "طباعة فليكس حسب القياس (متر مربع)",
                 "icon": "🖨️",
-                "display_order": 2
+                "display_order": 3
             },
             {
                 "name_ar": "طباعة فينيل",
                 "name_en": "Vinyl Printing",
                 "description_ar": "طباعة فينيل لاصق بجميع الأنواع",
                 "icon": "🎨",
-                "display_order": 3
+                "display_order": 4
             },
             {
                 "name_ar": "طباعة كلك بولستر",
                 "name_en": "Sticker Printing",
                 "description_ar": "طباعة ملصقات لاصقة بجميع الأشكال والأحجام",
                 "icon": "🏷️",
-                "display_order": 4
+                "display_order": 5
             },
             {
                 "name_ar": "طباعة البوسترات",
                 "name_en": "Poster Printing",
                 "description_ar": "طباعة بوسترات عالية الجودة بجميع المقاسات",
                 "icon": "📄",
-                "display_order": 5
+                "display_order": 6
             },
             {
                 "name_ar": "البانرات الإعلانية",
                 "name_en": "Advertising Banners",
                 "description_ar": "طباعة بانرات إعلانية بجميع المقاسات",
                 "icon": "📢",
-                "display_order": 6
+                "display_order": 7
             }
         ]
         
@@ -625,6 +793,17 @@ async def setup_lecture_printing_now():
         traceback.print_exc()
         return {"success": False, "error": str(e)}
 
+@app.post("/api/setup-clothing-printing-now")
+async def setup_clothing_printing_now():
+    """إعداد خدمة الطباعة على الملابس مباشرة - يمكن استدعاؤها يدوياً"""
+    try:
+        await _setup_clothing_printing_service()
+        return {"success": True, "message": "تم إعداد خدمة الطباعة على الملابس بنجاح"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():
@@ -635,5 +814,4 @@ if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", "8000"))
-    # Use workers=1 for Railway (single process)
-    uvicorn.run(app, host="0.0.0.0", port=port, workers=1)
+    uvicorn.run(app, host="0.0.0.0", port=port)

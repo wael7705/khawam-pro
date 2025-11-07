@@ -8,24 +8,31 @@ import json
 BASE_URL = "https://khawam-pro-production.up.railway.app/api"
 # BASE_URL = "http://localhost:8000/api"  # للاختبار المحلي
 
-def test_create_order():
-    """اختبار إنشاء طلب"""
-    print("🧪 بدء اختبار إنشاء الطلب...")
+def sanitize_amounts(order: dict):
+    """تصفير أسعار الطلب لضمان أن التسعير يحدد لاحقاً من قبل الفريق"""
+    order["total_amount"] = 0.0
+    order["final_amount"] = 0.0
+    for item in order.get("items", []):
+        item["unit_price"] = 0.0
+        item["total_price"] = 0.0
+    return order
+
+def test_create_order(service_name: str = "طباعة البوسترات"):
+    """اختبار إنشاء طلب لخدمة محددة"""
+    print(f"🧪 بدء اختبار إنشاء الطلب لخدمة: {service_name}...")
     print(f"📡 الاتصال بـ: {BASE_URL}")
     
     # بيانات الطلب التجريبية
-    order_data = {
+    order_data = sanitize_amounts({
         "customer_name": "اختبار العميل",
         "customer_phone": "0999123456",
         "customer_whatsapp": "0999123456",
         "shop_name": "متجر الاختبار",
-        "service_name": "طباعة البوسترات",
+        "service_name": service_name,
         "items": [
             {
-                "service_name": "طباعة البوسترات",
+                "service_name": service_name,
                 "quantity": 2,
-                "unit_price": 2000.0,
-                "total_price": 4000.0,
                 "specifications": {
                     "work_type": "طباعة عادية",
                     "notes": "طلب اختبار"
@@ -39,14 +46,12 @@ def test_create_order():
                 "design_files": []
             }
         ],
-        "total_amount": 4000.0,
-        "final_amount": 4000.0,
         "delivery_type": "self",
         "delivery_address": None,
         "delivery_latitude": None,
         "delivery_longitude": None,
         "notes": "طلب اختبار من السكريبت"
-    }
+    })
     
     try:
         print("\n📤 إرسال طلب إنشاء الطلب...")
@@ -111,13 +116,13 @@ def test_get_services():
             print(f"✅ تم جلب {len(services)} خدمة")
             if len(services) > 0:
                 print(f"   مثال: {services[0].get('name_ar', 'N/A')}")
-            return True
+            return services
         else:
             print(f"❌ فشل جلب الخدمات: {response.status_code}")
-            return False
+            return []
     except Exception as e:
         print(f"❌ خطأ في جلب الخدمات: {e}")
-        return False
+        return []
 
 if __name__ == "__main__":
     print("=" * 60)
@@ -128,23 +133,29 @@ if __name__ == "__main__":
     health_ok = test_health_check()
     
     # اختبار جلب الخدمات
-    services_ok = test_get_services()
+    services = test_get_services()
+    services_ok = len(services) > 0
     
-    # اختبار إنشاء الطلب (حتى لو فشل health check، جرب إنشاء الطلب)
+    # اختبار إنشاء الطلب لكل خدمة
+    all_orders_ok = True
     if services_ok:
-        order_ok = test_create_order()
-        
-        print("\n" + "=" * 60)
-        print("📊 ملخص النتائج:")
-        print("=" * 60)
-        print(f"🏥 Health Check: {'✅' if health_ok else '⚠️'}")
-        print(f"📋 Services API: {'✅' if services_ok else '❌'}")
-        print(f"📦 Create Order: {'✅' if order_ok else '❌'}")
-        
-        if services_ok and order_ok:
-            print("\n🎉 جميع الاختبارات الأساسية نجحت!")
-        else:
-            print("\n⚠️ بعض الاختبارات فشلت")
+        for service in services:
+            service_name = service.get("name_ar") or service.get("name_en") or "خدمة بدون اسم"
+            order_ok = test_create_order(service_name)
+            all_orders_ok = all_orders_ok and order_ok
+    
+    print("\n" + "=" * 60)
+    print("📊 ملخص النتائج:")
+    print("=" * 60)
+    print(f"🏥 Health Check: {'✅' if health_ok else '⚠️'}")
+    print(f"📋 Services API: {'✅' if services_ok else '❌'}")
+    if services_ok:
+        print(f"📦 Create Orders: {'✅' if all_orders_ok else '❌'} (عدد الخدمات المختبرة: {len(services)})")
     else:
-        print("\n⚠️ لا يمكن المتابعة - فشل جلب الخدمات")
+        print("📦 Create Orders: ❌ (لم يتم جلب الخدمات)")
+    
+    if health_ok and services_ok and all_orders_ok:
+        print("\n🎉 جميع الاختبارات نجحت!")
+    else:
+        print("\n⚠️ توجد بعض المشاكل خلال الاختبار")
 

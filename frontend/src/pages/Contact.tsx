@@ -1,7 +1,7 @@
 import GoogleMap from '../components/GoogleMap'
 import './Contact.css'
 
-const CONTACT_COORDINATES_TEXT = "33°30'33.7\"N 36°17'16.4\"E"
+const CONTACT_COORDINATES = { lat: 33.509361, lng: 36.287889 }
 const WHATSAPP_NUMBER = '+963112134640'
 const WHATSAPP_LINK = `https://wa.me/963112134640?text=${encodeURIComponent('مرحباً، أرغب بمتابعة طلبي لدى شركة خوام.')}`
 
@@ -61,15 +61,11 @@ export default function Contact() {
               <ul>
                 <li>
                   <strong>العنوان</strong>
-                  <span>سوريا - دمشق - ساحة المرجة - مبنى خوام للطباعة</span>
-                </li>
-                <li>
-                  <strong>الإحداثيات</strong>
-                  <span>{CONTACT_COORDINATES_TEXT}</span>
+                  <span>سوريا - دمشق - البرامكة خلف الهجرة والجوازات</span>
                 </li>
                 <li>
                   <strong>ساعات العمل</strong>
-                  <span>يومياً من 9 صباحاً حتى 9 مساءً</span>
+                  <span>يومياً من 9 صباحاً حتى 6 مساءً</span>
                 </li>
               </ul>
             </div>
@@ -80,16 +76,14 @@ export default function Contact() {
       <section className="contact-map-section">
         <div className="container contact-map-grid">
           <div className="contact-map-grid__map">
-            <GoogleMap description="زورونا في مقر خوام للطباعة والتصميم – موقعنا مباشرة على ساحة المرجة." />
-          </div>
-          <div className="contact-map-grid__cta">
-            <h2>جاهز لزيارتنا؟</h2>
-            <p>
-              استخدم الإحداثيات أو خريطة جوجل للوصول بشكل مباشر. أخبرنا على واتساب عند اقترابك لنستقبلك ونجهّز الطلب أو
-              العينات التي ترغب بمشاهدتها.
-            </p>
-            <a className="btn btn-secondary" href={WHATSAPP_LINK} target="_blank" rel="noreferrer">
-              أعلمني عند الوصول
+            <GoogleMap description="زورونا في البرامكة خلف الهجرة والجوازات – خوام للطباعة بالقرب من قلب دمشق التجاري." />
+            <a
+              className="map-gps-btn"
+              href={`https://www.google.com/maps/search/?api=1&query=${CONTACT_COORDINATES.lat},${CONTACT_COORDINATES.lng}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              فتح الموقع في GPS
             </a>
           </div>
         </div>

@@ -5,6 +5,7 @@
 import type React from 'react'
 import { PrintingService } from './printing/PrintingService'
 import { LecturePrintingService } from './lecture-printing/LecturePrintingService'
+import { ClothingPrintingService } from './clothing/ClothingPrintingService'
 
 export interface ServiceHandler {
   // معرف الخدمة (اسمها أو ID)
@@ -31,6 +32,7 @@ export interface ServiceHandler {
 // ملاحظة: LecturePrintingService يجب أن يكون أولاً لأنه أكثر تحديداً
 const registeredServices: ServiceHandler[] = [
   LecturePrintingService,  // يجب أن يكون أولاً لأنه يطابق على "محاضرات"
+  ClothingPrintingService,
   PrintingService
 ]
 

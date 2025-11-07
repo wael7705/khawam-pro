@@ -157,23 +157,23 @@
   min-height: 360px;
 }
 
-.contact-map-grid__cta {
-  background: var(--bg);
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  border-radius: 24px;
-  padding: 30px;
-  display: grid;
-  gap: 16px;
-  color: var(--text-secondary);
+.map-gps-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  padding: 12px 20px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.contact-map-grid__cta h2 {
-  color: var(--text);
-  font-size: 2rem;
-}
-
-.contact-map-grid__cta .btn {
-  width: fit-content;
+.map-gps-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(14, 165, 233, 0.35);
 }
 
 @media (max-width: 960px) {
@@ -187,8 +187,7 @@
 }
 
 @media (max-width: 640px) {
-  .contact-card__action,
-  .contact-map-grid__cta .btn {
+  .contact-card__action {
     width: 100%;
     text-align: center;
   }

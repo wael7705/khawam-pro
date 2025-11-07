@@ -1,24 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
-import L from 'leaflet'
+import L, { LatLngExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './GoogleMap.css'
 
-const COORDINATES = {
-  lat: 33.509361,
-  lng: 36.287889,
-}
+const COORDINATES: LatLngExpression = [33.509361, 36.287889]
+const [LAT, LNG] = COORDINATES as [number, number]
 
-const createMarkerIcon = () =>
-  new L.Icon({
-    iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).toString(),
-    iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).toString(),
-    shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).toString(),
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41],
-  })
+const MARKER_ICON = new L.Icon({
+  iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).toString(),
+  iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).toString(),
+  shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).toString(),
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+})
 
 interface GoogleMapProps {
   title?: string
@@ -27,7 +24,7 @@ interface GoogleMapProps {
 
 export default function GoogleMap({ title = 'خوام للطباعة والتصميم', description }: GoogleMapProps) {
   const [isClient, setIsClient] = useState(false)
-  const markerIcon = useMemo(() => createMarkerIcon(), [])
+  const markerIcon = useMemo(() => MARKER_ICON, [])
 
   useEffect(() => {
     setIsClient(true)
@@ -49,7 +46,7 @@ export default function GoogleMap({ title = 'خوام للطباعة والتص�
             <strong>{title}</strong>
             {description && <p>{description}</p>}
             <a
-              href={`https://www.google.com/maps/search/?api=1&query=${COORDINATES.lat},${COORDINATES.lng}`}
+              href={`https://www.google.com/maps/search/?api=1&query=${LAT},${LNG}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -61,4 +58,3 @@ export default function GoogleMap({ title = 'خوام للطباعة والتص�
     </div>
   )
 }
-

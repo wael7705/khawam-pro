@@ -35,6 +35,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [autoExtractedColors, setAutoExtractedColors] = useState<string[]>([]) // الألوان المستخرجة تلقائياً من الصورة
   const [workType, setWorkType] = useState('')
   const [notes, setNotes] = useState('')
+  const [clothingSource, setClothingSource] = useState<'customer' | 'store'>('customer')
+  const [clothingProduct, setClothingProduct] = useState<string>('hoodie')
+  const [clothingColor, setClothingColor] = useState<string>('أبيض')
+  const [clothingDesigns, setClothingDesigns] = useState<Record<string, File | null>>({
+    logo: null,
+    front: null,
+    back: null,
+    shoulder_right: null,
+    shoulder_left: null,
+  })
   const [customerName, setCustomerName] = useState('')
   const [customerWhatsApp, setCustomerWhatsApp] = useState('')
   const [customerPhoneExtra, setCustomerPhoneExtra] = useState('')
@@ -81,6 +91,21 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
   }, [workflowSteps, printColor])
 
+  useEffect(() => {
+    if (!isOpen) {
+      setClothingSource('customer')
+      setClothingProduct('hoodie')
+      setClothingColor('أبيض')
+      setClothingDesigns({
+        logo: null,
+        front: null,
+        back: null,
+        shoulder_right: null,
+        shoulder_left: null,
+      })
+    }
+  }, [isOpen])
+
   // Helper function to render step content based on step_type
   const renderStepContent = (currentStep: number) => {
     console.log('📋 renderStepContent called - Step:', currentStep, 'WorkflowSteps:', workflowSteps.length)
@@ -125,6 +150,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setPrintSides,
         notes,
         setNotes,
+        clothingSource,
+        setClothingSource,
+        clothingProduct,
+        setClothingProduct,
+        clothingColor,
+        setClothingColor,
+        clothingDesigns,
+        setClothingDesigns,
         customerName,
         setCustomerName,
         customerWhatsApp,
@@ -952,7 +985,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       totalPages,
                       paperType,
                       serviceName,
-                      uploadedFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type }))
+                      uploadedFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
+                      clothingSource,
+                      clothingProduct,
+                      clothingColor
                     }))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
                     localStorage.setItem('orderModalService', serviceName)
@@ -1037,7 +1073,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         name: f.name, 
                         size: f.size, 
                         type: f.type 
-                      }))
+                      })),
+                      clothingSource,
+                      clothingProduct,
+                      clothingColor
                     }))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
                     localStorage.setItem('orderModalService', serviceName)
@@ -1509,7 +1548,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         name: f.name, 
                         size: f.size, 
                         type: f.type 
-                      }))
+                      })),
+                      clothingSource,
+                      clothingProduct,
+                      clothingColor
                     }))
                     localStorage.setItem('shouldReopenOrderModal', 'true')
                     localStorage.setItem('orderModalService', serviceName)
@@ -1797,6 +1839,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               if (formState.paperSize !== undefined) setPaperSize(formState.paperSize)
               if (formState.totalPages !== undefined) setTotalPages(formState.totalPages)
               if (formState.paperType !== undefined) setPaperType(formState.paperType)
+              if (formState.clothingSource) setClothingSource(formState.clothingSource)
+              if (formState.clothingProduct) setClothingProduct(formState.clothingProduct)
+              if (formState.clothingColor) setClothingColor(formState.clothingColor)
               
               // Restore delivery type
               if (formState.deliveryType === 'delivery') {
@@ -2154,7 +2199,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           height,
           unit,
           selectedColors,
-          workType
+          workType,
+          clothingSource,
+          clothingProduct,
+          clothingColor,
+          clothingDesigns
         }
         
         orderData = serviceHandler.prepareOrderData(serviceData, baseOrderData)
@@ -2248,6 +2297,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setDeliveryType('self')
         setDeliveryAddress(null)
         setAddressConfirmed(false)
+        setClothingSource('customer')
+        setClothingProduct('hoodie')
+        setClothingColor('أبيض')
+        setClothingDesigns({
+          logo: null,
+          front: null,
+          back: null,
+          shoulder_right: null,
+          shoulder_left: null,
+        })
         onClose()
       } else {
         showError('فشل إرسال الطلب. يرجى المحاولة مرة أخرى')

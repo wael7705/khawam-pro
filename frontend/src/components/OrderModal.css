@@ -173,6 +173,22 @@
   gap: 12px;
 }
 
+.design-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.upload-area.small {
+  min-height: 120px;
+  padding: 18px;
+}
+
+.upload-area.small .upload-placeholder {
+  padding: 16px 10px;
+}
+
 .uploaded-file-item {
   display: flex;
   align-items: center;

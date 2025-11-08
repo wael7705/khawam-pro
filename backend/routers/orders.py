@@ -22,7 +22,7 @@ class OrderItemCreate(BaseModel):
     unit_price: Decimal
     total_price: Decimal
     specifications: Optional[dict] = None
-    design_files: Optional[List[str]] = None
+    design_files: Optional[List[Any]] = None
     dimensions: Optional[dict] = None
     colors: Optional[List[str]] = None
 

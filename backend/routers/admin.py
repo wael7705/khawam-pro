@@ -2721,11 +2721,20 @@ async def ensure_portfolio_images_column(db: Session = Depends(get_db)):
 # Payment Settings Management Endpoints
 # ============================================
 
+def ensure_payment_settings_table(db: Session):
+    """Ensure payment_settings table exists."""
+    try:
+        from models import PaymentSettings
+        PaymentSettings.__table__.create(bind=db.bind, checkfirst=True)
+    except Exception as exc:
+        print(f"⚠️ Unable to ensure payment_settings table: {exc}")
+
 @router.get("/payment-settings")
 async def get_payment_settings_admin(db: Session = Depends(get_db)):
     """Get payment settings (admin view with full details)"""
     try:
         from models import PaymentSettings
+        ensure_payment_settings_table(db)
         settings = db.query(PaymentSettings).filter(
             PaymentSettings.payment_method == "sham_cash"
         ).first()
@@ -2764,6 +2773,7 @@ async def create_payment_settings_admin(settings_data: dict, db: Session = Depen
     """Create payment settings (admin)"""
     try:
         from models import PaymentSettings
+        ensure_payment_settings_table(db)
         
         # التحقق من وجود إعدادات أخرى
         existing = db.query(PaymentSettings).filter(
@@ -2816,6 +2826,7 @@ async def update_payment_settings_admin(settings_id: int, settings_data: dict, d
     """Update payment settings (admin)"""
     try:
         from models import PaymentSettings
+        ensure_payment_settings_table(db)
         
         settings = db.query(PaymentSettings).filter(
             PaymentSettings.id == settings_id

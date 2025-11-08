@@ -1547,7 +1547,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               />
             </div>
             <div className="form-group">
-              <label>رفع الصورة <span className="optional">(اختياري)</span></label>
+              <label>العرض <span className="required">*</span></label>
               <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
                 <input
                   ref={fileInputRef}
@@ -1563,7 +1563,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   </div>
                 ) : (
                   <div className="upload-placeholder">
-                    <p>اضغط لرفع الصورة</p>
+                    <p>اضغط لتحديد العرض</p>
                   </div>
                 )}
               </div>
@@ -1575,33 +1575,25 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           <div className="modal-body">
             <h3>المرحلة 2: الأبعاد</h3>
             <div className="form-group">
-              <label>الطول <span className="optional">(اختياري)</span></label>
+              <label>الطول <span className="required">*</span></label>
               <input
                 type="number"
                 value={length}
                 onChange={(e) => setLength(e.target.value)}
                 className="form-input"
-                placeholder="0"
+                placeholder=""
+                required
               />
             </div>
             <div className="form-group">
-              <label>العرض <span className="optional">(اختياري)</span></label>
+              <label>العرض <span className="required">*</span></label>
               <input
                 type="number"
                 value={width}
                 onChange={(e) => setWidth(e.target.value)}
                 className="form-input"
-                placeholder="0"
-              />
-            </div>
-            <div className="form-group">
-              <label>الارتفاع <span className="optional">(اختياري)</span></label>
-              <input
-                type="number"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                className="form-input"
-                placeholder="0"
+                placeholder=""
+                required
               />
             </div>
             <div className="form-group">
@@ -2578,8 +2570,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           if (Array.isArray(selectedProduct.colors) && selectedProduct.colors.length > 0) {
             const matchingColor = selectedProduct.colors.find((color: string) => color === clothingColor)
             clothingColorLabel = matchingColor || clothingColor
-          }
         }
+      }
       }
       if (!clothingColorLabel) {
         clothingColorLabel = clothingColor

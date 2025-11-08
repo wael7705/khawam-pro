@@ -56,6 +56,8 @@ export default function OrdersManagement() {
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
   const [selectedOrderForMap, setSelectedOrderForMap] = useState<number | null>(null)
   const [archivedOrders, setArchivedOrders] = useState<Order[]>([])
+  const [deleteModalOpen, setDeleteModalOpen] = useState<number | null>(null)
+  const [deleteReason, setDeleteReason] = useState('')
 
   const loadOrders = async (showLoading = false) => {
     try {
@@ -471,13 +473,17 @@ export default function OrdersManagement() {
     }
   }
 
-  const handleDeleteOrder = async (orderId: number) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الطلب؟ هذا الإجراء لا يمكن التراجع عنه.')) {
-      return
-    }
-    
+  const handleDeleteOrder = async (orderId: number, reason?: string) => {
     try {
       setUpdatingOrderId(orderId)
+      if (reason && reason.trim()) {
+        try {
+          await adminAPI.orders.updateStatus(orderId, 'cancelled', reason.trim())
+        } catch (statusError) {
+          console.warn('Failed to record delete reason before deletion:', statusError)
+        }
+      }
+
       await adminAPI.orders.delete(orderId)
       
       // Remove from orders list
@@ -491,12 +497,16 @@ export default function OrdersManagement() {
       })
       
       showSuccess('تم حذف الطلب بنجاح')
-      loadOrders(false)
+      if (activeTab !== 'archived') {
+        loadOrders(false)
+      }
     } catch (e: any) {
       console.error('Error deleting order:', e)
       showError(e.response?.data?.detail || 'حدث خطأ في حذف الطلب')
     } finally {
       setUpdatingOrderId(null)
+      setDeleteModalOpen(null)
+      setDeleteReason('')
     }
   }
 
@@ -871,7 +881,10 @@ export default function OrdersManagement() {
                     {order.delivery_type === 'delivery' && !order.delivery_address && !order.delivery_latitude && (
                       <button
                         className="action-btn delete-btn"
-                        onClick={() => handleDeleteOrder(order.id)}
+                        onClick={() => {
+                          setDeleteReason('')
+                          setDeleteModalOpen(order.id)
+                        }}
                         disabled={updatingOrderId === order.id}
                         title="حذف الطلب المعطل"
                       >
@@ -884,9 +897,28 @@ export default function OrdersManagement() {
                     {activeTab === 'archived' && (
                       <button
                         className="action-btn delete-btn"
-                        onClick={() => handleDeleteOrder(order.id)}
+                        onClick={() => {
+                          setDeleteReason('')
+                          setDeleteModalOpen(order.id)
+                        }}
                         disabled={updatingOrderId === order.id}
                         title="حذف من الأرشيف"
+                      >
+                        <Trash2 size={16} />
+                        <span>حذف</span>
+                      </button>
+                    )}
+
+                    {/* General delete with reason for non-pending statuses */}
+                    {order.status !== 'pending' && activeTab !== 'archived' && !(!order.delivery_address && order.delivery_type === 'delivery' && !order.delivery_latitude) && (
+                      <button
+                        className="action-btn delete-btn"
+                        onClick={() => {
+                          setDeleteReason('')
+                          setDeleteModalOpen(order.id)
+                        }}
+                        disabled={updatingOrderId === order.id}
+                        title="حذف الطلب مع توثيق السبب"
                       >
                         <Trash2 size={16} />
                         <span>حذف</span>
@@ -1089,6 +1121,52 @@ export default function OrdersManagement() {
                 disabled={updatingOrderId === rejectModalOpen}
               >
                 {updatingOrderId === rejectModalOpen ? 'جاري الرفض...' : 'تأكيد الرفض'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {deleteModalOpen && (
+        <div className="modal-overlay" onClick={() => { setDeleteModalOpen(null); setDeleteReason('') }}>
+          <div className="cancel-modal delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <Trash2 size={24} />
+              <h3>حذف الطلب</h3>
+              <button className="modal-close" onClick={() => { setDeleteModalOpen(null); setDeleteReason('') }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>يرجى إدخال سبب حذف الطلب (سيتم حفظه قبل الحذف):</p>
+              <textarea
+                className="cancel-reason-input"
+                placeholder="مثال: تم إنشاء طلب جديد بدلاً منه..."
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="modal-footer">
+              <button
+                className="cancel-btn-secondary"
+                onClick={() => { setDeleteModalOpen(null); setDeleteReason('') }}
+              >
+                إلغاء
+              </button>
+              <button
+                className="delete-btn-primary"
+                onClick={() => {
+                  if (!deleteReason.trim()) {
+                    showError('يرجى إدخال سبب الحذف')
+                    return
+                  }
+                  handleDeleteOrder(deleteModalOpen, deleteReason.trim())
+                }}
+                disabled={updatingOrderId === deleteModalOpen}
+              >
+                {updatingOrderId === deleteModalOpen ? 'جاري الحذف...' : 'تأكيد الحذف'}
               </button>
             </div>
           </div>

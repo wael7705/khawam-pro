@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, type ReactNode, type CSSProperties } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, MessageSquare, Save, MapPin, ExternalLink, Download, FileText, Paperclip } from 'lucide-react'
 import { adminAPI, ordersAPI } from '../../lib/api'
@@ -451,6 +451,17 @@ const buildGenericSpecEntries = (specs: Record<string, any> | undefined) => {
   return Object.entries(specs).filter(([key, value]) => !SPEC_EXCLUDED_KEYS.has(key) && !isEmptyValue(value))
 }
 
+const STATUS_OPTIONS = [
+  { id: 'pending', label: 'في الانتظار', color: '#F59E0B' },
+  { id: 'accepted', label: 'تم القبول', color: '#3B82F6' },
+  { id: 'preparing', label: 'قيد التحضير', color: '#8B5CF6' },
+  { id: 'awaiting_pickup', label: 'في انتظار الاستلام', color: '#06B6D4' },
+  { id: 'shipping', label: 'قيد التوصيل', color: '#10B981' },
+  { id: 'completed', label: 'مكتمل', color: '#10B981' },
+  { id: 'cancelled', label: 'ملغى', color: '#EF4444' },
+  { id: 'rejected', label: 'مرفوض', color: '#EF4444' },
+]
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -461,6 +472,7 @@ export default function OrderDetail() {
   const [showLocationMap, setShowLocationMap] = useState(false)
   const [orderAttachments, setOrderAttachments] = useState<NormalizedAttachment[]>([])
   const [attachmentsLoading, setAttachmentsLoading] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -511,7 +523,7 @@ export default function OrderDetail() {
 
   const handleSaveNotes = async () => {
     if (!order) return
-
+    
     setIsSavingNotes(true)
     try {
       await adminAPI.orders.updateStaffNotes(order.id, staffNotes)
@@ -536,6 +548,36 @@ export default function OrderDetail() {
       rejected: 'مرفوض',
     }
     return labels[status] || status
+  }
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: '#F59E0B',
+      accepted: '#3B82F6',
+      preparing: '#8B5CF6',
+      shipping: '#10B981',
+      awaiting_pickup: '#06B6D4',
+      completed: '#10B981',
+      cancelled: '#EF4444',
+      rejected: '#EF4444',
+    }
+    return colors[status] || '#6B7280'
+  }
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!order || order.status === newStatus) return
+
+    setIsUpdatingStatus(true)
+    try {
+      await adminAPI.orders.updateStatus(order.id, newStatus)
+      setOrder({ ...order, status: newStatus })
+      showSuccess(`تم تحديث حالة الطلب إلى: ${getStatusLabel(newStatus)}`)
+    } catch (error: any) {
+      console.error('Error updating status:', error)
+      showError('فشل تحديث حالة الطلب')
+    } finally {
+      setIsUpdatingStatus(false)
+    }
   }
 
   const openWhatsApp = (phone: string) => {
@@ -645,7 +687,22 @@ export default function OrderDetail() {
       )
     }
 
-    if (sections.length === 0) return null
+    if (sections.length === 0) {
+      return (
+        <div className="detail-card attachments-card">
+          <div className="attachments-card-header">
+            <h2>
+              <Paperclip size={18} />
+              <span>الملفات والمرفقات</span>
+            </h2>
+            {attachmentsLoading && <span className="attachments-loading">جاري تحميل المرفقات...</span>}
+          </div>
+          <p className="attachments-card-empty">
+            {attachmentsLoading ? 'جاري تحميل المرفقات...' : 'لا توجد مرفقات متاحة لهذا الطلب بعد.'}
+          </p>
+        </div>
+      )
+    }
 
     return (
       <div className="detail-card attachments-card">
@@ -690,7 +747,7 @@ export default function OrderDetail() {
             العودة للطلبات
           </button>
           <div className="order-header-meta">
-            <h1>تفاصيل الطلب: {order.order_number}</h1>
+          <h1>تفاصيل الطلب: {order.order_number}</h1>
             <span className="order-status-chip">{getStatusLabel(order.status || 'pending')}</span>
           </div>
         </div>
@@ -739,88 +796,119 @@ export default function OrderDetail() {
             </div>
           </div>
 
+          <div className="detail-card status-card">
+            <h2>حالة الطلب</h2>
+            <div className="status-controls">
+              <div className="current-status">
+                <span
+                  className="status-badge"
+                  style={{ backgroundColor: getStatusColor(order.status || 'pending') }}
+                >
+                  {getStatusLabel(order.status || 'pending')}
+                </span>
+              </div>
+              <div className="status-buttons">
+                {STATUS_OPTIONS.map((option) => {
+                  const style = { '--status-color': option.color } as CSSProperties
+                  const isCurrent = option.id === (order.status || 'pending')
+                  return (
+                    <button
+                      key={option.id}
+                      className={`status-btn ${isCurrent ? 'active' : ''}`}
+                      style={style}
+                      onClick={() => handleStatusChange(option.id)}
+                      disabled={isUpdatingStatus || isCurrent}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
           {attachmentsOverview}
 
-          {/* Order Items */}
-          <div className="detail-card items-card">
-            <h2>عناصر الطلب</h2>
-            {order.order_type && (
-              <div className="order-type-badge-container">
-                <span className={`order-type-badge ${order.order_type}`}>
-                  {order.order_type === 'service' ? '🛠️ طلب خدمة' : '📦 طلب منتج'}
+        {/* Order Items */}
+        <div className="detail-card items-card">
+          <h2>عناصر الطلب</h2>
+          {order.order_type && (
+            <div className="order-type-badge-container">
+              <span className={`order-type-badge ${order.order_type}`}>
+                {order.order_type === 'service' ? '🛠️ طلب خدمة' : '📦 طلب منتج'}
+              </span>
+              {order.total_quantity && order.total_quantity > 0 && (
+                <span className="total-quantity-badge">
+                  الكمية الإجمالية: {order.total_quantity}
                 </span>
-                {order.total_quantity && order.total_quantity > 0 && (
-                  <span className="total-quantity-badge">
-                    الكمية الإجمالية: {order.total_quantity}
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="items-list">
+              )}
+            </div>
+          )}
+          <div className="items-list">
               {order.items.map((item) => {
                 const specs = item.specifications || {}
                 const genericSpecEntries = buildGenericSpecEntries(specs)
                 return (
-                  <div key={item.id} className="order-item-card">
-                    <div className="item-header">
-                      <div className="item-name-section">
-                        <h3>{item.service_name || item.product_name}</h3>
-                        {item.order_type && (
-                          <span className={`item-type-badge ${item.order_type}`}>
-                            {item.order_type === 'service' ? '🛠️ خدمة' : '📦 منتج'}
-                          </span>
-                        )}
-                      </div>
-                      <span className="item-quantity">الكمية: {item.quantity}</span>
-                    </div>
-                    <div className="item-details">
-                      <div className="item-price">
-                        <span>السعر للوحدة: {item.unit_price.toLocaleString()} ل.س</span>
-                        <span className="total">الإجمالي: {item.total_price.toLocaleString()} ل.س</span>
-                      </div>
-                      {item.specifications && (
-                        <div className="item-specs">
+              <div key={item.id} className="order-item-card">
+                <div className="item-header">
+                  <div className="item-name-section">
+                    <h3>{item.service_name || item.product_name}</h3>
+                    {item.order_type && (
+                      <span className={`item-type-badge ${item.order_type}`}>
+                        {item.order_type === 'service' ? '🛠️ خدمة' : '📦 منتج'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="item-quantity">الكمية: {item.quantity}</span>
+                </div>
+                <div className="item-details">
+                  <div className="item-price">
+                    <span>السعر للوحدة: {item.unit_price.toLocaleString()} ل.س</span>
+                    <span className="total">الإجمالي: {item.total_price.toLocaleString()} ل.س</span>
+                  </div>
+                  {item.specifications && (
+                    <div className="item-specs">
                           {specs.dimensions && (
-                            <div className="spec-group dimensions-group">
-                              <label>الأبعاد:</label>
-                              <div className="dimensions-details">
+                        <div className="spec-group dimensions-group">
+                          <label>الأبعاد:</label>
+                          <div className="dimensions-details">
                                 {specs.dimensions.length && (
-                                  <div className="dimension-item">
-                                    <span className="dimension-label">الطول:</span>
-                                    <span className="dimension-value">
+                              <div className="dimension-item">
+                                <span className="dimension-label">الطول:</span>
+                                <span className="dimension-value">
                                       {specs.dimensions.length} {specs.dimensions.unit || 'سم'}
-                                    </span>
-                                  </div>
-                                )}
-                                {specs.dimensions.width && (
-                                  <div className="dimension-item">
-                                    <span className="dimension-label">العرض:</span>
-                                    <span className="dimension-value">
-                                      {specs.dimensions.width} {specs.dimensions.unit || 'سم'}
-                                    </span>
-                                  </div>
-                                )}
-                                {specs.dimensions.height && (
-                                  <div className="dimension-item">
-                                    <span className="dimension-label">الارتفاع:</span>
-                                    <span className="dimension-value">
-                                      {specs.dimensions.height} {specs.dimensions.unit || 'سم'}
-                                    </span>
-                                  </div>
-                                )}
-                                {specs.dimensions.unit && (
-                                  <div className="dimension-item">
-                                    <span className="dimension-label">وحدة القياس:</span>
-                                    <span className="dimension-value">{specs.dimensions.unit}</span>
-                                  </div>
-                                )}
+                                </span>
                               </div>
-                            </div>
-                          )}
+                            )}
+                                {specs.dimensions.width && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">العرض:</span>
+                                <span className="dimension-value">
+                                      {specs.dimensions.width} {specs.dimensions.unit || 'سم'}
+                                </span>
+                              </div>
+                            )}
+                                {specs.dimensions.height && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">الارتفاع:</span>
+                                <span className="dimension-value">
+                                      {specs.dimensions.height} {specs.dimensions.unit || 'سم'}
+                                </span>
+                              </div>
+                            )}
+                                {specs.dimensions.unit && (
+                              <div className="dimension-item">
+                                <span className="dimension-label">وحدة القياس:</span>
+                                    <span className="dimension-value">{specs.dimensions.unit}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                           {Array.isArray(specs.colors) && specs.colors.length > 0 && (
-                            <div className="spec-group">
-                              <label>الألوان:</label>
-                              <div className="colors-list">
+                        <div className="spec-group">
+                          <label>الألوان:</label>
+                          <div className="colors-list">
                                 {specs.colors.map((color: string, idx: number) => (
                                   <span key={idx} className="color-dot" style={{ backgroundColor: color }} title={color} />
                                 ))}
@@ -843,19 +931,19 @@ export default function OrderDetail() {
                               <div className="colors-list">
                                 {specs.auto_colors.map((color: string, idx: number) => (
                                   <span key={idx} className="color-dot" style={{ backgroundColor: color }} title={color} />
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                            ))}
+                          </div>
+                        </div>
+                      )}
                           {specs.work_type && (
-                            <div className="spec-group">
-                              <label>نوع العمل:</label>
+                        <div className="spec-group">
+                          <label>نوع العمل:</label>
                               <span>{specs.work_type}</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
                           {specs.print_color && (
-                            <div className="spec-group">
-                              <label>نوع الطباعة:</label>
+                        <div className="spec-group">
+                          <label>نوع الطباعة:</label>
                               <span>{specs.print_color === 'color' ? 'ملون' : 'أبيض وأسود'}</span>
                             </div>
                           )}
@@ -863,11 +951,11 @@ export default function OrderDetail() {
                             <div className="spec-group">
                               <label>جودة الطباعة:</label>
                               <span>{specs.print_quality}</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
                           {specs.print_sides && (
-                            <div className="spec-group">
-                              <label>الوجهين:</label>
+                        <div className="spec-group">
+                          <label>الوجهين:</label>
                               <span>{specs.print_sides === 'double' ? 'وجهين' : 'وجه واحد'}</span>
                             </div>
                           )}
@@ -875,29 +963,29 @@ export default function OrderDetail() {
                             <div className="spec-group">
                               <label>عدد الصفحات:</label>
                               <span>{specs.number_of_pages}</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
                           {specs.total_pages && !specs.number_of_pages && (
-                            <div className="spec-group">
-                              <label>عدد الصفحات:</label>
+                        <div className="spec-group">
+                          <label>عدد الصفحات:</label>
                               <span>{specs.total_pages}</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
                           {specs.paper_size && (
-                            <div className="spec-group">
-                              <label>حجم الورق:</label>
+                        <div className="spec-group">
+                          <label>حجم الورق:</label>
                               <span>{specs.paper_size}</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
                           {specs.delivery_type && (
-                            <div className="spec-group">
-                              <label>نوع التوصيل:</label>
+                        <div className="spec-group">
+                          <label>نوع التوصيل:</label>
                               <span>{specs.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
                           {specs.notes && (
-                            <div className="spec-group">
-                              <label>ملاحظات:</label>
+                        <div className="spec-group">
+                          <label>ملاحظات:</label>
                               <span>{specs.notes}</span>
                             </div>
                           )}
@@ -914,130 +1002,130 @@ export default function OrderDetail() {
                         </div>
                       )}
                     </div>
-                  </div>
+                      </div>
                 )
               })}
-            </div>
           </div>
+        </div>
 
-          {/* Order Summary */}
-          <div className="detail-card summary-card">
-            <h2>ملخص الطلب</h2>
-            <div className="summary-grid">
-              <div className="summary-item">
-                <label>تاريخ الطلب:</label>
-                <span>{new Date(order.created_at).toLocaleDateString('ar-SY', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}</span>
+        {/* Order Summary */}
+        <div className="detail-card summary-card">
+          <h2>ملخص الطلب</h2>
+          <div className="summary-grid">
+            <div className="summary-item">
+              <label>تاريخ الطلب:</label>
+              <span>{new Date(order.created_at).toLocaleDateString('ar-SY', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</span>
+            </div>
+            <div className="summary-item">
+              <label>نوع التوصيل:</label>
+              <div className="delivery-info-wrapper">
+                <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+                {order.delivery_type === 'delivery' && (order.delivery_latitude && order.delivery_longitude) && (
+                  <button
+                    className="show-location-btn"
+                    onClick={() => setShowLocationMap(!showLocationMap)}
+                  >
+                    <MapPin size={16} />
+                    {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
+                  </button>
+                )}
               </div>
-              <div className="summary-item">
-                <label>نوع التوصيل:</label>
-                <div className="delivery-info-wrapper">
-                  <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-                  {order.delivery_type === 'delivery' && (order.delivery_latitude && order.delivery_longitude) && (
-                    <button
-                      className="show-location-btn"
-                      onClick={() => setShowLocationMap(!showLocationMap)}
-                    >
-                      <MapPin size={16} />
-                      {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
-                    </button>
-                  )}
-                </div>
-              </div>
-              {order.delivery_type === 'delivery' && (
-                <>
-                  {order.delivery_address && (
+            </div>
+            {order.delivery_type === 'delivery' && (
+              <>
+                {order.delivery_address && (
+                  <div className="summary-item">
+                    <label>عنوان التوصيل:</label>
+                    <span>{order.delivery_address}</span>
+                  </div>
+                )}
+                {order.delivery_latitude && order.delivery_longitude && (
+                  <>
                     <div className="summary-item">
-                      <label>عنوان التوصيل:</label>
-                      <span>{order.delivery_address}</span>
+                      <label>الإحداثيات:</label>
+                      <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
                     </div>
-                  )}
-                  {order.delivery_latitude && order.delivery_longitude && (
-                    <>
-                      <div className="summary-item">
-                        <label>الإحداثيات:</label>
-                        <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
-                      </div>
-                      <div className="summary-item">
-                        <label>رابط الخريطة:</label>
-                        <a
-                          href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="map-link"
-                        >
-                          <MapPin size={16} />
-                          فتح في Google Maps
-                        </a>
-                      </div>
-                      <div className="summary-item">
-                        <button
-                          className="show-location-btn"
-                          onClick={() => setShowLocationMap(!showLocationMap)}
-                        >
-                          <MapPin size={16} />
-                          {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
-                        </button>
-                      </div>
-                      {showLocationMap && (
-                        <div className="summary-item location-map-item">
-                          <label>الموقع على الخريطة:</label>
-                          <div className="location-map-container">
-                            <SimpleMap
-                              address={order.delivery_address}
-                              latitude={order.delivery_latitude}
-                              longitude={order.delivery_longitude}
-                              defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
-                              defaultZoom={17}
-                            />
-                          </div>
+                    <div className="summary-item">
+                      <label>رابط الخريطة:</label>
+                      <a 
+                        href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="map-link"
+                      >
+                        <MapPin size={16} />
+                        فتح في Google Maps
+                      </a>
+                    </div>
+                    <div className="summary-item">
+                      <button
+                        className="show-location-btn"
+                        onClick={() => setShowLocationMap(!showLocationMap)}
+                      >
+                        <MapPin size={16} />
+                        {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
+                      </button>
+                    </div>
+                    {showLocationMap && (
+                      <div className="summary-item location-map-item">
+                        <label>الموقع على الخريطة:</label>
+                        <div className="location-map-container">
+                          <SimpleMap
+                            address={order.delivery_address}
+                            latitude={order.delivery_latitude}
+                            longitude={order.delivery_longitude}
+                            defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                            defaultZoom={17}
+                          />
                         </div>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-              <div className="summary-item">
-                <label>حالة الدفع:</label>
-                <span>{order.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}</span>
-              </div>
-              <div className="summary-item total">
-                <label>الإجمالي:</label>
-                <span className="amount">{order.final_amount.toLocaleString()} ل.س</span>
-              </div>
-            </div>
-            {order.notes && (
-              <div className="customer-notes">
-                <label>ملاحظات العميل:</label>
-                <p>{order.notes}</p>
-              </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
+            <div className="summary-item">
+              <label>حالة الدفع:</label>
+              <span>{order.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}</span>
+            </div>
+            <div className="summary-item total">
+              <label>الإجمالي:</label>
+              <span className="amount">{order.final_amount.toLocaleString()} ل.س</span>
+            </div>
           </div>
+          {order.notes && (
+            <div className="customer-notes">
+              <label>ملاحظات العميل:</label>
+              <p>{order.notes}</p>
+            </div>
+          )}
+        </div>
 
-          {/* Staff Notes */}
-          <div className="detail-card notes-card">
-            <h2>ملاحظات الموظف</h2>
-            <textarea
-              value={staffNotes}
-              onChange={(e) => setStaffNotes(e.target.value)}
-              placeholder="أضف ملاحظات حول هذا الطلب..."
-              className="notes-textarea"
-              rows={4}
-            />
-            <button
-              className="save-notes-btn"
-              onClick={handleSaveNotes}
-              disabled={isSavingNotes}
-            >
-              <Save size={16} />
-              {isSavingNotes ? 'جاري الحفظ...' : 'حفظ الملاحظات'}
-            </button>
-          </div>
+        {/* Staff Notes */}
+        <div className="detail-card notes-card">
+          <h2>ملاحظات الموظف</h2>
+          <textarea
+            value={staffNotes}
+            onChange={(e) => setStaffNotes(e.target.value)}
+            placeholder="أضف ملاحظات حول هذا الطلب..."
+            className="notes-textarea"
+            rows={4}
+          />
+          <button
+            className="save-notes-btn"
+            onClick={handleSaveNotes}
+            disabled={isSavingNotes}
+          >
+            <Save size={16} />
+            {isSavingNotes ? 'جاري الحفظ...' : 'حفظ الملاحظات'}
+          </button>
+        </div>
         </div>
       </div>
     </div>

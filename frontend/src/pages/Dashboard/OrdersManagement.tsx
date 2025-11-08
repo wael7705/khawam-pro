@@ -498,7 +498,7 @@ export default function OrdersManagement() {
       
       showSuccess('تم حذف الطلب بنجاح')
       if (activeTab !== 'archived') {
-        loadOrders(false)
+      loadOrders(false)
       }
     } catch (e: any) {
       console.error('Error deleting order:', e)

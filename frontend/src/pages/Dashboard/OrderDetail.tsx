@@ -753,48 +753,48 @@ export default function OrderDetail() {
         </div>
 
         <div className="order-detail-content">
-          {/* Customer Info Card */}
-          <div className="detail-card customer-card">
-            <h2>معلومات العميل</h2>
-            <div className="customer-info-grid">
+        {/* Customer Info Card */}
+        <div className="detail-card customer-card">
+          <h2>معلومات العميل</h2>
+          <div className="customer-info-grid">
+            <div className="info-item">
+              <label>اسم العميل:</label>
+              <span>{order.customer_name || '-'}</span>
+            </div>
+            <div className="info-item">
+              <label>رقم الهاتف:</label>
+              <span>{order.customer_phone || '-'}</span>
+            </div>
+            <div className="info-item">
+              <label>واتساب:</label>
+              <button 
+                className="whatsapp-btn"
+                onClick={() => openWhatsApp(order.customer_whatsapp || order.customer_phone)}
+              >
+                <MessageSquare size={16} />
+                {order.customer_whatsapp || order.customer_phone}
+              </button>
+            </div>
+            {order.customer_whatsapp && order.customer_whatsapp !== order.customer_phone && (
               <div className="info-item">
-                <label>اسم العميل:</label>
-                <span>{order.customer_name || '-'}</span>
-              </div>
-              <div className="info-item">
-                <label>رقم الهاتف:</label>
-                <span>{order.customer_phone || '-'}</span>
-              </div>
-              <div className="info-item">
-                <label>واتساب:</label>
-                <button
+                <label>واتساب إضافي:</label>
+                <button 
                   className="whatsapp-btn"
-                  onClick={() => openWhatsApp(order.customer_whatsapp || order.customer_phone)}
+                  onClick={() => openWhatsApp(order.customer_whatsapp)}
                 >
                   <MessageSquare size={16} />
-                  {order.customer_whatsapp || order.customer_phone}
+                  {order.customer_whatsapp}
                 </button>
               </div>
-              {order.customer_whatsapp && order.customer_whatsapp !== order.customer_phone && (
-                <div className="info-item">
-                  <label>واتساب إضافي:</label>
-                  <button
-                    className="whatsapp-btn"
-                    onClick={() => openWhatsApp(order.customer_whatsapp)}
-                  >
-                    <MessageSquare size={16} />
-                    {order.customer_whatsapp}
-                  </button>
-                </div>
-              )}
-              {order.shop_name && (
-                <div className="info-item">
-                  <label>اسم المتجر:</label>
-                  <span>{order.shop_name}</span>
-                </div>
-              )}
-            </div>
+            )}
+            {order.shop_name && (
+              <div className="info-item">
+                <label>اسم المتجر:</label>
+                <span>{order.shop_name}</span>
+              </div>
+            )}
           </div>
+        </div>
 
           <div className="detail-card status-card">
             <h2>حالة الطلب</h2>

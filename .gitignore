@@ -34,10 +34,9 @@ logs/
 Thumbs.db
 
 # Uploads
-uploads/
-*.jpg
-*.png
-*.jpeg
+/uploads/**
+# نسمح بنسخ الملفات ضمن uploads التي نحتاجها للاختبارات أو السجلات
+!uploads/
 
 # Database
 *.db

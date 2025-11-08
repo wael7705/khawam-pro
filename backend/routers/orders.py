@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
+from sqlalchemy import text, inspect
 from database import get_db
 from models import Order, OrderItem, User
 from pydantic import BaseModel
@@ -39,6 +40,92 @@ class OrderCreate(BaseModel):
     notes: Optional[str] = None
     service_name: Optional[str] = None
 
+def ensure_order_columns(db: Session):
+    """Ensure required customer-related columns exist on orders table."""
+    try:
+        inspector = inspect(db.bind)
+        current = {col['name'] for col in inspector.get_columns('orders')}
+    except Exception as exc:
+        print(f"⚠️ Unable to inspect orders table: {exc}")
+        return
+
+    column_statements = []
+    if 'customer_name' not in current:
+        column_statements.append("ADD COLUMN customer_name VARCHAR(100)")
+    if 'customer_phone' not in current:
+        column_statements.append("ADD COLUMN customer_phone VARCHAR(20)")
+    if 'customer_whatsapp' not in current:
+        column_statements.append("ADD COLUMN customer_whatsapp VARCHAR(20)")
+    if 'shop_name' not in current:
+        column_statements.append("ADD COLUMN shop_name VARCHAR(200)")
+    if 'delivery_type' not in current:
+        column_statements.append("ADD COLUMN delivery_type VARCHAR(20) DEFAULT 'self'")
+    if 'delivery_latitude' not in current:
+        column_statements.append("ADD COLUMN delivery_latitude DECIMAL(10, 8)")
+    if 'delivery_longitude' not in current:
+        column_statements.append("ADD COLUMN delivery_longitude DECIMAL(11, 8)")
+    if 'notes' not in current:
+        column_statements.append("ADD COLUMN notes TEXT")
+    if 'staff_notes' not in current:
+        column_statements.append("ADD COLUMN staff_notes TEXT")
+    if 'paid_amount' not in current:
+        column_statements.append("ADD COLUMN paid_amount DECIMAL(12, 2) DEFAULT 0")
+    if 'remaining_amount' not in current:
+        column_statements.append("ADD COLUMN remaining_amount DECIMAL(12, 2) DEFAULT 0")
+    if 'rating' not in current:
+        column_statements.append("ADD COLUMN rating INTEGER")
+    if 'rating_comment' not in current:
+        column_statements.append("ADD COLUMN rating_comment TEXT")
+
+    for stmt in column_statements:
+        try:
+            db.execute(text(f"ALTER TABLE orders {stmt}"))
+            db.commit()
+            print(f"✅ Migration executed: ALTER TABLE orders {stmt}")
+        except Exception as exc:
+            print(f"⚠️ Unable to execute migration ({stmt}): {exc}")
+            db.rollback()
+
+def ensure_order_items_columns(db: Session):
+    """Ensure order_items table has JSONB columns for specifications and design_files."""
+    try:
+        inspector = inspect(db.bind)
+        columns = {col['name']: col for col in inspector.get_columns('order_items')}
+    except Exception as exc:
+        print(f"⚠️ Unable to inspect order_items table: {exc}")
+        return
+
+    if 'specifications' not in columns:
+        try:
+            db.execute(text("ALTER TABLE order_items ADD COLUMN specifications JSONB"))
+            db.commit()
+            print("✅ Added specifications column (JSONB)")
+        except Exception as exc:
+            print(f"⚠️ Unable to add specifications column: {exc}")
+            db.rollback()
+    if 'design_files' not in columns:
+        try:
+            db.execute(text("ALTER TABLE order_items ADD COLUMN design_files JSONB"))
+            db.commit()
+            print("✅ Added design_files column (JSONB)")
+        except Exception as exc:
+            print(f"⚠️ Unable to add design_files column: {exc}")
+            db.rollback()
+    else:
+        design_info = columns.get('design_files')
+        if design_info:
+            col_type = str(design_info['type']).upper()
+            if 'JSON' not in col_type:
+                try:
+                    if 'TEXT[]' in col_type or 'ARRAY' in col_type:
+                        db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE JSONB USING to_jsonb(design_files)"))
+                    else:
+                        db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE JSONB USING design_files::jsonb"))
+                    db.commit()
+                    print("✅ Converted design_files column to JSONB")
+                except Exception as exc:
+                    print(f"⚠️ Unable to convert design_files column type: {exc}")
+                    db.rollback()
 # Background task for notifications
 async def send_order_notification(order_number: str, customer_name: str, customer_phone: str):
     """Background task to send notifications (can be extended with email/SMS)"""
@@ -59,56 +146,7 @@ async def create_order(
         random_suffix = uuid.uuid4().hex[:3].upper()
         order_number = f"ORD{date_str}-{random_suffix}"
         
-        # Check and add missing columns if they don't exist
-        from sqlalchemy import text, inspect
-        
-        # Check and add missing columns using safer approach
-        try:
-            inspector = inspect(db.bind)
-            current_columns = [col['name'] for col in inspector.get_columns('orders')]
-            
-            # Add delivery_latitude if missing
-            if 'delivery_latitude' not in current_columns:
-                try:
-                    db.execute(text("ALTER TABLE orders ADD COLUMN delivery_latitude DECIMAL(10, 8)"))
-                    db.commit()
-                    print("✅ Added delivery_latitude column")
-                except Exception as e:
-                    print(f"Warning: Could not add delivery_latitude: {e}")
-                    db.rollback()
-            
-            # Add delivery_longitude if missing
-            if 'delivery_longitude' not in current_columns:
-                try:
-                    db.execute(text("ALTER TABLE orders ADD COLUMN delivery_longitude DECIMAL(11, 8)"))
-                    db.commit()
-                    print("✅ Added delivery_longitude column")
-                except Exception as e:
-                    print(f"Warning: Could not add delivery_longitude: {e}")
-                    db.rollback()
-            
-            # Add rating if missing
-            if 'rating' not in current_columns:
-                try:
-                    db.execute(text("ALTER TABLE orders ADD COLUMN rating INTEGER"))
-                    db.commit()
-                    print("✅ Added rating column")
-                except Exception as e:
-                    print(f"Warning: Could not add rating: {e}")
-                    db.rollback()
-            
-            # Add rating_comment if missing
-            if 'rating_comment' not in current_columns:
-                try:
-                    db.execute(text("ALTER TABLE orders ADD COLUMN rating_comment TEXT"))
-                    db.commit()
-                    print("✅ Added rating_comment column")
-                except Exception as e:
-                    print(f"Warning: Could not add rating_comment: {e}")
-                    db.rollback()
-        except Exception as e:
-            print(f"Error checking/adding columns: {e}")
-            # Continue anyway - we'll handle missing columns in order_dict
+        ensure_order_columns(db)
         
         # Create order - use SQL directly to avoid SQLAlchemy trying to insert into non-existent columns
         # First, check which columns actually exist
@@ -198,85 +236,7 @@ async def create_order(
             "created_at": order_result[14].isoformat() if order_result[14] else None
         }
         
-        # Check and fix order_items table columns and types
-        try:
-            inspector = inspect(db.bind)
-            order_items_columns = [col['name'] for col in inspector.get_columns('order_items')]
-            
-            # Add specifications column if missing
-            if 'specifications' not in order_items_columns:
-                try:
-                    db.execute(text("ALTER TABLE order_items ADD COLUMN specifications jsonb"))
-                    db.commit()
-                    print("✅ Added specifications column as JSONB")
-                except Exception as e:
-                    print(f"Warning: Could not add specifications column: {e}")
-                    db.rollback()
-            
-            # Add design_files column if missing
-            if 'design_files' not in order_items_columns:
-                try:
-                    db.execute(text("ALTER TABLE order_items ADD COLUMN design_files jsonb"))
-                    db.commit()
-                    print("✅ Added design_files column as JSONB")
-                except Exception as e:
-                    print(f"Warning: Could not add design_files column: {e}")
-                    db.rollback()
-            
-            # Check and fix column types
-            specs_col_info = None
-            design_files_col_info = None
-            for col in inspector.get_columns('order_items'):
-                if col['name'] == 'specifications':
-                    specs_col_info = col
-                if col['name'] == 'design_files':
-                    design_files_col_info = col
-            
-            # Fix specifications column if it's not JSONB
-            if specs_col_info:
-                col_type = str(specs_col_info['type']).upper()
-                if 'JSONB' not in col_type and 'JSON' not in col_type:
-                    try:
-                        # Try to convert to JSONB
-                        if 'TEXT' in col_type or 'VARCHAR' in col_type:
-                            db.execute(text("ALTER TABLE order_items ALTER COLUMN specifications TYPE jsonb USING specifications::jsonb"))
-                        else:
-                            db.execute(text("ALTER TABLE order_items ALTER COLUMN specifications TYPE jsonb"))
-                        db.commit()
-                        print("✅ Fixed specifications column type to JSONB")
-                    except Exception as e:
-                        print(f"Warning: Could not change specifications column type: {e}")
-                        db.rollback()
-            
-            # Fix design_files column if it's text[] instead of jsonb
-            if design_files_col_info:
-                col_type = str(design_files_col_info['type']).upper()
-                if 'TEXT[]' in col_type or 'ARRAY' in col_type:
-                    try:
-                        # Convert text[] to jsonb
-                        db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE jsonb USING to_jsonb(design_files::text[])"))
-                        db.commit()
-                        print("✅ Fixed design_files column type from text[] to JSONB")
-                    except Exception as e:
-                        print(f"Warning: Could not change design_files column type from array: {e}")
-                        db.rollback()
-                elif 'JSONB' not in col_type and 'JSON' not in col_type:
-                    try:
-                        # Try to convert other types to JSONB
-                        if 'TEXT' in col_type or 'VARCHAR' in col_type:
-                            db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE jsonb USING design_files::jsonb"))
-                        else:
-                            db.execute(text("ALTER TABLE order_items ALTER COLUMN design_files TYPE jsonb"))
-                        db.commit()
-                        print("✅ Fixed design_files column type to JSONB")
-                    except Exception as e:
-                        print(f"Warning: Could not change design_files column type: {e}")
-                        db.rollback()
-        except Exception as e:
-            print(f"Warning: Error checking/fixing order_items columns: {e}")
-            import traceback
-            traceback.print_exc()
-            # Continue anyway
+        ensure_order_items_columns(db)
         
         # Create order items using raw SQL
         for item_data in order_data.items:
@@ -352,6 +312,8 @@ async def create_order(
 async def get_orders(db: Session = Depends(get_db)):
     """Get all orders with their details and items"""
     try:
+        ensure_order_columns(db)
+        ensure_order_items_columns(db)
         orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
         order_ids = [order.id for order in orders]
 

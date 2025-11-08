@@ -1256,7 +1256,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <div className="invoice-item">
                   <span>عدد الوجوه:</span>
                   <span>{printSides === 'double' ? 'وجهان' : 'وجه واحد'}</span>
-                </div>
+              </div>
               {printColor === 'color' && (
                 <div className="invoice-item">
                   <span>جودة الطباعة:</span>

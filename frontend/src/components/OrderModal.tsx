@@ -65,6 +65,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const hasRestoredState = useRef(false)
   const addressToastShown = useRef(false)
   const [successInfo, setSuccessInfo] = useState<{ orderNumber: string } | null>(null)
+  const hasPrefilledCustomer = useRef(false)
   
   // Print options states (no pricing)
   const [printColor, setPrintColor] = useState<'bw' | 'color'>('bw')
@@ -176,6 +177,27 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       })
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) {
+      hasPrefilledCustomer.current = false
+      return
+    }
+
+    if (hasPrefilledCustomer.current) return
+
+    const user = getUserData()
+    if (user) {
+      if (user.name && !customerName) {
+        setCustomerName(user.name)
+      }
+      if (user.phone && !customerWhatsApp) {
+        setCustomerWhatsApp(user.phone)
+      }
+    }
+
+    hasPrefilledCustomer.current = true
+  }, [isOpen, customerName, customerWhatsApp])
 
   // Helper function to render step content based on step_type
   const renderStepContent = (currentStep: number) => {

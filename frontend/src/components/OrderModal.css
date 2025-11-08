@@ -23,6 +23,7 @@
   overflow-y: auto;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
   border: 3px solid rgba(249, 115, 22, 0.2);
+  color: #1f2937;
 }
 
 .order-modal.success {
@@ -126,7 +127,7 @@
   font-size: 1.3rem;
   font-weight: 700;
   margin-bottom: 20px;
-  color: var(--text);
+  color: #111827;
 }
 
 .form-group {
@@ -137,7 +138,7 @@
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: var(--text);
+  color: #1f2937;
 }
 
 .form-group label .required {
@@ -160,8 +161,12 @@
   font-size: 15px;
   font-family: inherit;
   background: #ffffff;
-  color: #1a202c;
+  color: #0f172a;
   transition: all 0.3s ease;
+}
+
+.form-input::placeholder {
+  color: rgba(15, 23, 42, 0.55);
 }
 
 .form-input:focus {
@@ -352,7 +357,7 @@
 .invoice-section h4 {
   margin: 0 0 12px 0;
   font-size: 1.05rem;
-  color: #1f2937;
+  color: #0f172a;
   font-weight: 700;
 }
 
@@ -370,6 +375,7 @@
   padding: 12px 0;
   font-size: 16px;
   border-bottom: 1px solid #e2e8f0;
+  color: #1f2937;
 }
 
 .invoice-item:last-child {
@@ -384,7 +390,7 @@
 
 .invoice-item-column > span:first-child {
   font-weight: 600;
-  color: #1f2937;
+  color: #0f172a;
 }
 
 .invoice-item.total {
@@ -532,12 +538,12 @@
   display: block;
   font-weight: 700;
   margin-bottom: 6px;
-  color: #1f2937;
+  color: #0f172a;
 }
 
 .invoice-note p {
   margin: 0;
-  color: #334155;
+  color: #1f2937;
   line-height: 1.7;
   white-space: pre-wrap;
 }

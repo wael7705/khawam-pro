@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react
 import type { AxiosError } from 'axios'
 import { Download, ExternalLink, FileText } from 'lucide-react'
 import { ordersAPI } from '../lib/api'
+import { isAuthenticated } from '../lib/auth'
 import { Link } from 'react-router-dom'
 import './Orders.css'
 
@@ -209,6 +210,11 @@ export default function Orders() {
 
   useEffect(() => {
     const loadOrders = async () => {
+      if (!isAuthenticated()) {
+        setError('يجب تسجيل الدخول للاطلاع على طلباتك.')
+        setLoading(false)
+        return
+      }
       try {
         const response = await ordersAPI.getAll()
         const normalized = normalizeOrdersResponse(response.data)
@@ -224,7 +230,12 @@ export default function Orders() {
           const detail =
             (axiosErr.response?.data && (axiosErr.response.data.detail || axiosErr.response.data.message)) ||
             axiosErr.message
-          console.error('Error loading orders:', { status, detail, data: axiosErr.response?.data })
+          console.error('Error loading orders:', {
+            status,
+            detail,
+            data: axiosErr.response?.data,
+            url: axiosErr.config?.url,
+          })
           if (status === 401) {
             message = 'يجب تسجيل الدخول للاطلاع على طلباتك.'
           } else if (status === 500) {

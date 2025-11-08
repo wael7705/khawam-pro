@@ -290,25 +290,29 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
               <span className="attachment-name">{file.filename}</span>
               {file.sizeLabel && <span className="attachment-size">{file.sizeLabel}</span>}
               <div className="attachment-actions">
-                <a
+                <button
                   className="attachment-action"
-                  href={file.url}
-                  target="_blank"
-                  rel="noreferrer"
+                  type="button"
+                  onClick={() => window.open(file.url, '_blank', 'noopener,noreferrer')}
                 >
                   <ExternalLink size={16} />
                   عرض
-                </a>
-                <a
+                </button>
+                <button
                   className="attachment-action"
-                  href={file.url}
-                  download={file.filename || true}
-                  target="_blank"
-                  rel="noreferrer"
+                  type="button"
+                  onClick={() => {
+                    const link = document.createElement('a')
+                    link.href = file.url
+                    link.download = file.filename || 'attachment'
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                  }}
                 >
                   <Download size={16} />
                   تحميل
-                </a>
+                </button>
               </div>
             </div>
           </div>

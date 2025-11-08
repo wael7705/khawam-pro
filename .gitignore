@@ -35,8 +35,8 @@ Thumbs.db
 
 # Uploads
 /uploads/**
-# نسمح بنسخ الملفات ضمن uploads التي نحتاجها للاختبارات أو السجلات
-!uploads/
+# نسمح بنسخ ملف manifest لاختبارات الرفع
+!uploads/.keep_git
 
 # Database
 *.db

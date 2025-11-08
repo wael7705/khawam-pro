@@ -85,6 +85,10 @@ export const ordersAPI = {
   getAll: () => api.get('/orders/'),
   create: (data: any) => api.post('/orders/', data),
   getAttachments: (orderId: number) => api.get(`/orders/${orderId}/attachments`),
+  getFile: (orderId: number, fileKey: string) =>
+    api.get(`/orders/${orderId}/attachments/${encodeURIComponent(fileKey)}`, {
+      responseType: 'blob',
+    }),
 }
 
 // Studio API

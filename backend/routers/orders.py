@@ -144,7 +144,9 @@ def build_file_url(raw_path: Optional[str]) -> str:
     raw_path = str(raw_path).strip()
     if not raw_path:
         return ""
-    if raw_path.startswith("http://") or raw_path.startswith("https://") or raw_path.startswith("data:"):
+    if raw_path.startswith("data:"):
+        return raw_path
+    if raw_path.startswith("http://") or raw_path.startswith("https://"):
         return raw_path
     base = get_public_base_url()
     if raw_path.startswith("/"):
@@ -490,6 +492,7 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
 
     items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
     attachments: List[Dict[str, Any]] = []
+    attachments_by_key: Dict[str, Dict[str, Any]] = {}
 
     for item in items:
         design_files = item.design_files
@@ -508,6 +511,8 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
         for idx, design_entry in enumerate(design_files):
             normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx)
             if normalized:
+                if normalized.get("file_key"):
+                    attachments_by_key[str(normalized["file_key"])] = normalized
                 normalized["order_item_service_name"] = getattr(item, "product_name", None)
                 attachments.append(normalized)
 
@@ -515,7 +520,67 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
         "success": True,
         "attachments": attachments,
         "count": len(attachments),
+        "attachments_map": attachments_by_key,
     }
+
+
+@router.get("/{order_id}/attachments/{file_key}")
+async def download_order_attachment(order_id: int, file_key: str, db: Session = Depends(get_db)):
+    ensure_order_columns(db)
+    ensure_order_items_columns(db)
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="الطلب غير موجود")
+
+    items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+
+    normalized_entry: Optional[Dict[str, Any]] = None
+
+    for item in items:
+        design_files = item.design_files
+        if not design_files:
+            continue
+
+        if isinstance(design_files, str):
+            try:
+                design_files = json.loads(design_files)
+            except Exception:
+                design_files = [design_files]
+
+        if not isinstance(design_files, list):
+            design_files = [design_files]
+
+        for idx, design_entry in enumerate(design_files):
+            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx)
+            if normalized and str(normalized.get("file_key")) == file_key:
+                normalized_entry = normalized
+                break
+        if normalized_entry:
+            break
+
+    if not normalized_entry:
+        raise HTTPException(status_code=404, detail="الملف غير موجود لهذا الطلب")
+
+    file_url = normalized_entry.get("url") or normalized_entry.get("download_url")
+    if not file_url:
+        raise HTTPException(status_code=400, detail="لا يوجد رابط صالح للملف")
+
+    if file_url.startswith("data:"):
+        try:
+            import base64
+            header, encoded = file_url.split(",", 1)
+            mime_type = "application/octet-stream"
+            if ";" in header:
+                mime_type = header.split(";")[0].replace("data:", "") or mime_type
+            file_bytes = base64.b64decode(encoded)
+            response = StreamingResponse(BytesIO(file_bytes), media_type=mime_type)
+            response.headers["Content-Disposition"] = f'attachment; filename="{normalized_entry.get("filename", "attachment")}"'
+            return response
+        except Exception:
+            raise HTTPException(status_code=500, detail="تعذر تحويل الملف من base64")
+
+    return RedirectResponse(file_url, status_code=302)
 
 @router.get("/{order_id}")
 async def get_order(order_id: int, db: Session = Depends(get_db)):

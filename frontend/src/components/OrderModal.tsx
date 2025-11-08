@@ -1195,10 +1195,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     </button>
                   )}
                 </div>
-                <div className="invoice-item">
+              <div className="invoice-item">
                   <span>اسم العميل:</span>
                   <span>{customerName || 'غير محدد'}</span>
-                </div>
+              </div>
                 <div className="invoice-item">
                   <span>رقم واتساب:</span>
                   <span>{customerWhatsApp || 'غير محدد'}</span>
@@ -1215,11 +1215,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
               <div className="invoice-section">
                 <h4>تفاصيل الطلب</h4>
-                <div className="invoice-item">
+                            <div className="invoice-item">
                   <span>الخدمة:</span>
                   <span>{serviceName}</span>
-                </div>
-                <div className="invoice-item">
+                            </div>
+                            <div className="invoice-item">
                   <span>الكمية:</span>
                   <span>{quantity}</span>
                 </div>
@@ -1227,26 +1227,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <span>عدد الصفحات:</span>
                   <span>{totalPagesValue > 0 ? totalPagesValue : 'غير محدد'}</span>
                 </div>
-                <div className="invoice-item">
-                  <span>نوع الطباعة:</span>
-                  <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>
-                </div>
+              <div className="invoice-item">
+                <span>نوع الطباعة:</span>
+                <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>
+              </div>
                 <div className="invoice-item">
                   <span>عدد الوجوه:</span>
                   <span>{printSides === 'double' ? 'وجهان' : 'وجه واحد'}</span>
                 </div>
-                {printColor === 'color' && (
-                  <div className="invoice-item">
-                    <span>جودة الطباعة:</span>
-                    <span>
+              {printColor === 'color' && (
+                <div className="invoice-item">
+                  <span>جودة الطباعة:</span>
+                  <span>
                       {printQuality === 'uv'
                         ? 'دقة عالية (UV)'
                         : printQuality === 'laser'
                         ? 'دقة عالية (ليزرية)'
                         : 'طباعة عادية'}
-                    </span>
-                  </div>
-                )}
+                  </span>
+                </div>
+              )}
                 <div className="invoice-item">
                   <span>مقاس الورق:</span>
                   <span>{paperSize || 'A4'}</span>
@@ -1276,13 +1276,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         <div key={`${color}-${index}`} className="invoice-color-chip">
                           <span className="invoice-color-dot" style={{ backgroundColor: color }} />
                           <span>{color}</span>
-                        </div>
+                </div>
                       ))}
                     </div>
                   ) : (
                     <span className="muted-text">لم يتم اختيار ألوان</span>
-                  )}
-                </div>
+              )}
+              </div>
                 <div className="invoice-item invoice-item-column">
                   <span>الألوان المستخرجة من الملفات:</span>
                   {autoExtractedColors.length > 0 ? (
@@ -1291,7 +1291,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         <div key={`${color}-${index}`} className="invoice-color-chip auto">
                           <span className="invoice-color-dot" style={{ backgroundColor: color }} />
                           <span>{color}</span>
-                        </div>
+                </div>
                       ))}
                     </div>
                   ) : (
@@ -1325,11 +1325,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     </div>
                   </div>
                 ) : (
-                  <div className="invoice-item">
+                <div className="invoice-item">
                     <span>تفاصيل إضافية:</span>
                     <span>{addressConfirmed ? 'تم تأكيد الاستلام الذاتي' : 'سيتم التواصل لتحديد تفاصيل الاستلام'}</span>
-                  </div>
-                )}
+                </div>
+              )}
               </div>
 
               <div className="invoice-section">
@@ -1368,11 +1368,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               {(clothingSource || clothingProduct || clothingColor || clothingDesignEntries.length > 0) && (
                 <div className="invoice-section">
                   <h4>تفاصيل الملابس</h4>
-                  <div className="invoice-item">
+              <div className="invoice-item">
                     <span>مصدر القطعة:</span>
                     <span>{clothingSourceLabel}</span>
-                  </div>
-                  <div className="invoice-item">
+              </div>
+                <div className="invoice-item">
                     <span>نوع القطعة:</span>
                     <span>{clothingProduct || 'غير محدد'}</span>
                   </div>
@@ -1398,8 +1398,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                </div>
+              )}
                 </div>
               )}
 

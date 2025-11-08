@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { X, FileText, User, MapPin, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ordersAPI, workflowsAPI, servicesAPI, fileAnalysisAPI, adminAPI } from '../lib/api'
+import { ordersAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import { findServiceHandler } from '../services/serviceRegistry'
@@ -40,16 +40,27 @@ type SerializedDesignFile = {
 
 const getFileSignature = (file: File) => `${file.name}-${file.size}-${file.lastModified}`
 
-const uploadFile = async (file: File) => {
-  const formData = new FormData()
-  formData.append('file', file)
-  const response = await adminAPI.upload(file)
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 
-  if (!response?.data?.success || !response?.data?.url) {
-    throw new Error('فشل رفع الملف')
+const serializeFile = async (file: File): Promise<SerializedDesignFile> => {
+  const dataUrl = await fileToDataUrl(file)
+  const key = getFileSignature(file)
+  return {
+    file_key: key,
+    filename: file.name,
+    url: dataUrl,
+    download_url: dataUrl,
+    raw_path: dataUrl,
+    data_url: dataUrl,
+    mime_type: file.type || undefined,
+    size_in_bytes: file.size,
   }
-
-  return response.data
 }
 
 const isFileObject = (value: unknown): value is File =>
@@ -2443,17 +2454,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         const signature = getFileSignature(file)
         let base = serializedFilesByKey.get(signature)
         if (!base) {
-          const uploadResponse = await uploadFile(file)
-          base = {
-            file_key: signature,
-            filename: uploadResponse.filename || file.name,
-            url: uploadResponse.url,
-            download_url: uploadResponse.download_url || uploadResponse.url,
-            raw_path: uploadResponse.raw_path || uploadResponse.url,
-            data_url: uploadResponse.url,
-            mime_type: file.type || uploadResponse.mime_type,
-            size_in_bytes: file.size || uploadResponse.size_in_bytes,
-          }
+          base = await serializeFile(file)
           serializedFilesByKey.set(signature, base)
           serializedFilesByName.set(base.filename, base)
         }
@@ -2496,7 +2497,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         }
 
         if (typeof entry === 'string') {
-          if (entry.startsWith('http')) {
+          if (entry.startsWith('data:') || entry.startsWith('http')) {
             const filename = entry.split('/').pop() || `file-${index + 1}`
             return {
               file_key: `${filename}-${index}`,

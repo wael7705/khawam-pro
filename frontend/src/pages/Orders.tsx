@@ -415,7 +415,15 @@ export default function Orders() {
 
   const renderSpecifications = (specs?: Record<string, any>) => {
     if (!specs || Object.keys(specs).length === 0) return null
-    const excludedKeys = new Set(['design_files', 'files', 'attachments', 'uploaded_files'])
+    const excludedKeys = new Set([
+      'design_files',
+      'files',
+      'attachments',
+      'uploaded_files',
+      'clothing_source_value',
+      'clothing_product_code',
+      'clothing_color_code',
+    ])
     return (
       <div className="order-item-specs">
         <h4>التفاصيل:</h4>

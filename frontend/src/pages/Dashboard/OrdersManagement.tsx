@@ -768,22 +768,20 @@ export default function OrdersManagement() {
                     {order.status === 'pending' && (
                       <>
                         <button
-                          className="action-btn accept-btn"
+                          className="action-btn icon-btn accept-btn"
                           onClick={() => handleAcceptOrder(order.id)}
                           disabled={updatingOrderId === order.id}
                           title="قبول الطلب"
                         >
                           <CheckCircle size={18} />
-                          <span>قبول الطلب</span>
                         </button>
                         <button
-                          className="action-btn reject-btn"
+                          className="action-btn icon-btn reject-btn"
                           onClick={() => setRejectModalOpen(order.id)}
                           disabled={updatingOrderId === order.id}
                           title="رفض الطلب"
                         >
                           <AlertCircle size={18} />
-                          <span>رفض</span>
                         </button>
                       </>
                     )}
@@ -791,13 +789,12 @@ export default function OrdersManagement() {
                     {order.status === 'preparing' && (
                       <>
                         <button
-                          className="action-btn finish-prep-btn"
+                          className="action-btn icon-btn finish-prep-btn"
                           onClick={() => handleFinishPreparing(order.id)}
                           disabled={updatingOrderId === order.id}
                           title="انتهاء التحضير"
                         >
                           <Package size={18} />
-                          <span>انتهاء التحضير</span>
                         </button>
                         <button
                           className="action-btn cancel-btn-small"
@@ -813,13 +810,12 @@ export default function OrdersManagement() {
                     {order.status === 'awaiting_pickup' && (
                       <>
                         <button
-                          className="action-btn complete-btn"
+                          className="action-btn icon-btn complete-btn"
                           onClick={() => handleCompleteOrder(order.id)}
                           disabled={updatingOrderId === order.id}
                           title="تم الاستلام"
                         >
                           <Truck size={18} />
-                          <span>تم الاستلام</span>
                         </button>
                         <button
                           className="action-btn cancel-btn-small"
@@ -835,7 +831,7 @@ export default function OrdersManagement() {
                     {order.status === 'shipping' && (
                       <>
                         <button
-                          className="action-btn map-btn"
+                          className="action-btn icon-btn map-btn"
                           onClick={() => setSelectedOrderForMap(order.id === selectedOrderForMap ? null : order.id)}
                           disabled={updatingOrderId === order.id}
                           title="عرض على الخريطة"
@@ -844,13 +840,12 @@ export default function OrdersManagement() {
                           <MapPin size={18} />
                         </button>
                         <button
-                          className="action-btn complete-btn"
+                          className="action-btn icon-btn complete-btn"
                           onClick={() => handleCompleteOrder(order.id)}
                           disabled={updatingOrderId === order.id}
                           title="تم الاستلام"
                         >
                           <Truck size={18} />
-                          <span>تم الاستلام</span>
                         </button>
                         <button
                           className="action-btn cancel-btn-small"
@@ -880,7 +875,7 @@ export default function OrdersManagement() {
                     {/* Delete button for orders with delivery type but missing address data */}
                     {order.delivery_type === 'delivery' && !order.delivery_address && !order.delivery_latitude && (
                       <button
-                        className="action-btn delete-btn"
+                        className="action-btn icon-btn delete-btn"
                         onClick={() => {
                           setDeleteReason('')
                           setDeleteModalOpen(order.id)
@@ -889,14 +884,13 @@ export default function OrdersManagement() {
                         title="حذف الطلب المعطل"
                       >
                         <Trash2 size={16} />
-                        <span>حذف</span>
                       </button>
                     )}
 
                     {/* Delete button in archive */}
                     {activeTab === 'archived' && (
                       <button
-                        className="action-btn delete-btn"
+                        className="action-btn icon-btn delete-btn"
                         onClick={() => {
                           setDeleteReason('')
                           setDeleteModalOpen(order.id)
@@ -905,14 +899,13 @@ export default function OrdersManagement() {
                         title="حذف من الأرشيف"
                       >
                         <Trash2 size={16} />
-                        <span>حذف</span>
                       </button>
                     )}
 
                     {/* General delete with reason for non-pending statuses */}
                     {order.status !== 'pending' && activeTab !== 'archived' && !(!order.delivery_address && order.delivery_type === 'delivery' && !order.delivery_latitude) && (
                       <button
-                        className="action-btn delete-btn"
+                        className="action-btn icon-btn delete-btn"
                         onClick={() => {
                           setDeleteReason('')
                           setDeleteModalOpen(order.id)
@@ -921,7 +914,6 @@ export default function OrdersManagement() {
                         title="حذف الطلب مع توثيق السبب"
                       >
                         <Trash2 size={16} />
-                        <span>حذف</span>
                       </button>
                     )}
                   </div>

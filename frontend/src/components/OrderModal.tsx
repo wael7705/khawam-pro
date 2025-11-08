@@ -2562,6 +2562,29 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         return null
       }
 
+      // استخراج عناوين منتجات الملابس من إعدادات الـ workflow (إن وجدت)
+      let clothingSourceLabel: string | undefined
+      let clothingProductLabel: string | undefined
+      let clothingColorLabel: string | undefined
+      const clothingStep = workflowSteps.find((step) => step.step_type === 'clothing_source')
+      const clothingOptions = clothingStep?.step_config?.options || []
+      const selectedSourceOption = clothingOptions.find((option: any) => option.id === clothingSource)
+      if (selectedSourceOption) {
+        clothingSourceLabel = selectedSourceOption.label
+        const products = selectedSourceOption.products || []
+        const selectedProduct = products.find((product: any) => product.id === clothingProduct)
+        if (selectedProduct) {
+          clothingProductLabel = selectedProduct.name
+          if (Array.isArray(selectedProduct.colors) && selectedProduct.colors.length > 0) {
+            const matchingColor = selectedProduct.colors.find((color: string) => color === clothingColor)
+            clothingColorLabel = matchingColor || clothingColor
+          }
+        }
+      }
+      if (!clothingColorLabel) {
+        clothingColorLabel = clothingColor
+      }
+
       // تحضير البيانات الأساسية
       const baseOrderData = {
         customer_name: customerName,
@@ -2602,8 +2625,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           selectedColors,
           workType,
           clothingSource,
+          clothingSourceLabel,
           clothingProduct,
+          clothingProductLabel,
           clothingColor,
+          clothingColorLabel,
           clothingDesigns
         }
         

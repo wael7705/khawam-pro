@@ -244,6 +244,18 @@
   white-space: nowrap;
 }
 
+.action-btn.icon-btn {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.action-btn.icon-btn svg {
+  pointer-events: none;
+}
+
 .accept-btn {
   background: #10B981;
   color: white;
@@ -800,11 +812,6 @@
 .map-btn {
   background: #6366f1;
   color: white;
-  padding: 10px 12px;
-  min-width: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .map-btn:hover:not(:disabled) {

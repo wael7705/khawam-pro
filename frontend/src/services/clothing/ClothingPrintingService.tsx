@@ -234,8 +234,11 @@ export const ClothingPrintingService: ServiceHandler = {
   prepareOrderData: (serviceData: any, baseOrderData: any) => {
     const {
       clothingSource,
+      clothingSourceLabel,
       clothingProduct,
+      clothingProductLabel,
       clothingColor,
+      clothingColorLabel,
       clothingDesigns,
       quantity,
       notes,
@@ -243,12 +246,15 @@ export const ClothingPrintingService: ServiceHandler = {
 
     const designEntries = Object.entries(clothingDesigns || {}).filter(([, file]) => !!file) as Array<[string, File]>
     const specifications: Record<string, any> = {
-      clothing_source: clothingSource,
+      clothing_source: clothingSourceLabel || (clothingSource === 'store' ? 'من الشركة' : 'من العميل'),
+      clothing_source_value: clothingSource,
     }
 
     if (clothingSource === 'store') {
-      specifications.clothing_product = clothingProduct
-      specifications.clothing_color = clothingColor
+      specifications.clothing_product = clothingProductLabel || clothingProduct
+      specifications.clothing_product_code = clothingProduct
+      specifications.clothing_color = clothingColorLabel || clothingColor
+      specifications.clothing_color_code = clothingColor
     }
 
     if (designEntries.length > 0) {
@@ -285,8 +291,11 @@ export const ClothingPrintingService: ServiceHandler = {
   getSpecifications: (serviceData: any) => {
     const {
       clothingSource,
+      clothingSourceLabel,
       clothingProduct,
+      clothingProductLabel,
       clothingColor,
+      clothingColorLabel,
       clothingDesigns,
       quantity,
     } = serviceData
@@ -294,9 +303,12 @@ export const ClothingPrintingService: ServiceHandler = {
     const designEntries = Object.entries(clothingDesigns || {}).filter(([, file]) => !!file) as Array<[string, File]>
 
     return {
-      clothing_source: clothingSource,
-      clothing_product: clothingSource === 'store' ? clothingProduct : undefined,
-      clothing_color: clothingSource === 'store' ? clothingColor : undefined,
+      clothing_source: clothingSourceLabel || (clothingSource === 'store' ? 'من الشركة' : 'من العميل'),
+      clothing_source_value: clothingSource,
+      clothing_product: clothingSource === 'store' ? (clothingProductLabel || clothingProduct) : undefined,
+      clothing_product_code: clothingSource === 'store' ? clothingProduct : undefined,
+      clothing_color: clothingSource === 'store' ? (clothingColorLabel || clothingColor) : undefined,
+      clothing_color_code: clothingSource === 'store' ? clothingColor : undefined,
       quantity: quantity || 1,
       design_positions: designEntries.map(([location, file]) => ({
         location,

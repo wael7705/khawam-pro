@@ -337,6 +337,9 @@ const SPEC_EXCLUDED_KEYS = new Set([
   'delivery_type',
   'notes',
   'quantity',
+  'clothing_source_value',
+  'clothing_product_code',
+  'clothing_color_code',
 ])
 
 interface OrderItem {

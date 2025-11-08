@@ -45,6 +45,20 @@ type NormalizedFile = {
   sizeLabel?: string
 }
 
+type OrderAttachment = {
+  id?: string
+  order_item_id?: number
+  order_item_service_name?: string
+  filename?: string
+  url?: string
+  download_url?: string
+  raw_path?: string
+  location?: string
+  mime_type?: string
+  size_label?: string
+  size_in_bytes?: number
+}
+
 const isDataUrl = (value: string) => /^data:/i.test(value)
 const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value) || value.startsWith('blob:')
 const looksLikeImage = (value: string) => /\.(jpg|jpeg|png|gif|bmp|webp|svg|tiff)$/i.test(value)
@@ -173,6 +187,27 @@ const collectDesignFiles = (item: OrderItem): NormalizedFile[] => {
 
   return unique
 }
+
+const mapAttachmentToNormalized = (attachment: OrderAttachment): NormalizedFile | null => {
+  if (!attachment) return null
+  const raw = attachment.url || attachment.download_url || attachment.raw_path
+  if (!raw) return null
+  const absoluteUrl = resolveToAbsoluteUrl(raw)
+  if (!absoluteUrl) return null
+  const filename = attachment.filename || extractFileName(raw) || 'ملف'
+  const isImage = looksLikeImage(absoluteUrl) || looksLikeImage(filename)
+  const sizeLabel =
+    attachment.size_label ||
+    (attachment.size_in_bytes !== undefined ? prettyFileSize(attachment.size_in_bytes) : undefined)
+
+  return {
+    url: absoluteUrl,
+    filename,
+    isImage,
+    location: attachment.location,
+    sizeLabel,
+  }
+}
 const SPEC_LABELS: Record<string, string> = {
   clothing_source: 'مصدر الملابس',
   clothing_product: 'نوع المنتج',
@@ -207,6 +242,8 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attachmentsMap, setAttachmentsMap] = useState<Record<number, OrderAttachment[]>>({})
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -254,6 +291,50 @@ export default function Orders() {
 
     loadOrders()
   }, [])
+
+  useEffect(() => {
+    if (!orders.length) {
+      setAttachmentsMap({})
+      return
+    }
+
+    let cancelled = false
+    const loadAttachments = async () => {
+      setAttachmentsLoading(true)
+      try {
+        const results = await Promise.all(
+          orders.map(async (order) => {
+            try {
+              const response = await ordersAPI.getAttachments(order.id)
+              const attachments = Array.isArray(response.data?.attachments) ? response.data.attachments : []
+              return [order.id, attachments as OrderAttachment[]] as const
+            } catch (err) {
+              console.error(`Error loading attachments for order ${order.id}:`, err)
+              return [order.id, [] as OrderAttachment[]] as const
+            }
+          })
+        )
+
+        if (!cancelled) {
+          const nextMap: Record<number, OrderAttachment[]> = {}
+          results.forEach(([orderId, attachments]) => {
+            nextMap[orderId] = attachments
+          })
+          setAttachmentsMap(nextMap)
+        }
+      } finally {
+        if (!cancelled) {
+          setAttachmentsLoading(false)
+        }
+      }
+    }
+
+    loadAttachments()
+
+    return () => {
+      cancelled = true
+    }
+  }, [orders])
 
   const groupedOrders = useMemo(() => {
     const active = orders.filter((order) => !order.status || !isCompletedStatus(order.status))
@@ -352,6 +433,28 @@ export default function Orders() {
     )
   }
 
+  const getOrderAttachments = useCallback(
+    (order: Order): NormalizedFile[] => {
+      const fromEndpoint = attachmentsMap[order.id] || []
+      const normalizedFromEndpoint = fromEndpoint
+        .map(mapAttachmentToNormalized)
+        .filter((file): file is NormalizedFile => Boolean(file))
+
+      if (normalizedFromEndpoint.length > 0) {
+        return normalizedFromEndpoint
+      }
+
+      const fallback: NormalizedFile[] = []
+      if (order.items && order.items.length > 0) {
+        order.items.forEach((item) => {
+          fallback.push(...collectDesignFiles(item))
+        })
+      }
+      return fallback
+    },
+    [attachmentsMap]
+  )
+
   const formatDate = (date?: string) => {
     if (!date) return 'غير متوفر'
     return new Date(date).toLocaleDateString('ar-SY', {
@@ -361,11 +464,12 @@ export default function Orders() {
     })
   }
 
-  const renderFilesSection = useCallback((files: NormalizedFile[]) => {
+  const renderFilesSection = useCallback((files: NormalizedFile[], options?: { hideTitle?: boolean; title?: string }) => {
     if (!files || files.length === 0) return null
+    const title = options?.title ?? 'الملفات والمرفقات:'
     return (
       <div className="order-item-files">
-        <h4>الملفات والمرفقات:</h4>
+        {!options?.hideTitle && <h4>{title}</h4>}
         <div className="order-files-grid">
           {files.map((file, index) => (
             <div key={`${file.url}-${index}`} className="order-file-card">
@@ -409,6 +513,122 @@ export default function Orders() {
     )
   }, [])
 
+  const renderOrderCard = (order: Order, variant: 'active' | 'done' = 'active') => {
+    const attachments = getOrderAttachments(order)
+    const hasAttachments = attachments.length > 0
+    const serviceDisplayName =
+      order.service_name ||
+      order.items?.[0]?.service_name ||
+      order.items?.[0]?.product_name ||
+      'غير محدد'
+    const statusClass = variant === 'done' ? 'completed' : 'in-progress'
+    const dateLabel = variant === 'done' ? 'تاريخ الإنجاز:' : 'تاريخ الطلب:'
+    const dateValue = variant === 'done' ? formatDate(order.updated_at || order.created_at) : formatDate(order.created_at)
+
+    return (
+      <article key={order.id} className={`order-card ${variant === 'done' ? 'done' : ''}`}>
+        <div className="order-card__content">
+          <div className="order-card__main">
+            <div className="order-card__header">
+              <span className="order-card__id">طلب #{order.order_number || order.id}</span>
+              <span className={`order-card__status ${statusClass}`}>{formatStatus(order.status)}</span>
+            </div>
+
+            <div className="order-card__details">
+              <div>
+                <strong>الخدمة:</strong>
+                <span>{serviceDisplayName}</span>
+              </div>
+              <div>
+                <strong>{dateLabel}</strong>
+                <span>{dateValue}</span>
+              </div>
+              <div>
+                <strong>اسم العميل:</strong>
+                <span>{order.customer_name || 'غير متوفر'}</span>
+              </div>
+              {order.shop_name && (
+                <div>
+                  <strong>اسم المتجر:</strong>
+                  <span>{order.shop_name}</span>
+                </div>
+              )}
+              <div>
+                <strong>واتساب:</strong>
+                <span>{order.customer_whatsapp || order.customer_phone || 'غير متوفر'}</span>
+              </div>
+              {order.delivery_type && (
+                <div>
+                  <strong>طريقة التسليم:</strong>
+                  <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+                </div>
+              )}
+              {order.delivery_type === 'delivery' && (
+                <div>
+                  <strong>عنوان التسليم:</strong>
+                  <span>{order.delivery_address || 'غير محدد'}</span>
+                </div>
+              )}
+              {order.notes && (
+                <div className="order-card__notes">
+                  <strong>ملاحظات العميل:</strong>
+                  <span>{order.notes}</span>
+                </div>
+              )}
+              {variant === 'done' && order.total_price && (
+                <div>
+                  <strong>قيمة الفاتورة:</strong>
+                  <span>{order.total_price} ل.س</span>
+                </div>
+              )}
+            </div>
+
+            {order.items && order.items.length > 0 && (
+              <div className="order-card__items">
+                <h4>تفاصيل العناصر</h4>
+                {order.items.map((item, index) => (
+                  <div key={index} className="order-card__item">
+                    <div className="order-card__item-header">
+                      <strong>{item.service_name || item.product_name || `عنصر ${index + 1}`}</strong>
+                      <span>الكمية: {item.quantity || 1}</span>
+                    </div>
+                    {renderSpecifications(item.specifications)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="order-card__footer">
+              <a
+                className={`order-card__action ${variant === 'done' ? 'secondary' : ''}`}
+                href={buildWhatsAppLink(order)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {variant === 'done' ? 'اطلب نسخة عن الفاتورة' : 'متابعة عبر واتساب'}
+              </a>
+            </div>
+          </div>
+
+          <div className="order-card__attachments-panel">
+            <div className="attachments-panel-header">
+              <h4>مرفقات العميل</h4>
+              {attachmentsLoading && <span className="attachments-loading">جاري التحميل...</span>}
+            </div>
+
+            {hasAttachments ? (
+              <div className="attachments-panel-content">{renderFilesSection(attachments, { hideTitle: true })}</div>
+            ) : (
+              <p className="attachments-empty">
+                {attachmentsLoading ? 'جاري تحميل المرفقات...' : 'لا توجد ملفات مرفوعة لهذا الطلب.'}
+              </p>
+            )}
+          </div>
+        </div>
+      </article>
+    )
+  }
+
   return (
     <div className="orders-page">
       <div className="container">
@@ -440,166 +660,22 @@ export default function Orders() {
             <section>
               <h2>طلبات قيد التنفيذ</h2>
               <div className="orders-grid">
-                {groupedOrders.active.length === 0 && <p className="orders-empty">لا توجد طلبات قيد التنفيذ حالياً.</p>}
-                {groupedOrders.active.map((order) => (
-                  <article key={order.id} className="order-card">
-                    <div className="order-card__header">
-                      <span className="order-card__id">طلب #{order.order_number || order.id}</span>
-                      <span className="order-card__status in-progress">{formatStatus(order.status)}</span>
-                    </div>
-                    <div className="order-card__body">
-                      <div className="order-card__details">
-                        <div>
-                          <strong>الخدمة:</strong>
-                          <span>{order.service_name || 'غير محدد'}</span>
-                        </div>
-                        <div>
-                          <strong>تاريخ الطلب:</strong>
-                          <span>{formatDate(order.created_at)}</span>
-                        </div>
-                        <div>
-                          <strong>اسم العميل:</strong>
-                          <span>{order.customer_name || 'غير متوفر'}</span>
-                        </div>
-                        {order.shop_name && (
-                          <div>
-                            <strong>اسم المتجر:</strong>
-                            <span>{order.shop_name}</span>
-                          </div>
-                        )}
-                        <div>
-                          <strong>واتساب:</strong>
-                          <span>{order.customer_whatsapp || order.customer_phone || 'غير متوفر'}</span>
-                        </div>
-                        {order.delivery_type && (
-                          <div>
-                            <strong>طريقة التسليم:</strong>
-                            <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-                          </div>
-                        )}
-                        {order.delivery_type === 'delivery' && (
-                          <div>
-                            <strong>عنوان التسليم:</strong>
-                            <span>{order.delivery_address || 'غير محدد بعد'}</span>
-                          </div>
-                        )}
-                        {order.notes && (
-                          <div>
-                            <strong>ملاحظات العميل:</strong>
-                            <span>{order.notes}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {order.items && order.items.length > 0 && (
-                        <div className="order-card__items">
-                          <h4>تفاصيل العناصر</h4>
-                          {order.items.map((item, index) => (
-                            <div key={index} className="order-card__item">
-                              <div className="order-card__item-header">
-                                <strong>{item.service_name || order.service_name || 'عنصر'}</strong>
-                                <span>الكمية: {item.quantity || 1}</span>
-                              </div>
-                              {renderSpecifications(item.specifications)}
-                              {renderFilesSection(collectDesignFiles(item))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="order-card__footer">
-                      <a className="order-card__action" href={buildWhatsAppLink(order)} target="_blank" rel="noreferrer">
-                        متابعة عبر واتساب
-                      </a>
-                    </div>
-                  </article>
-                ))}
+                {groupedOrders.active.length === 0 ? (
+                  <p className="orders-grid__empty">لا توجد طلبات قيد التنفيذ حالياً.</p>
+                ) : (
+                  groupedOrders.active.map((order) => renderOrderCard(order, 'active'))
+                )}
               </div>
             </section>
 
             <section>
               <h2>طلبات منجزة</h2>
               <div className="orders-grid">
-                {groupedOrders.finished.length === 0 && <p className="orders-empty">لا توجد طلبات منجزة بعد.</p>}
-                {groupedOrders.finished.map((order) => (
-                  <article key={order.id} className="order-card done">
-                    <div className="order-card__header">
-                      <span className="order-card__id">طلب #{order.order_number || order.id}</span>
-                      <span className="order-card__status completed">{formatStatus(order.status)}</span>
-                    </div>
-                    <div className="order-card__body">
-                      <div className="order-card__details">
-                        <div>
-                          <strong>الخدمة:</strong>
-                          <span>{order.service_name || 'غير محدد'}</span>
-                        </div>
-                        <div>
-                          <strong>تاريخ الإنجاز:</strong>
-                          <span>{formatDate(order.updated_at || order.created_at)}</span>
-                        </div>
-                        <div>
-                          <strong>اسم العميل:</strong>
-                          <span>{order.customer_name || 'غير متوفر'}</span>
-                        </div>
-                        {order.shop_name && (
-                          <div>
-                            <strong>اسم المتجر:</strong>
-                            <span>{order.shop_name}</span>
-                          </div>
-                        )}
-                        <div>
-                          <strong>واتساب:</strong>
-                          <span>{order.customer_whatsapp || order.customer_phone || 'غير متوفر'}</span>
-                        </div>
-                        {order.delivery_type && (
-                          <div>
-                            <strong>طريقة التسليم:</strong>
-                            <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-                          </div>
-                        )}
-                        {order.delivery_type === 'delivery' && (
-                          <div>
-                            <strong>عنوان التسليم:</strong>
-                            <span>{order.delivery_address || 'غير محدد'}</span>
-                          </div>
-                        )}
-                        {order.notes && (
-                          <div>
-                            <strong>ملاحظات العميل:</strong>
-                            <span>{order.notes}</span>
-                          </div>
-                        )}
-                        {order.total_price && (
-                          <div>
-                            <strong>قيمة الفاتورة:</strong>
-                            <span>{order.total_price} ل.س</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {order.items && order.items.length > 0 && (
-                        <div className="order-card__items">
-                          <h4>تفاصيل العناصر</h4>
-                          {order.items.map((item, index) => (
-                            <div key={index} className="order-card__item">
-                              <div className="order-card__item-header">
-                                <strong>{item.service_name || order.service_name || 'عنصر'}</strong>
-                                <span>الكمية: {item.quantity || 1}</span>
-                              </div>
-                              {renderSpecifications(item.specifications)}
-                              {renderFilesSection(collectDesignFiles(item))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="order-card__footer">
-                      <a className="order-card__action secondary" href={buildWhatsAppLink(order)} target="_blank" rel="noreferrer">
-                        اطلب نسخة عن الفاتورة
-                      </a>
-                    </div>
-                  </article>
-                ))}
+                {groupedOrders.finished.length === 0 ? (
+                  <p className="orders-grid__empty">لا توجد طلبات منجزة بعد.</p>
+                ) : (
+                  groupedOrders.finished.map((order) => renderOrderCard(order, 'done'))
+                )}
               </div>
             </section>
           </div>

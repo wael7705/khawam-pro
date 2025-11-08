@@ -84,6 +84,7 @@ export const servicesAPI = {
 export const ordersAPI = {
   getAll: () => api.get('/orders/'),
   create: (data: any) => api.post('/orders/', data),
+  getAttachments: (orderId: number) => api.get(`/orders/${orderId}/attachments`),
 }
 
 // Studio API

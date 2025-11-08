@@ -4,12 +4,13 @@ from sqlalchemy import text, inspect
 from database import get_db
 from models import Order, OrderItem, User
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from decimal import Decimal
 import uuid
 from datetime import datetime
 from collections import defaultdict
 import json
+import os
 
 router = APIRouter()
 
@@ -126,6 +127,84 @@ def ensure_order_items_columns(db: Session):
                 except Exception as exc:
                     print(f"⚠️ Unable to convert design_files column type: {exc}")
                     db.rollback()
+
+def get_public_base_url() -> str:
+    base = (
+        os.getenv("PUBLIC_BASE_URL")
+        or os.getenv("FRONTEND_BASE_URL")
+        or os.getenv("API_PUBLIC_BASE_URL")
+        or os.getenv("APP_BASE_URL")
+        or ""
+    )
+    return base.rstrip('/')
+
+def build_file_url(raw_path: Optional[str]) -> str:
+    if not raw_path:
+        return ""
+    raw_path = str(raw_path).strip()
+    if not raw_path:
+        return ""
+    if raw_path.startswith("http://") or raw_path.startswith("https://") or raw_path.startswith("data:"):
+        return raw_path
+    base = get_public_base_url()
+    if raw_path.startswith("/"):
+        return f"{base}{raw_path}" if base else raw_path
+    return f"{base}/{raw_path}" if base else raw_path
+
+def normalize_attachment_entry(
+    entry: Any,
+    order_id: int,
+    order_item_id: Optional[int],
+    index: int
+) -> Optional[Dict[str, any]]:
+    if not entry:
+        return None
+
+    filename = None
+    raw_path = None
+    location = None
+    mime_type = None
+    size_label = None
+    size_in_bytes = None
+
+    if isinstance(entry, dict):
+        filename = entry.get("filename") or entry.get("name") or entry.get("original_name")
+        raw_path = (
+            entry.get("url")
+            or entry.get("download_url")
+            or entry.get("path")
+            or entry.get("file")
+            or entry.get("location_url")
+        )
+        location = entry.get("location") or entry.get("position") or entry.get("side")
+        mime_type = entry.get("mime_type") or entry.get("mimetype") or entry.get("content_type")
+        size_label = entry.get("size_label")
+        size_in_bytes = entry.get("size") or entry.get("size_in_bytes")
+        if not raw_path and filename:
+            raw_path = f"/uploads/{filename}"
+    else:
+        raw_path = str(entry).strip()
+        filename = os.path.basename(raw_path.split("?")[0]) if raw_path else None
+
+    if not raw_path:
+        return None
+
+    file_url = build_file_url(raw_path)
+    if not file_url:
+        return None
+
+    return {
+        "id": f"{order_id}-{order_item_id or 'item'}-{index}",
+        "order_item_id": order_item_id,
+        "filename": filename or "ملف",
+        "raw_path": raw_path,
+        "url": file_url,
+        "download_url": file_url,
+        "location": location,
+        "mime_type": mime_type,
+        "size_label": size_label,
+        "size_in_bytes": size_in_bytes,
+    }
 # Background task for notifications
 async def send_order_notification(order_number: str, customer_name: str, customer_phone: str):
     """Background task to send notifications (can be extended with email/SMS)"""
@@ -399,6 +478,44 @@ async def get_orders(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error fetching orders: {e}")
         raise HTTPException(status_code=500, detail=f"خطأ في جلب الطلبات: {str(e)}")
+
+@router.get("/{order_id}/attachments")
+async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
+    ensure_order_columns(db)
+    ensure_order_items_columns(db)
+
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="الطلب غير موجود")
+
+    items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+    attachments: List[Dict[str, Any]] = []
+
+    for item in items:
+        design_files = item.design_files
+        if not design_files:
+            continue
+
+        if isinstance(design_files, str):
+            try:
+                design_files = json.loads(design_files)
+            except Exception:
+                design_files = [design_files]
+
+        if not isinstance(design_files, list):
+            design_files = [design_files]
+
+        for idx, design_entry in enumerate(design_files):
+            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx)
+            if normalized:
+                normalized["order_item_service_name"] = getattr(item, "product_name", None)
+                attachments.append(normalized)
+
+    return {
+        "success": True,
+        "attachments": attachments,
+        "count": len(attachments),
+    }
 
 @router.get("/{order_id}")
 async def get_order(order_id: int, db: Session = Depends(get_db)):

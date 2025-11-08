@@ -25,6 +25,47 @@ const CLOTHING_DESIGN_LABELS: Record<string, string> = {
   shoulder_left: 'الكتف الأيسر',
 }
 
+type SerializedDesignFile = {
+  file_key: string
+  filename: string
+  url: string
+  download_url: string
+  raw_path: string
+  data_url: string
+  mime_type?: string
+  size_in_bytes?: number
+  location?: string
+  source?: string
+}
+
+const getFileSignature = (file: File) => `${file.name}-${file.size}-${file.lastModified}`
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+
+const serializeFile = async (file: File): Promise<SerializedDesignFile> => {
+  const dataUrl = await fileToDataUrl(file)
+  const key = getFileSignature(file)
+  return {
+    file_key: key,
+    filename: file.name,
+    url: dataUrl,
+    download_url: dataUrl,
+    raw_path: dataUrl,
+    data_url: dataUrl,
+    mime_type: file.type || undefined,
+    size_in_bytes: file.size,
+  }
+}
+
+const isFileObject = (value: unknown): value is File =>
+  typeof File !== 'undefined' && value instanceof File
+
 export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: OrderModalProps) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
@@ -2404,19 +2445,123 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     let orderData: any = null
     
     try {
-      // Upload image if exists
-      let imageUrl = null
-      if (image) {
-        try {
-          const formData = new FormData()
-          formData.append('file', image)
-          // For now, we'll skip image upload and add it to design_files later
-          // const uploadResponse = await adminAPI.upload(image)
-          // imageUrl = uploadResponse.url
-        } catch (uploadError) {
-          console.warn('Image upload failed, continuing without image:', uploadError)
+      const serializedFilesByKey = new Map<string, SerializedDesignFile>()
+      const serializedFilesByName = new Map<string, SerializedDesignFile>()
+      const serializedByLocation = new Map<string, SerializedDesignFile>()
+
+      const registerFile = async (file: File | null, options?: { location?: string; source?: string }) => {
+        if (!file) return
+        const signature = getFileSignature(file)
+        let base = serializedFilesByKey.get(signature)
+        if (!base) {
+          base = await serializeFile(file)
+          serializedFilesByKey.set(signature, base)
+          serializedFilesByName.set(base.filename, base)
+        }
+
+        if (options?.location) {
+          const withLocation: SerializedDesignFile = {
+            ...base,
+            location: options.location,
+            source: options.source ?? base.source,
+          }
+          serializedByLocation.set(options.location, withLocation)
+          serializedFilesByName.set(withLocation.filename, withLocation)
+        } else if (options?.source) {
+          serializedFilesByName.set(base.filename, { ...base, source: options.source })
         }
       }
+
+      await Promise.all(uploadedFiles.map((file) => registerFile(file, { source: 'uploaded' })))
+      if (image) {
+        await registerFile(image, { source: 'primary' })
+      }
+      await Promise.all(
+        Object.entries(clothingDesigns).map(([location, file]) =>
+          registerFile(file, { location, source: 'clothing' })
+        )
+      )
+
+      const ensureSerializedEntry = (
+        entry: any,
+        index: number
+      ): (SerializedDesignFile & Record<string, any>) | SerializedDesignFile | null => {
+        if (!entry) return null
+
+        if (isFileObject(entry)) {
+          const signature = getFileSignature(entry)
+          const base = serializedFilesByKey.get(signature)
+          if (base) {
+            return { ...base }
+          }
+        }
+
+        if (typeof entry === 'string') {
+          if (entry.startsWith('data:') || entry.startsWith('http')) {
+            const filename = entry.split('/').pop() || `file-${index + 1}`
+            return {
+              file_key: `${filename}-${index}`,
+              filename,
+              url: entry,
+              download_url: entry,
+              raw_path: entry,
+              data_url: entry,
+            }
+          }
+
+          const fromName = serializedFilesByName.get(entry)
+          if (fromName) {
+            return { ...fromName }
+          }
+
+          const inferred = entry.startsWith('/') ? entry : `/uploads/${entry}`
+          const filename = entry.split('/').pop() || `file-${index + 1}`
+          return {
+            file_key: `${filename}-${index}`,
+            filename,
+            url: inferred,
+            download_url: inferred,
+            raw_path: inferred,
+            data_url: inferred,
+          }
+        }
+
+        if (typeof entry === 'object') {
+          const candidate = entry as Record<string, any>
+          let base: SerializedDesignFile | undefined
+
+          if (candidate.location && serializedByLocation.has(candidate.location)) {
+            base = serializedByLocation.get(candidate.location)
+          } else if (candidate.filename && serializedFilesByName.has(candidate.filename)) {
+            base = serializedFilesByName.get(candidate.filename)
+          }
+
+          const merged: any = { ...base, ...candidate }
+          const effectiveUrl =
+            merged.url ||
+            merged.download_url ||
+            merged.raw_path ||
+            merged.location_url ||
+            merged.data_url
+
+          if (effectiveUrl) {
+            merged.url = effectiveUrl
+            merged.download_url = merged.download_url || effectiveUrl
+            merged.raw_path = merged.raw_path || effectiveUrl
+            merged.data_url = merged.data_url || effectiveUrl
+            merged.file_key =
+              merged.file_key || base?.file_key || `${merged.filename || 'file'}-${index}`
+            return merged
+          }
+
+          if (base) {
+            return { ...base }
+          }
+        }
+
+        return null
+      }
+
       // تحضير البيانات الأساسية
       const baseOrderData = {
         customer_name: customerName,
@@ -2504,7 +2649,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 unit: unit
               },
               colors: selectedColors,
-              design_files: imageUrl ? [imageUrl] : []
+              design_files: uploadedFiles
             }
           ],
           total_amount: safeTotalPrice,
@@ -2521,6 +2666,44 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             : null,
           notes: notes || workType || null
         }
+      }
+
+      if (Array.isArray(orderData?.items)) {
+        orderData.items = orderData.items.map((item: any) => {
+          const processedDesignFiles = Array.isArray(item.design_files)
+            ? item.design_files
+                .map((entry: any, idx: number) => ensureSerializedEntry(entry, idx))
+                .filter(Boolean)
+            : []
+
+          const specifications = item.specifications ? { ...item.specifications } : undefined
+          const attachmentKeys = ['design_files', 'files', 'attachments', 'uploaded_files', 'documents', 'images']
+
+          if (specifications) {
+            attachmentKeys.forEach((key) => {
+              if (Array.isArray(specifications[key])) {
+                const processed = specifications[key]
+                  .map((entry: any, idx: number) => ensureSerializedEntry(entry, idx))
+                  .filter(Boolean)
+                if (processed.length > 0) {
+                  specifications[key] = processed
+                } else {
+                  delete specifications[key]
+                }
+              }
+            })
+          }
+
+          return {
+            ...item,
+            design_files: processedDesignFiles,
+            specifications,
+          }
+        })
+      }
+
+      if (orderData && typeof orderData === 'object' && 'uploadedFiles' in orderData) {
+        delete orderData.uploadedFiles
       }
 
       const response = await ordersAPI.create(orderData)

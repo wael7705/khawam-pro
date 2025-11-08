@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { X, FileText } from 'lucide-react'
+import { X, FileText, User, MapPin, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ordersAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import { findServiceHandler } from '../services/serviceRegistry'
-import { getUserData } from '../lib/auth'
+import { getUserData, isAdmin, isEmployee } from '../lib/auth'
 import './OrderModal.css'
 
 type PrintQuality = 'standard' | 'laser' | 'uv'
@@ -17,6 +17,14 @@ interface OrderModalProps {
   serviceId?: number
 }
 
+const CLOTHING_DESIGN_LABELS: Record<string, string> = {
+  logo: 'الشعار',
+  front: 'الجهة الأمامية',
+  back: 'الجهة الخلفية',
+  shoulder_right: 'الكتف الأيمن',
+  shoulder_left: 'الكتف الأيسر',
+}
+
 export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: OrderModalProps) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
@@ -24,6 +32,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [loadingWorkflow, setLoadingWorkflow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [image, setImage] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [totalPages, setTotalPages] = useState<number>(0)
   const [isAnalyzingPages, setIsAnalyzingPages] = useState(false)
@@ -69,6 +78,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   
   // Service Handler - منطق الخدمة المحددة
   const serviceHandler = findServiceHandler(serviceName, serviceId)
+  const canAccessCustomerProfile = isAdmin() || isEmployee()
+
+  const formatPaperType = (type: string) => {
+    switch (type) {
+      case 'normal':
+        return 'ورق عادي'
+      case 'photo':
+        return 'ورق PHOTO'
+      case 'tracing':
+        return 'ورق كالك'
+      case 'bond':
+        return 'ورق بوند'
+      case 'vellum':
+        return 'ورق فيلوم'
+      case 'perforated':
+        return 'فينيل مثقب'
+      default:
+        return type
+    }
+  }
 
   const applyWorkflowSteps = (steps: any[], currentServiceName: string) => {
     setWorkflowSteps(steps)
@@ -118,6 +147,20 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
     }
   }, [workflowSteps, printColor])
+
+  useEffect(() => {
+    if (!image) {
+      setImagePreviewUrl(null)
+      return
+    }
+
+    const url = URL.createObjectURL(image)
+    setImagePreviewUrl(url)
+
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [image])
 
   useEffect(() => {
     if (!isOpen) {
@@ -1120,7 +1163,20 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           </div>
         )
 
-      case 'invoice':
+      case 'invoice': {
+        const totalPagesValue = totalPages || numberOfPages || 0
+        const clothingDesignEntries = Object.entries(clothingDesigns || {}).filter(([, file]) => !!file) as Array<[string, File]>
+        const clothingSourceLabel = clothingSource === 'store' ? 'من المتجر' : 'من العميل'
+        const hasDeliveryAddress = deliveryType === 'delivery' && deliveryAddress
+        const readableAddress =
+          (deliveryAddress && (deliveryAddress.street || deliveryAddress.description || deliveryAddress.formattedAddress || deliveryAddress.label)) || ''
+        const hasCoordinates = Boolean(deliveryAddress?.latitude && deliveryAddress?.longitude)
+        const measurementItems = [
+          { label: 'الطول', value: length },
+          { label: 'العرض', value: width },
+          { label: 'الارتفاع', value: height },
+        ]
+
         return (
           <div className="modal-body">
             <h3>{workflowStep.step_name_ar}</h3>
@@ -1128,111 +1184,236 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
             <div className="invoice-summary">
-              <div className="invoice-item">
-                <span>الخدمة:</span>
-                <span>{serviceName}</span>
-              </div>
-              {totalPages > 0 && (
-                <div className="invoice-item">
-                  <span>عدد الصفحات:</span>
-                  <span>{totalPages}</span>
+              <div className="invoice-section">
+                <div className="invoice-section-header">
+                  <h4>معلومات العميل</h4>
+                  {canAccessCustomerProfile && customerWhatsApp && (
+                    <button type="button" className="customer-profile-link" onClick={handleOpenCustomerProfile}>
+                      <User size={16} />
+                      <span>فتح ملف العميل</span>
+                      <ExternalLink size={14} />
+                    </button>
+                  )}
                 </div>
-              )}
-              {/* عرض الأبعاد إذا كانت موجودة */}
-              {(width || length || height) && (
-                <div className="invoice-item">
-                  <span>الأبعاد:</span>
-                  <span>
-                    {width && `${width} ${unit}`}
-                    {width && (length || height) && ' × '}
-                    {(length || height) && `${length || height} ${unit}`}
-                  </span>
-                </div>
-              )}
-              {/* عرض نوع الورق فقط إذا كان موجوداً (ليس A4 افتراضي) */}
-              {paperSize && paperSize !== 'A4' && (
-                <div className="invoice-item">
-                  <span>نوع الورق:</span>
-                  <span>{paperSize}</span>
-                </div>
-              )}
-                          {/* عرض نوع الورق المخصص (paperType) إذا كان موجوداً */}
-                          {paperType && (
-                            <div className="invoice-item">
-                              <span>نوع الورق:</span>
-                              <span>
-                                {paperType === 'normal' ? 'ورق عادي' :
-                                 paperType === 'photo' ? 'ورق PHOTO' :
-                                 paperType === 'tracing' ? 'ورق كالك' :
-                                 paperType === 'bond' ? 'ورق بوند' :
-                                 paperType === 'vellum' ? 'ورق فيلوم' :
-                                 paperType}
-                              </span>
-                            </div>
-                          )}
-                          {/* عرض نوع الفينيل إذا كان موجوداً */}
-                          {paperType && (serviceName.includes('فينيل') || serviceName.toLowerCase().includes('vinyl')) && (
-                            <div className="invoice-item">
-                              <span>نوع الفينيل:</span>
-                              <span>
-                                {paperType === 'normal' ? 'فينيل عادي' :
-                                 paperType === 'perforated' ? 'فينيل مثقب' :
-                                 paperType}
-                              </span>
-                </div>
-              )}
-              <div className="invoice-item">
-                <span>نوع الطباعة:</span>
-                <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>
-              </div>
-              {printColor === 'color' && (
-                <div className="invoice-item">
-                  <span>جودة الطباعة:</span>
-                  <span>
-                    {printQuality === 'uv' ? 'دقة عالية (UV)' : 
-                     printQuality === 'laser' ? 'دقة عالية (ليزرية)' : 
-                     'طباعة عادية'}
-                  </span>
-                </div>
-              )}
-              {selectedColors.length > 0 && (
-                <div className="invoice-item">
-                  <span>الألوان المختارة:</span>
-                  <span>{selectedColors.length} لون</span>
-                </div>
-              )}
-              <div className="invoice-item">
-                <span>الكمية (عدد النسخ):</span>
-                <span>{quantity}</span>
-              </div>
-              {customerName && (
                 <div className="invoice-item">
                   <span>اسم العميل:</span>
-                  <span>{customerName}</span>
+                  <span>{customerName || 'غير محدد'}</span>
                 </div>
-              )}
-              {customerWhatsApp && (
                 <div className="invoice-item">
-                  <span>رقم التواصل:</span>
-                  <span>{customerWhatsApp}</span>
+                  <span>رقم واتساب:</span>
+                  <span>{customerWhatsApp || 'غير محدد'}</span>
                 </div>
-              )}
-              {customerPhoneExtra && (
                 <div className="invoice-item">
-                  <span>رقم إضافي:</span>
-                  <span>{customerPhoneExtra}</span>
+                  <span>رقم تواصل إضافي:</span>
+                  <span>{customerPhoneExtra || 'لا يوجد'}</span>
                 </div>
-              )}
-              <div className="invoice-item">
-                <span>طريقة الاستلام:</span>
-                <span>{deliveryType === 'self' ? 'استلام ذاتي' : 'توصيل'}</span>
+                <div className="invoice-item">
+                  <span>اسم المتجر / الشركة:</span>
+                  <span>{shopName || 'لا يوجد'}</span>
+                </div>
               </div>
-              {deliveryType === 'delivery' && deliveryAddress && (
+
+              <div className="invoice-section">
+                <h4>تفاصيل الطلب</h4>
                 <div className="invoice-item">
-                  <span>عنوان التوصيل:</span>
-                  <span>{deliveryAddress.street || 'تم تحديد الموقع'}</span>
+                  <span>الخدمة:</span>
+                  <span>{serviceName}</span>
+                </div>
+                <div className="invoice-item">
+                  <span>الكمية:</span>
+                  <span>{quantity}</span>
+                </div>
+                <div className="invoice-item">
+                  <span>عدد الصفحات:</span>
+                  <span>{totalPagesValue > 0 ? totalPagesValue : 'غير محدد'}</span>
+                </div>
+                <div className="invoice-item">
+                  <span>نوع الطباعة:</span>
+                  <span>{printColor === 'bw' ? 'أبيض وأسود' : 'ملون'}</span>
+                </div>
+                <div className="invoice-item">
+                  <span>عدد الوجوه:</span>
+                  <span>{printSides === 'double' ? 'وجهان' : 'وجه واحد'}</span>
+                </div>
+                {printColor === 'color' && (
+                  <div className="invoice-item">
+                    <span>جودة الطباعة:</span>
+                    <span>
+                      {printQuality === 'uv'
+                        ? 'دقة عالية (UV)'
+                        : printQuality === 'laser'
+                        ? 'دقة عالية (ليزرية)'
+                        : 'طباعة عادية'}
+                    </span>
+                  </div>
+                )}
+                <div className="invoice-item">
+                  <span>مقاس الورق:</span>
+                  <span>{paperSize || 'A4'}</span>
+                </div>
+                {paperType && (
+                  <div className="invoice-item">
+                    <span>نوع الورق:</span>
+                    <span>{formatPaperType(paperType)}</span>
+                  </div>
+                )}
+                <div className="invoice-item invoice-item-column">
+                  <span>الأبعاد المطلوبة:</span>
+                  <div className="invoice-dimensions">
+                    {measurementItems.map(({ label, value }) => (
+                      <span key={label} className="invoice-dimension-item">
+                        {label}:{' '}
+                        {value && value.trim() !== '' ? `${value} ${unit}` : 'غير محدد'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="invoice-item invoice-item-column">
+                  <span>الألوان المختارة:</span>
+                  {selectedColors.length > 0 ? (
+                    <div className="invoice-color-list">
+                      {selectedColors.map((color, index) => (
+                        <div key={`${color}-${index}`} className="invoice-color-chip">
+                          <span className="invoice-color-dot" style={{ backgroundColor: color }} />
+                          <span>{color}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="muted-text">لم يتم اختيار ألوان</span>
+                  )}
+                </div>
+                <div className="invoice-item invoice-item-column">
+                  <span>الألوان المستخرجة من الملفات:</span>
+                  {autoExtractedColors.length > 0 ? (
+                    <div className="invoice-color-list">
+                      {autoExtractedColors.map((color, index) => (
+                        <div key={`${color}-${index}`} className="invoice-color-chip auto">
+                          <span className="invoice-color-dot" style={{ backgroundColor: color }} />
+                          <span>{color}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="muted-text">لم يتم استخراج ألوان</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="invoice-section">
+                <h4>التسليم والاستلام</h4>
+                <div className="invoice-item">
+                  <span>نوع الاستلام:</span>
+                  <span>{deliveryType === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+                </div>
+                {hasDeliveryAddress ? (
+                  <div className="invoice-item invoice-item-column">
+                    <span>عنوان التوصيل:</span>
+                    <div className="invoice-location">
+                      <span>{readableAddress || 'تم تحديد الموقع على الخريطة'}</span>
+                      {hasCoordinates && (
+                        <>
+                          <span className="invoice-coordinates">
+                            خط العرض: {deliveryAddress.latitude}, خط الطول: {deliveryAddress.longitude}
+                          </span>
+                          <button type="button" className="map-link" onClick={handleOpenMapLocation}>
+                            <MapPin size={16} />
+                            <span>عرض على الخريطة</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="invoice-item">
+                    <span>تفاصيل إضافية:</span>
+                    <span>{addressConfirmed ? 'تم تأكيد الاستلام الذاتي' : 'سيتم التواصل لتحديد تفاصيل الاستلام'}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="invoice-section">
+                <h4>الملفات والمرفقات</h4>
+                {imagePreviewUrl ? (
+                  <div className="invoice-media-preview">
+                    <span className="invoice-note-title">صورة مرفوعة</span>
+                    <img src={imagePreviewUrl} alt="صورة الطلب" />
+                    <button type="button" className="file-action-btn" onClick={() => handlePreviewFile(image)}>
+                      <ExternalLink size={14} />
+                      <span>عرض الصورة</span>
+                    </button>
+                  </div>
+                ) : null}
+                {uploadedFiles.length > 0 ? (
+                  <div className="invoice-file-list">
+                    {uploadedFiles.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} className="invoice-file-item">
+                        <FileText size={18} />
+                        <div className="invoice-file-meta">
+                          <span className="invoice-file-name">{file.name}</span>
+                          <span className="invoice-file-size">{(file.size / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <button type="button" className="file-action-btn" onClick={() => handlePreviewFile(file)}>
+                          <ExternalLink size={14} />
+                          <span>عرض</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  !imagePreviewUrl && <p className="invoice-empty">لا توجد ملفات مرفوعة</p>
+                )}
+              </div>
+
+              {(clothingSource || clothingProduct || clothingColor || clothingDesignEntries.length > 0) && (
+                <div className="invoice-section">
+                  <h4>تفاصيل الملابس</h4>
+                  <div className="invoice-item">
+                    <span>مصدر القطعة:</span>
+                    <span>{clothingSourceLabel}</span>
+                  </div>
+                  <div className="invoice-item">
+                    <span>نوع القطعة:</span>
+                    <span>{clothingProduct || 'غير محدد'}</span>
+                  </div>
+                  <div className="invoice-item">
+                    <span>لون القطعة:</span>
+                    <span>{clothingColor || 'غير محدد'}</span>
+                  </div>
+                  {clothingDesignEntries.length > 0 && (
+                    <div className="invoice-item invoice-item-column">
+                      <span>ملفات التصميم:</span>
+                      <div className="invoice-file-list">
+                        {clothingDesignEntries.map(([key, file]) => (
+                          <div key={key} className="invoice-file-item">
+                            <FileText size={18} />
+                            <div className="invoice-file-meta">
+                              <span className="invoice-file-name">{CLOTHING_DESIGN_LABELS[key] || key}</span>
+                              <span className="invoice-file-size">{file.name}</span>
+                            </div>
+                            <button type="button" className="file-action-btn" onClick={() => handlePreviewFile(file)}>
+                              <ExternalLink size={14} />
+                              <span>عرض</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+              <div className="invoice-section">
+                <h4>الملاحظات والتوجيهات</h4>
+                <div className="invoice-note">
+                  <span className="invoice-note-title">ملاحظات العميل</span>
+                  <p>{notes && notes.trim() !== '' ? notes : 'لا توجد ملاحظات مضافة'}</p>
+                </div>
+                <div className="invoice-note">
+                  <span className="invoice-note-title">نوع العمل / الغرض</span>
+                  <p>{workType && workType.trim() !== '' ? workType : 'لم يتم تحديد نوع العمل'}</p>
+                </div>
+              </div>
             </div>
             <div style={{ marginTop: '20px', padding: '15px', background: '#e3f2fd', borderRadius: '8px', color: '#1565c0' }}>
               <p style={{ margin: 0, fontWeight: 600 }}>
@@ -1244,6 +1425,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             </div>
           </div>
         )
+      }
 
       case 'notes':
         return (
@@ -1311,9 +1493,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   onChange={handleImageUpload}
                   className="hidden"
                 />
-                {image ? (
+                {image && imagePreviewUrl ? (
                   <div className="uploaded-file">
-                    <img src={URL.createObjectURL(image)} alt="Preview" />
+                    <img src={imagePreviewUrl} alt="Preview" />
                     <p>{image.name}</p>
                   </div>
                 ) : (
@@ -2143,6 +2325,33 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       // Reset restoration flag if delivery type changed to self
       hasRestoredState.current = false
     }
+  }
+
+  const handleOpenCustomerProfile = () => {
+    if (!canAccessCustomerProfile || !customerWhatsApp) return
+    const normalizedPhone = customerWhatsApp.replace(/\s+/g, '')
+    onClose()
+    navigate('/dashboard/customers', {
+      state: {
+        customerPhone: normalizedPhone,
+        customerName: customerName || undefined,
+      },
+    })
+  }
+
+  const handlePreviewFile = (file: File | null) => {
+    if (!file) return
+    const objectUrl = URL.createObjectURL(file)
+    window.open(objectUrl, '_blank', 'noopener,noreferrer')
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl)
+    }, 60_000)
+  }
+
+  const handleOpenMapLocation = () => {
+    if (!deliveryAddress?.latitude || !deliveryAddress?.longitude) return
+    const url = `https://www.google.com/maps?q=${deliveryAddress.latitude},${deliveryAddress.longitude}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleNext = () => {

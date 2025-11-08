@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Search, User, Phone, ShoppingCart, DollarSign, MessageSquare, Eye, Calendar, TrendingUp } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
 import './CustomersManagement.css'
@@ -38,6 +38,7 @@ interface CustomerDetail {
 
 export default function CustomersManagement() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetail | null>(null)
@@ -79,7 +80,7 @@ export default function CustomersManagement() {
     }
   }
 
-  const handleViewCustomer = async (phone: string) => {
+  const handleViewCustomer = useCallback(async (phone: string) => {
     try {
       const response = await adminAPI.customers.getByPhone(phone)
       if (response.data.success) {
@@ -89,7 +90,20 @@ export default function CustomersManagement() {
     } catch (error) {
       console.error('Error loading customer details:', error)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const state = (location.state || {}) as { customerPhone?: string; customerName?: string }
+    if (state.customerPhone) {
+      handleViewCustomer(state.customerPhone)
+      if (state.customerName) {
+        setSearchQuery(state.customerName)
+      } else {
+        setSearchQuery(state.customerPhone)
+      }
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, location.pathname, handleViewCustomer, navigate])
 
   const handleSaveNotes = async () => {
     if (!selectedCustomer) return

@@ -122,6 +122,16 @@ export default function Dashboard() {
                 </button>
               )
             })}
+            {isEmployee() && (
+              <button
+                className="nav-item quick-orders-btn"
+                onClick={() => navigate('/dashboard/orders')}
+                title={sidebarCollapsed ? 'الذهاب للطلبات' : ''}
+              >
+                <ShoppingCartIcon size={20} />
+                {!sidebarCollapsed && <span>الذهاب مباشرة للطلبات</span>}
+              </button>
+            )}
           </nav>
 
           {!sidebarCollapsed && (

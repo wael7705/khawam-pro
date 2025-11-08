@@ -1777,16 +1777,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               />
             </div>
             {!isPosterPrinting && !isBannerPrinting && (
-              <div className="form-group">
-                <label>الارتفاع <span className="optional">(اختياري)</span></label>
-                <input
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  className="form-input"
-                  placeholder="0"
-                />
-              </div>
+            <div className="form-group">
+              <label>الارتفاع <span className="optional">(اختياري)</span></label>
+              <input
+                type="number"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="form-input"
+                placeholder="0"
+              />
+            </div>
             )}
             <div className="form-group">
               <label>وحدة القياس</label>

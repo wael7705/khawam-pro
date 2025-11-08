@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { X, FileText, User, MapPin, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ordersAPI, workflowsAPI, servicesAPI, fileAnalysisAPI } from '../lib/api'
@@ -121,6 +121,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   // Service Handler - منطق الخدمة المحددة
   const serviceHandler = findServiceHandler(serviceName, serviceId)
   const canAccessCustomerProfile = isAdmin() || isEmployee()
+
+  const normalizedServiceName = serviceName ? serviceName.toLowerCase() : ''
+  const isLecturePrinting = normalizedServiceName.includes('محاضرات') || normalizedServiceName.includes('lecture')
+  const isFlexPrinting = normalizedServiceName.includes('فليكس') || normalizedServiceName.includes('flex')
+  const isPosterPrinting = normalizedServiceName.includes('بوستر') || normalizedServiceName.includes('poster')
+  const isBannerPrinting = normalizedServiceName.includes('بانر') || normalizedServiceName.includes('banner')
+
+  const defaultSteps = useMemo(() => {
+    if (isLecturePrinting || isFlexPrinting) {
+      return [1, 2, 3, 4]
+    }
+    return [1, 2, 3, 4, 5]
+  }, [isLecturePrinting, isFlexPrinting])
+
+  useEffect(() => {
+    const maxStep = workflowSteps.length > 0 ? workflowSteps.length : defaultSteps.length
+    if (step > maxStep) {
+      setStep(maxStep)
+    }
+  }, [step, workflowSteps, defaultSteps])
 
   const formatPaperType = (type: string) => {
     switch (type) {
@@ -1531,6 +1551,149 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
   const renderDefaultStep = (currentStep: number) => {
     // Default step rendering (fallback)
+    const renderAdditionalDetailsStep = (heading: string) => (
+      <div className="modal-body">
+        <h3>{heading}</h3>
+        <div className="form-group">
+          <label>نوع العمل / الغرض <span className="optional">(اختياري)</span></label>
+          <textarea
+            value={workType}
+            onChange={(e) => setWorkType(e.target.value)}
+            className="form-input"
+            rows={4}
+            placeholder="اذكر سبب حاجتك لهذه الخدمة..."
+          />
+        </div>
+        <div className="form-group">
+          <label>ملاحظات إضافية <span className="optional">(اختياري)</span></label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="form-input"
+            rows={4}
+            placeholder="أي ملاحظات إضافية..."
+          />
+        </div>
+      </div>
+    )
+
+    const renderContactInfoStep = (heading: string) => (
+      <div className="modal-body">
+        <h3>{heading}</h3>
+        <div className="form-group">
+          <label>اسم العميل</label>
+          <input
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className="form-input"
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>رقم واتساب <span className="required">*</span></label>
+          <input
+            type="tel"
+            value={customerWhatsApp}
+            onChange={(e) => {
+              const value = e.target.value.replace(/[^0-9+]/g, '')
+              setCustomerWhatsApp(value)
+            }}
+            className="form-input"
+            placeholder="963xxxxxxxxx"
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>اسم المتجر <span className="optional">(اختياري)</span></label>
+          <input
+            type="text"
+            value={shopName}
+            onChange={(e) => setShopName(e.target.value)}
+            className="form-input"
+          />
+        </div>
+        <div className="form-group">
+          <label>نوع التوصيل</label>
+          <div className="delivery-options">
+            <label className="radio-option">
+              <input
+                type="radio"
+                value="self"
+                checked={deliveryType === 'self'}
+                onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+              />
+              <span>استلام ذاتي</span>
+            </label>
+            <label className="radio-option">
+              <input
+                type="radio"
+                value="delivery"
+                checked={deliveryType === 'delivery'}
+                onChange={(e) => handleDeliveryTypeChange(e.target.value)}
+              />
+              <span>توصيل</span>
+            </label>
+          </div>
+          {deliveryType === 'delivery' && deliveryAddress && (
+            <div className="delivery-address-info" style={{ marginTop: '10px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
+              <p><strong>العنوان:</strong> {deliveryAddress.street || 'لم يتم تحديد العنوان'}</p>
+              {addressConfirmed && (
+                <p style={{ color: 'green', fontSize: '0.9rem', marginTop: '5px' }}>✓ تم تأكيد العنوان</p>
+              )}
+            </div>
+          )}
+          {deliveryType === 'delivery' && !addressConfirmed && (
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('orderFormState', JSON.stringify({
+                  step: step,
+                  quantity,
+                  length,
+                  width,
+                  height,
+                  unit,
+                  selectedColors,
+                  autoExtractedColors,
+                  workType,
+                  notes,
+                  customerName,
+                  customerWhatsApp,
+                  customerPhoneExtra,
+                  shopName,
+                  deliveryType,
+                  printColor,
+                  printQuality,
+                  printSides,
+                  paperSize,
+                  numberOfPages,
+                  totalPages,
+                  paperType,
+                  serviceName,
+                  uploadedFiles: uploadedFiles.map(f => ({ 
+                    name: f.name, 
+                    size: f.size, 
+                    type: f.type 
+                  })),
+                  clothingSource,
+                  clothingProduct,
+                  clothingColor
+                }))
+                localStorage.setItem('shouldReopenOrderModal', 'true')
+                localStorage.setItem('orderModalService', serviceName)
+                navigate('/location-picker')
+              }}
+              className="btn btn-secondary"
+              style={{ marginTop: '10px' }}
+            >
+              اختر موقع التوصيل
+            </button>
+          )}
+        </div>
+      </div>
+    )
+
     switch (currentStep) {
       case 1:
         return (
@@ -1547,7 +1710,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               />
             </div>
             <div className="form-group">
-              <label>العرض <span className="required">*</span></label>
+              <label>
+                {isPosterPrinting || isBannerPrinting ? 'رفع التصميم' : 'العرض'}
+                {!isPosterPrinting && !isBannerPrinting && <span className="optional">(اختياري)</span>}
+              </label>
               <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
                 <input
                   ref={fileInputRef}
@@ -1563,7 +1729,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   </div>
                 ) : (
                   <div className="upload-placeholder">
-                    <p>اضغط لتحديد العرض</p>
+                    <p>{isPosterPrinting || isBannerPrinting ? 'اضغط لرفع التصميم' : 'اضغط لتحديد العرض'}</p>
                   </div>
                 )}
               </div>
@@ -1575,27 +1741,53 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           <div className="modal-body">
             <h3>المرحلة 2: الأبعاد</h3>
             <div className="form-group">
-              <label>الطول <span className="required">*</span></label>
+              <label>
+                الطول{' '}
+                {isPosterPrinting || isBannerPrinting || isFlexPrinting ? (
+                  <span className="required">*</span>
+                ) : (
+                  <span className="optional">(اختياري)</span>
+                )}
+              </label>
               <input
                 type="number"
                 value={length}
                 onChange={(e) => setLength(e.target.value)}
                 className="form-input"
-                placeholder=""
-                required
+                placeholder="0"
+                required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
               />
             </div>
             <div className="form-group">
-              <label>العرض <span className="required">*</span></label>
+              <label>
+                العرض{' '}
+                {isPosterPrinting || isBannerPrinting || isFlexPrinting ? (
+                  <span className="required">*</span>
+                ) : (
+                  <span className="optional">(اختياري)</span>
+                )}
+              </label>
               <input
                 type="number"
                 value={width}
                 onChange={(e) => setWidth(e.target.value)}
                 className="form-input"
-                placeholder=""
-                required
+                placeholder="0"
+                required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
               />
             </div>
+            {!isPosterPrinting && !isBannerPrinting && (
+              <div className="form-group">
+                <label>الارتفاع <span className="optional">(اختياري)</span></label>
+                <input
+                  type="number"
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                />
+              </div>
+            )}
             <div className="form-group">
               <label>وحدة القياس</label>
               <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
@@ -1605,7 +1797,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <option value="m">متر (m)</option>
               </select>
             </div>
-            {(serviceName.includes('طباعة') || serviceName.includes('محاضرات') || serviceName.includes('صفح')) && (
+            {(isLecturePrinting ||
+              (!isPosterPrinting &&
+                !isBannerPrinting &&
+                !isFlexPrinting &&
+                (normalizedServiceName.includes('طباعة') || normalizedServiceName.includes('print')))) && (
               <>
                 <div className="form-group">
                   <label>عدد الصفحات <span className="required">*</span></label>
@@ -1678,6 +1874,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           </div>
         )
       case 3:
+        if (isFlexPrinting) {
+          return renderAdditionalDetailsStep('المرحلة 3: تفاصيل إضافية')
+        }
         return (
           <div className="modal-body">
             <h3>المرحلة 3: اختيار الألوان</h3>
@@ -1689,148 +1888,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           </div>
         )
       case 4:
-        return (
-          <div className="modal-body">
-            <h3>المرحلة 4: نوع العمل</h3>
-            <div className="form-group">
-              <label>نوع العمل / الغرض <span className="optional">(اختياري)</span></label>
-              <textarea
-                value={workType}
-                onChange={(e) => setWorkType(e.target.value)}
-                className="form-input"
-                rows={4}
-                placeholder="اذكر سبب حاجتك لهذه الخدمة..."
-              />
-            </div>
-            <div className="form-group">
-              <label>ملاحظات إضافية <span className="optional">(اختياري)</span></label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="form-input"
-                rows={4}
-                placeholder="أي ملاحظات إضافية..."
-              />
-            </div>
-          </div>
-        )
+        if (isFlexPrinting) {
+          return renderContactInfoStep('المرحلة 4: معلومات الطلب')
+        }
+        return renderAdditionalDetailsStep('المرحلة 4: نوع العمل')
       case 5:
-        return (
-          <div className="modal-body">
-            <h3>المرحلة 5: معلومات الطلب</h3>
-            <div className="form-group">
-              <label>اسم العميل</label>
-              <input
-                type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="form-input"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>رقم واتساب <span className="required">*</span></label>
-              <input
-                type="tel"
-                value={customerWhatsApp}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9+]/g, '')
-                  setCustomerWhatsApp(value)
-                }}
-                className="form-input"
-                placeholder="963xxxxxxxxx"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>اسم المتجر <span className="optional">(اختياري)</span></label>
-              <input
-                type="text"
-                value={shopName}
-                onChange={(e) => setShopName(e.target.value)}
-                className="form-input"
-              />
-            </div>
-            <div className="form-group">
-              <label>نوع التوصيل</label>
-              <div className="delivery-options">
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    value="self"
-                    checked={deliveryType === 'self'}
-                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
-                  />
-                  <span>استلام ذاتي</span>
-                </label>
-                <label className="radio-option">
-                  <input
-                    type="radio"
-                    value="delivery"
-                    checked={deliveryType === 'delivery'}
-                    onChange={(e) => handleDeliveryTypeChange(e.target.value)}
-                  />
-                  <span>توصيل</span>
-                </label>
-              </div>
-              {deliveryType === 'delivery' && deliveryAddress && (
-                <div className="delivery-address-info" style={{ marginTop: '10px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' }}>
-                  <p><strong>العنوان:</strong> {deliveryAddress.street || 'لم يتم تحديد العنوان'}</p>
-                  {addressConfirmed && (
-                    <p style={{ color: 'green', fontSize: '0.9rem', marginTop: '5px' }}>✓ تم تأكيد العنوان</p>
-                  )}
-                </div>
-              )}
-              {deliveryType === 'delivery' && !addressConfirmed && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.setItem('orderFormState', JSON.stringify({
-                      step: step, // حفظ المرحلة الحالية
-                      quantity,
-                      length,
-                      width,
-                      height,
-                      unit,
-                      selectedColors,
-                      autoExtractedColors,
-                      workType,
-                      notes,
-                      customerName,
-                      customerWhatsApp,
-                      customerPhoneExtra,
-                      shopName,
-                      deliveryType,
-                      printColor,
-                      printQuality,
-                      printSides,
-                      paperSize,
-                      numberOfPages,
-                      totalPages,
-                      paperType,
-                      serviceName,
-                      uploadedFiles: uploadedFiles.map(f => ({ 
-                        name: f.name, 
-                        size: f.size, 
-                        type: f.type 
-                      })),
-                      clothingSource,
-                      clothingProduct,
-                      clothingColor
-                    }))
-                    localStorage.setItem('shouldReopenOrderModal', 'true')
-                    localStorage.setItem('orderModalService', serviceName)
-                    navigate('/location-picker')
-                  }}
-                  className="btn btn-secondary"
-                  style={{ marginTop: '10px' }}
-                >
-                  اختر موقع التوصيل
-                </button>
-              )}
-            </div>
-          </div>
-        )
+        return renderContactInfoStep('المرحلة 5: معلومات الطلب')
       default:
         return null
     }
@@ -1840,10 +1903,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   useEffect(() => {
     const loadWorkflow = async () => {
       console.log('🔄 loadWorkflow called - isOpen:', isOpen, 'serviceId:', serviceId, 'serviceName:', serviceName)
-      
-      // التحقق إذا كانت هذه خدمة "طباعة محاضرات" أو "طباعة فليكس"
-      const isLecturePrinting = serviceName.includes('محاضرات') || serviceName.toLowerCase().includes('lecture')
-      const isFlexPrinting = serviceName.includes('فليكس') || serviceName.toLowerCase().includes('flex')
       
       if (isOpen && serviceId) {
         try {
@@ -2410,7 +2469,25 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }
 
   const handleNext = () => {
-    setStep(step + 1)
+    const maxStep = workflowSteps.length > 0 ? workflowSteps.length : defaultSteps.length
+
+    if ((isPosterPrinting || isBannerPrinting) && step === 1) {
+      if (!image && uploadedFiles.length === 0) {
+        showError('يرجى رفع التصميم قبل المتابعة')
+        return
+      }
+    }
+
+    if ((isPosterPrinting || isBannerPrinting || isFlexPrinting) && step === 2) {
+      const lengthValue = parseFloat(length)
+      const widthValue = parseFloat(width)
+      if (!lengthValue || lengthValue <= 0 || !widthValue || widthValue <= 0) {
+        showError('يرجى إدخال الطول والعرض بشكل صحيح قبل المتابعة')
+        return
+      }
+    }
+
+    setStep(Math.min(step + 1, maxStep))
   }
 
   const handlePrev = () => {
@@ -2854,7 +2931,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
         {/* Progress Bar */}
         <div className="progress-bar">
-          {(workflowSteps.length > 0 ? workflowSteps : [1, 2, 3, 4, 5]).map((s) => {
+          {(workflowSteps.length > 0 ? workflowSteps : defaultSteps).map((s) => {
             const stepNum = workflowSteps.length > 0 ? s.step_number : s
             const stepName = workflowSteps.length > 0 ? s.step_name_ar : `مرحلة ${s}`
             return (
@@ -2888,7 +2965,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             </button>
           )}
           {(() => {
-            const maxStep = workflowSteps.length > 0 ? workflowSteps.length : 5
+            const maxStep = workflowSteps.length > 0 ? workflowSteps.length : defaultSteps.length
             return step < maxStep ? (
               <button className="btn btn-primary" onClick={handleNext}>
                 التالي

@@ -2,10 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User
+from models import User, UserType
 # UserType removed to avoid ORM column issues - using raw SQL instead
 from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
+from passlib.hash import bcrypt_sha256 as legacy_bcrypt_sha256
+from passlib.hash import bcrypt as legacy_bcrypt
+from passlib.exc import UnknownHashError
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -21,10 +24,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 pwd_context = CryptContext(
-    schemes=["bcrypt_sha256", "bcrypt"],
-    default="bcrypt_sha256",
-    deprecated=["bcrypt"],
-    bcrypt__truncate_error=False
+    schemes=["pbkdf2_sha256"],
+    default="pbkdf2_sha256",
+    pbkdf2_sha256__rounds=320000
 )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -72,17 +74,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         try:
             if pwd_context.verify(plain_password, hashed_password):
                 return True
+        except UnknownHashError:
+            pass
         except Exception as context_error:
             print(f"⚠️ pwd_context verify failed: {context_error}")
 
+        if hashed_password.startswith("$bcrypt-sha256$"):
+            try:
+                if legacy_bcrypt_sha256.verify(plain_password, hashed_password):
+                    return True
+            except Exception as legacy_sha_error:
+                print(f"⚠️ Legacy bcrypt_sha256 verify failed: {legacy_sha_error}")
+
         if hashed_password.startswith('$2'):
             try:
-                password_bytes = plain_password.encode('utf-8')
-                hash_bytes = hashed_password.encode('utf-8')
-                if bcrypt.checkpw(password_bytes, hash_bytes):
+                if legacy_bcrypt.verify(plain_password, hashed_password):
                     return True
             except Exception as bcrypt_error:
-                print(f"⚠️ bcrypt verify compatibility path failed: {bcrypt_error}")
+                print(f"⚠️ Legacy bcrypt verify failed: {bcrypt_error}")
 
         return False
     except Exception as e:
@@ -411,14 +420,7 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
         user_type_id, user_type_name_ar = user_type_result
         
         # تشفير كلمة المرور
-        try:
-            password_hash = get_password_hash(register_data.password)
-        except ValueError as hash_error:
-            print(f"⚠️ Password hash error: {hash_error}")
-            raise HTTPException(
-                status_code=400,
-                detail="تعذر تشفير كلمة المرور. يرجى استخدام كلمة مرور مختلفة."
-            )
+        password_hash = get_password_hash(register_data.password)
         
         # إنشاء المستخدم الجديد
         new_user = User(
@@ -515,7 +517,9 @@ async def update_profile(
         
         # الحصول على نوع المستخدم
         user_type = db.query(UserType).filter(UserType.id == current_user.user_type_id).first()
-        
+        user_type_id = user_type.id if user_type else current_user.user_type_id
+        user_type_name_ar = getattr(user_type, "name_ar", None) if user_type else None
+
         return {
             "success": True,
             "message": "تم تحديث معلومات الحساب بنجاح",
@@ -526,7 +530,7 @@ async def update_profile(
                 "phone": current_user.phone,
                 "user_type": {
                     "id": user_type_id,
-                    "name_ar": None,
+                    "name_ar": user_type_name_ar,
                     "name_en": None
                 },
                 "is_active": current_user.is_active

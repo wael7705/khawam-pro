@@ -51,8 +51,8 @@ export default function Register() {
       return
     }
 
-    if (formData.password.length < 6) {
-      showError('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+    if (!formData.password.trim()) {
+      showError('الرجاء إدخال كلمة مرور صالحة')
       return
     }
 
@@ -141,8 +141,7 @@ export default function Register() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="6 أحرف على الأقل"
-              minLength={6}
+              placeholder="اختر كلمة المرور التي تناسبك"
               required
               disabled={loading}
             />
@@ -160,7 +159,6 @@ export default function Register() {
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="أعد إدخال كلمة المرور"
-              minLength={6}
               required
               disabled={loading}
             />

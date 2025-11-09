@@ -11,6 +11,7 @@ from datetime import datetime
 from collections import defaultdict
 import json
 import os
+from notifications import order_notifications
 
 router = APIRouter()
 
@@ -208,11 +209,14 @@ def normalize_attachment_entry(
         "size_in_bytes": size_in_bytes,
     }
 # Background task for notifications
-async def send_order_notification(order_number: str, customer_name: str, customer_phone: str):
-    """Background task to send notifications (can be extended with email/SMS)"""
+async def send_order_notification(payload: Dict[str, Any]):
+    """إرسال إشعارات خلفية (SMS/Email) - يمكن توسيعها لاحقاً."""
+    order_number = payload.get("order_number")
+    customer_name = payload.get("customer_name")
+    customer_phone = payload.get("customer_phone")
     print(f"📧 Notification: Order {order_number} created for {customer_name} ({customer_phone})")
     # TODO: Integrate with email/SMS service
-    # await email_service.send_order_confirmation(order_number, customer_name, customer_phone)
+    # await email_service.send_order_confirmation(...)
 
 @router.post("/")
 async def create_order(
@@ -369,13 +373,31 @@ async def create_order(
         
         db.commit()
         
-        # Add background task for notifications
-        background_tasks.add_task(
-            send_order_notification,
-            order_number,
-            order_data.customer_name,
-            order_data.customer_phone
-        )
+        first_item = order_data.items[0] if order_data.items else None
+        notification_payload: Dict[str, Any] = {
+            "order_id": order_result[0],
+            "order_number": order_number,
+            "customer_name": order_data.customer_name,
+            "customer_phone": order_data.customer_phone,
+            "total_amount": float(order_data.total_amount),
+            "final_amount": float(order_data.final_amount),
+            "delivery_type": order_data.delivery_type,
+            "service_name": order_data.service_name or (first_item.service_name if first_item else None),
+            "items_count": len(order_data.items),
+            "created_at": order_result[14].isoformat() if order_result[14] else datetime.utcnow().isoformat(),
+        }
+
+        # Add background task for external notifications (email/SMS)
+        background_tasks.add_task(send_order_notification, notification_payload)
+
+        # بث الإشعار الفوري للموظفين عبر WebSocket
+        try:
+            await order_notifications.broadcast({
+                "event": "order_created",
+                "data": notification_payload
+            })
+        except Exception as notify_error:
+            print(f"⚠️ Failed to broadcast order notification: {notify_error}")
         
         return {
             "success": True,

@@ -14,6 +14,8 @@ import PaymentSettings from './Dashboard/PaymentSettings'
 import Studio from './Studio'
 import ProfileSettings from './ProfileSettings'
 import { isEmployee, isAdmin, getUserData, isAuthenticated } from '../lib/auth'
+import { useOrderNotifications } from '../hooks/useOrderNotifications'
+import OrderNotificationBanner from '../components/OrderNotificationBanner'
 import './Dashboard.css'
 
 export default function Dashboard() {
@@ -21,6 +23,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [userType, setUserType] = useState<string | null>(null)
+  const { notifications, dismissNotification } = useOrderNotifications()
 
   useEffect(() => {
     // Check authentication
@@ -92,6 +95,11 @@ export default function Dashboard() {
   return (
     <div className="admin-dashboard">
       <div className="dashboard-container">
+        <OrderNotificationBanner
+          notifications={notifications}
+          onDismiss={dismissNotification}
+          onViewOrder={(orderId) => navigate(`/dashboard/orders/${orderId}`)}
+        />
         {/* Sidebar */}
         <aside className={`dashboard-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
           <div className="sidebar-header">

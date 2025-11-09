@@ -20,7 +20,10 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-use-e
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt_sha256", "bcrypt"],
+    deprecated="auto"
+)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Pydantic models
@@ -61,32 +64,24 @@ class ChangePasswordRequest(BaseModel):
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """التحقق من كلمة المرور - يدعم bcrypt مباشرة و passlib"""
     try:
-        # التحقق من أن hashed_password ليس فارغاً أو None
-        if not hashed_password:
+        if not hashed_password or not plain_password:
             return False
-        # التحقق من أن plain_password ليس فارغاً أو None
-        if not plain_password:
-            return False
-        # التحقق من أن hashed_password يبدو كـ hash (يبدأ بـ $2b$ أو $2a$)
-        if not hashed_password.startswith('$2'):
-            return False
-        
-        # جرب bcrypt مباشرة أولاً (للتوافق مع db_rebuild.py)
-        try:
-            password_bytes = plain_password.encode('utf-8')
-            hash_bytes = hashed_password.encode('utf-8')
-            if bcrypt.checkpw(password_bytes, hash_bytes):
-                return True
-        except Exception as bcrypt_error:
-            print(f"⚠️ bcrypt verify failed: {bcrypt_error}")
-        
-        # إذا فشل bcrypt، جرب passlib (للتوافق مع المستخدمين القدامى)
+
         try:
             if pwd_context.verify(plain_password, hashed_password):
                 return True
-        except Exception as passlib_error:
-            print(f"⚠️ passlib verify failed: {passlib_error}")
-        
+        except Exception as context_error:
+            print(f"⚠️ pwd_context verify failed: {context_error}")
+
+        if hashed_password.startswith('$2'):
+            try:
+                password_bytes = plain_password.encode('utf-8')
+                hash_bytes = hashed_password.encode('utf-8')
+                if bcrypt.checkpw(password_bytes, hash_bytes):
+                    return True
+            except Exception as bcrypt_error:
+                print(f"⚠️ bcrypt verify compatibility path failed: {bcrypt_error}")
+
         return False
     except Exception as e:
         print(f"⚠️ Error verifying password: {e}")
@@ -364,6 +359,18 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
                 detail="يجب إدخال البريد الإلكتروني أو رقم الهاتف"
             )
         
+        if not register_data.password:
+            raise HTTPException(
+                status_code=400,
+                detail="كلمة المرور مطلوبة"
+            )
+        try:
+            register_data.password.encode("utf-8")
+        except UnicodeEncodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="تنسيق كلمة المرور غير صالح. الرجاء استخدام أحرف صالحة."
+            )
         # التحقق من صحة البيانات
         if register_data.email and not is_valid_email(register_data.email):
             raise HTTPException(

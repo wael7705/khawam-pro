@@ -693,7 +693,7 @@ app.add_middleware(
 
 # Import routers - استيراد آمن مع معالجة الأخطاء
 try:
-    from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple, pricing, init_pricing, file_analysis
+    from routers import auth, products, services, portfolio, orders, studio, admin, payments, setup, setup_simple, pricing, init_pricing, file_analysis, notifications
     app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(products.router, prefix="/api/products", tags=["Products"])
     app.include_router(services.router, prefix="/api/services", tags=["Services"])
@@ -707,6 +707,7 @@ try:
     app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(file_analysis.router, prefix="/api/files", tags=["File Analysis"])
+    app.include_router(notifications.router, tags=["Notifications"])
 except ImportError as e:
     print(f"Warning: Error importing main routers: {e}")
 

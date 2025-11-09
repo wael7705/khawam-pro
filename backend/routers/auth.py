@@ -408,15 +408,27 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
                     detail="رقم الهاتف مستخدم بالفعل"
                 )
         
-        # الحصول على نوع المستخدم باستخدام raw SQL
+        # الحصول على نوع المستخدم (عميل) باستخدام raw SQL
         from sqlalchemy import text
-        # استخدم أول user_type موجود (افتراضي)
-        user_type_result = db.execute(text("SELECT id, name_ar FROM user_types ORDER BY id LIMIT 1")).fetchone()
+        TARGET_ROLE = "عميل"
+        user_type_result = db.execute(text("""
+            SELECT id, name_ar
+            FROM user_types
+            WHERE name_ar = :target
+            ORDER BY id ASC
+            LIMIT 1
+        """), {"target": TARGET_ROLE}).fetchone()
+
         if not user_type_result:
-                raise HTTPException(
-                    status_code=500,
+            # في حال لم يتم العثور على "عميل"، استخدم أول نوع موجود كحل مؤقت
+            user_type_result = db.execute(text("SELECT id, name_ar FROM user_types ORDER BY id LIMIT 1")).fetchone()
+
+        if not user_type_result:
+            raise HTTPException(
+                status_code=500,
                 detail="لا يوجد أنواع مستخدمين في قاعدة البيانات"
-                )
+            )
+
         user_type_id, user_type_name_ar = user_type_result
         
         # تشفير كلمة المرور

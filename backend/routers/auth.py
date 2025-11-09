@@ -22,7 +22,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 pwd_context = CryptContext(
     schemes=["bcrypt_sha256", "bcrypt"],
-    deprecated="auto"
+    default="bcrypt_sha256",
+    deprecated=["bcrypt"],
+    bcrypt__truncate_error=False
 )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -66,7 +68,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         if not hashed_password or not plain_password:
             return False
-
+        
         try:
             if pwd_context.verify(plain_password, hashed_password):
                 return True
@@ -409,7 +411,14 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
         user_type_id, user_type_name_ar = user_type_result
         
         # تشفير كلمة المرور
-        password_hash = get_password_hash(register_data.password)
+        try:
+            password_hash = get_password_hash(register_data.password)
+        except ValueError as hash_error:
+            print(f"⚠️ Password hash error: {hash_error}")
+            raise HTTPException(
+                status_code=400,
+                detail="تعذر تشفير كلمة المرور. يرجى استخدام كلمة مرور مختلفة."
+            )
         
         # إنشاء المستخدم الجديد
         new_user = User(

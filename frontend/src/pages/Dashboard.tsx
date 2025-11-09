@@ -34,7 +34,16 @@ export default function Dashboard() {
 
     const user = getUserData()
     if (user) {
-      setUserType(user.user_type.name_ar)
+      const role = user.user_type.name_ar
+      setUserType(role)
+
+      // Only admins and employees may stay in dashboard
+      if (role !== 'مدير' && role !== 'موظف') {
+        navigate('/')
+      }
+    } else {
+      // If no user data, force logout to home
+      navigate('/')
     }
   }, [navigate, location])
 
@@ -60,8 +69,8 @@ export default function Dashboard() {
       // Admin sees all tabs (including dashboard home and studio)
       return true
     }
-    // Default: show all tabs
-    return true
+    // Customers should not see dashboard tabs
+    return false
   })
 
   // Determine active tab based on current pathname
@@ -171,9 +180,12 @@ export default function Dashboard() {
         {/* Main Content */}
         <main className="dashboard-main">
           <Routes>
-            {!isEmployee() && <Route path="/" element={<DashboardHome />} />}
-            <Route path="/orders" element={<OrdersManagement />} />
-            <Route path="/orders/:id" element={<OrderDetail />} />
+            {isAdmin() && <Route path="/" element={<DashboardHome />} />}
+            {isEmployee() && <Route path="/" element={<OrdersManagement />} />}
+            {isEmployee() && <Route path="/orders" element={<OrdersManagement />} />}
+            {isEmployee() && <Route path="/orders/:id" element={<OrderDetail />} />}
+            {isAdmin() && <Route path="/orders" element={<OrdersManagement />} />}
+            {isAdmin() && <Route path="/orders/:id" element={<OrderDetail />} />}
             {isAdmin() && <Route path="/customers" element={<CustomersManagement />} />}
 
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}
@@ -181,9 +193,11 @@ export default function Dashboard() {
             {isAdmin() && <Route path="/pricing" element={<PricingManagement />} />}
             {isAdmin() && <Route path="/pricing/wizard" element={<PricingWizard />} />}
             {isAdmin() && <Route path="/payments" element={<PaymentSettings />} />}
-            <Route path="/studio" element={<Studio />} />
-            <Route path="/profile" element={<ProfileSettings />} />
-            <Route path="*" element={<Navigate to={isEmployee() ? "/dashboard/orders" : "/dashboard"} replace />} />
+            {isEmployee() && <Route path="/studio" element={<Studio />} />}
+            {isAdmin() && <Route path="/studio" element={<Studio />} />}
+            {isAdmin() && <Route path="/profile" element={<ProfileSettings />} />}
+            {isEmployee() && <Route path="/profile" element={<ProfileSettings />} />}
+            <Route path="*" element={<Navigate to={isAdmin() ? "/dashboard" : isEmployee() ? "/dashboard/orders" : "/"} replace />} />
           </Routes>
         </main>
       </div>

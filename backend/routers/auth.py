@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database import get_db
 from models import User, UserType
 # UserType removed to avoid ORM column issues - using raw SQL instead
@@ -92,7 +93,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
                     return True
             except Exception as bcrypt_error:
                 print(f"⚠️ Legacy bcrypt verify failed: {bcrypt_error}")
-
+        
         return False
     except Exception as e:
         print(f"⚠️ Error verifying password: {e}")
@@ -135,6 +136,55 @@ def is_valid_phone(phone: str) -> bool:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """إنشاء JWT token"""
     to_encode = data.copy()
+def get_or_create_customer_user_type(db: Session) -> tuple[int, str]:
+    """الحصول على معرف نوع المستخدم 'عميل' أو إنشاؤه إذا لم يكن موجوداً."""
+    target_role = "عميل"
+
+    existing = db.execute(
+        text(
+            """
+            SELECT id, name_ar
+            FROM user_types
+            WHERE name_ar = :name
+            ORDER BY id ASC
+            LIMIT 1
+        """
+        ),
+        {"name": target_role},
+    ).fetchone()
+
+    if existing:
+        return existing[0], existing[1]
+
+    insert_result = db.execute(
+        text(
+            """
+            INSERT INTO user_types (name_ar, permissions, created_at)
+            VALUES (:name, NULL, NOW())
+            RETURNING id, name_ar
+        """
+        ),
+        {"name": target_role},
+    )
+
+    try:
+        db.commit()
+    except Exception as commit_error:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"تعذر إنشاء نوع المستخدم الافتراضي: {commit_error}",
+        )
+
+    new_role = insert_result.fetchone()
+    if not new_role:
+        raise HTTPException(
+            status_code=500,
+            detail="تعذر إنشاء نوع المستخدم الافتراضي 'عميل'",
+        )
+
+    return new_role[0], new_role[1]
+
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -408,28 +458,8 @@ async def register(register_data: RegisterRequest, db: Session = Depends(get_db)
                     detail="رقم الهاتف مستخدم بالفعل"
                 )
         
-        # الحصول على نوع المستخدم (عميل) باستخدام raw SQL
-        from sqlalchemy import text
-        TARGET_ROLE = "عميل"
-        user_type_result = db.execute(text("""
-            SELECT id, name_ar
-            FROM user_types
-            WHERE name_ar = :target
-            ORDER BY id ASC
-            LIMIT 1
-        """), {"target": TARGET_ROLE}).fetchone()
-
-        if not user_type_result:
-            # في حال لم يتم العثور على "عميل"، استخدم أول نوع موجود كحل مؤقت
-            user_type_result = db.execute(text("SELECT id, name_ar FROM user_types ORDER BY id LIMIT 1")).fetchone()
-
-        if not user_type_result:
-            raise HTTPException(
-                status_code=500,
-                detail="لا يوجد أنواع مستخدمين في قاعدة البيانات"
-            )
-
-        user_type_id, user_type_name_ar = user_type_result
+        # الحصول على نوع المستخدم (عميل) أو إنشاؤه إذا لم يكن موجوداً
+        user_type_id, user_type_name_ar = get_or_create_customer_user_type(db)
         
         # تشفير كلمة المرور
         password_hash = get_password_hash(register_data.password)
@@ -531,7 +561,7 @@ async def update_profile(
         user_type = db.query(UserType).filter(UserType.id == current_user.user_type_id).first()
         user_type_id = user_type.id if user_type else current_user.user_type_id
         user_type_name_ar = getattr(user_type, "name_ar", None) if user_type else None
-
+        
         return {
             "success": True,
             "message": "تم تحديث معلومات الحساب بنجاح",

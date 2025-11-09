@@ -138,33 +138,44 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
 def get_or_create_customer_user_type(db: Session) -> tuple[int, str]:
     """الحصول على معرف نوع المستخدم 'عميل' أو إنشاؤه إذا لم يكن موجوداً."""
-    target_role = "عميل"
+    target_role_ar = "عميل"
+    target_role_en = "customer"
 
     existing = db.execute(
         text(
             """
-            SELECT id, name_ar
+            SELECT id, name_ar, type_name
             FROM user_types
-            WHERE name_ar = :name
+            WHERE lower(type_name) = :type_name OR name_ar = :name_ar
             ORDER BY id ASC
             LIMIT 1
         """
         ),
-        {"name": target_role},
+        {"type_name": target_role_en, "name_ar": target_role_ar},
     ).fetchone()
 
     if existing:
-        return existing[0], existing[1]
+        user_type_id, existing_name_ar, existing_type_name = existing
+        name_to_use = existing_name_ar or target_role_ar
+
+        if existing_name_ar != name_to_use:
+            db.execute(
+                text("UPDATE user_types SET name_ar = :name_ar WHERE id = :id"),
+                {"name_ar": name_to_use, "id": user_type_id},
+            )
+            db.commit()
+
+        return user_type_id, name_to_use
 
     insert_result = db.execute(
         text(
             """
-            INSERT INTO user_types (name_ar, permissions, created_at)
-            VALUES (:name, NULL, NOW())
+            INSERT INTO user_types (type_name, description, permissions, created_at, name_ar)
+            VALUES (:type_name, :description, NULL, NOW(), :name_ar)
             RETURNING id, name_ar
         """
         ),
-        {"name": target_role},
+        {"type_name": target_role_en, "description": target_role_ar, "name_ar": target_role_ar},
     )
 
     try:
@@ -183,7 +194,7 @@ def get_or_create_customer_user_type(db: Session) -> tuple[int, str]:
             detail="تعذر إنشاء نوع المستخدم الافتراضي 'عميل'",
         )
 
-    return new_role[0], new_role[1]
+    return new_role[0], new_role[1] or target_role_ar
 
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

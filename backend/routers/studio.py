@@ -6,7 +6,10 @@ import base64
 import aiofiles
 
 router = APIRouter()
-REMOVE_BG_API_KEY = "QP2YU5oSDaLwXpzDRKv4fjo9"
+REMOVE_BG_API_KEY = os.getenv("REMOVE_BG_API_KEY", "QP2YU5oSDaLwXpzDRKv4fjo9")
+
+if not REMOVE_BG_API_KEY:
+    print("⚠️ REMOVE_BG_API_KEY is not set. remove.bg integration will fail until provided.")
 
 @router.post("/remove-background")
 async def remove_background(file: UploadFile = File(...)):

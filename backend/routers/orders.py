@@ -618,32 +618,32 @@ async def get_orders(db: Session = Depends(get_db)):
         for order in orders:
             order_items_payload = []
         for idx, item in enumerate(items_map.get(order.id, [])):
-                specs = item.specifications
-                if isinstance(specs, str):
-                    try:
-                        specs = json.loads(specs)
-                    except Exception:
-                        specs = {"raw": specs}
+            specs = item.specifications
+            if isinstance(specs, str):
+                try:
+                    specs = json.loads(specs)
+                except Exception:
+                    specs = {"raw": specs}
 
-                design_files = _persist_design_files(
-                    order.order_number,
-                    idx,
-                    _safe_design_file_list(item.design_files)
-                )
+            design_files = _persist_design_files(
+                order.order_number,
+                idx,
+                _safe_design_file_list(item.design_files)
+            )
 
-                order_items_payload.append({
-                    "id": item.id,
-                    "service_name": getattr(item, "product_name", None),
-                    "quantity": item.quantity,
-                    "unit_price": serialize_decimal(item.unit_price),
-                    "total_price": serialize_decimal(item.total_price),
-                    "specifications": specs,
-                    "design_files": design_files,
-                    "status": item.status,
-                    "created_at": item.created_at.isoformat() if item.created_at else None
-                })
+            order_items_payload.append({
+                "id": item.id,
+                "service_name": getattr(item, "product_name", None),
+                "quantity": item.quantity,
+                "unit_price": serialize_decimal(item.unit_price),
+                "total_price": serialize_decimal(item.total_price),
+                "specifications": specs,
+                "design_files": design_files,
+                "status": item.status,
+                "created_at": item.created_at.isoformat() if item.created_at else None
+            })
 
-            orders_payload.append({
+        orders_payload.append({
                 "id": order.id,
                 "order_number": order.order_number,
                 "status": order.status,

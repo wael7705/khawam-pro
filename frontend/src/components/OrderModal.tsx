@@ -88,6 +88,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [clothingSource, setClothingSource] = useState<'customer' | 'store'>('customer')
   const [clothingProduct, setClothingProduct] = useState<string>('hoodie')
   const [clothingColor, setClothingColor] = useState<string>('أبيض')
+  const [clothingSize, setClothingSize] = useState<string>('M')
   const [clothingDesigns, setClothingDesigns] = useState<Record<string, File | null>>({
     logo: null,
     front: null,
@@ -229,6 +230,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       setClothingSource('customer')
       setClothingProduct('hoodie')
       setClothingColor('أبيض')
+      setClothingSize('M')
       setClothingDesigns({
         logo: null,
         front: null,
@@ -310,6 +312,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         setClothingProduct,
         clothingColor,
         setClothingColor,
+        clothingSize,
+        setClothingSize,
         clothingDesigns,
         setClothingDesigns,
         customerName,
@@ -2635,6 +2639,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       let clothingSourceLabel: string | undefined
       let clothingProductLabel: string | undefined
       let clothingColorLabel: string | undefined
+      let clothingSizeLabel: string | undefined
       const clothingStep = workflowSteps.find((step) => step.step_type === 'clothing_source')
       const clothingOptions = clothingStep?.step_config?.options || []
       const selectedSourceOption = clothingOptions.find((option: any) => option.id === clothingSource)
@@ -2647,11 +2652,18 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           if (Array.isArray(selectedProduct.colors) && selectedProduct.colors.length > 0) {
             const matchingColor = selectedProduct.colors.find((color: string) => color === clothingColor)
             clothingColorLabel = matchingColor || clothingColor
+          }
+          if (Array.isArray(selectedProduct.sizes) && selectedProduct.sizes.length > 0) {
+            const matchingSize = selectedProduct.sizes.find((size: string) => size === clothingSize)
+            clothingSizeLabel = matchingSize || selectedProduct.sizes[0]
+          }
         }
-      }
       }
       if (!clothingColorLabel) {
         clothingColorLabel = clothingColor
+      }
+      if (!clothingSizeLabel) {
+        clothingSizeLabel = clothingSize
       }
 
       // تحضير البيانات الأساسية
@@ -2699,6 +2711,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           clothingProductLabel,
           clothingColor,
           clothingColorLabel,
+          clothingSize,
+          clothingSizeLabel,
           clothingDesigns
         }
         
@@ -2843,6 +2857,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           shoulder_right: null,
           shoulder_left: null,
         })
+        setClothingSize('M')
       } else {
         showError('فشل إرسال الطلب. يرجى المحاولة مرة أخرى')
       }

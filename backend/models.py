@@ -6,11 +6,10 @@ class UserType(Base):
     __tablename__ = "user_types"
     
     id = Column(Integer, primary_key=True, index=True)
-    # name_ar موجود في قاعدة البيانات (تم إضافته)
-    name_ar = Column(Text, nullable=True)  # مدير، موظف، عميل
-    # name_en غير موجود في قاعدة البيانات - تمت إزالته من النموذج
-    # سيتم استخدام raw SQL للحصول على name_en إذا لزم الأمر
-    permissions = Column(JSON, nullable=True)  # صلاحيات إضافية
+    type_name = Column(String(50), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    name_ar = Column(Text, nullable=True)  # الاسم العربي (مدير، موظف، عميل)
+    permissions = Column(JSON, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=True)
 
 class User(Base):

@@ -4,14 +4,18 @@ from sqlalchemy import text, inspect
 from database import get_db
 from models import Order, OrderItem, User
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from decimal import Decimal
 import uuid
 from datetime import datetime
 from collections import defaultdict
 import json
 import os
+import base64
+import mimetypes
+import re
 from notifications import order_notifications
+import asyncio
 
 router = APIRouter()
 
@@ -215,8 +219,179 @@ async def send_order_notification(payload: Dict[str, Any]):
     customer_name = payload.get("customer_name")
     customer_phone = payload.get("customer_phone")
     print(f"📧 Notification: Order {order_number} created for {customer_name} ({customer_phone})")
-    # TODO: Integrate with email/SMS service
-    # await email_service.send_order_confirmation(...)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _send_email_notification_sync, payload)
+
+EMAIL_RECIPIENTS = [email.strip() for email in os.getenv("ORDER_NOTIFICATION_EMAILS", "eyadmrx@gmail.com").split(",") if email.strip()]
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() != "false"
+EMAIL_SENDER = os.getenv("EMAIL_FROM") or SMTP_USERNAME or "no-reply@khawam.app"
+
+
+def _send_email_notification_sync(payload: Dict[str, Any]) -> None:
+    if not EMAIL_RECIPIENTS:
+        return
+    if not (SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD):
+        print("⚠️ Email notification skipped: SMTP configuration is incomplete.")
+        return
+
+    try:
+        from email.message import EmailMessage
+        import smtplib
+
+        order_number = payload.get("order_number", "ORD-UNKNOWN")
+        customer_name = payload.get("customer_name", "عميل")
+        customer_phone = payload.get("customer_phone", "")
+        service_name = payload.get("service_name") or "خدمة"
+        total_amount = payload.get("final_amount") or payload.get("total_amount") or 0
+        items_count = payload.get("items_count") or 0
+        created_at = payload.get("created_at")
+
+        subject = f"🚨 طلب جديد: {order_number}"
+        body = (
+            f"تم استلام طلب جديد.\n\n"
+            f"رقم الطلب: {order_number}\n"
+            f"اسم العميل: {customer_name}\n"
+            f"هاتف العميل: {customer_phone}\n"
+            f"الخدمة: {service_name}\n"
+            f"عدد العناصر: {items_count}\n"
+            f"المبلغ النهائي: {total_amount}\n"
+            f"تاريخ الإنشاء: {created_at}\n"
+        )
+
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = EMAIL_SENDER
+        msg["To"] = ", ".join(EMAIL_RECIPIENTS)
+        msg.set_content(body)
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+            if SMTP_USE_TLS:
+                server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+
+        print(f"📨 Email notification sent to {', '.join(EMAIL_RECIPIENTS)} for order {order_number}")
+    except Exception as email_error:
+        print(f"⚠️ Failed to send email notification: {email_error}")
+
+
+def _decode_data_url(data_url: str) -> Optional[Tuple[bytes, str]]:
+    if not data_url or not data_url.startswith("data:"):
+        return None
+    try:
+        header, encoded = data_url.split(",", 1)
+    except ValueError:
+        return None
+    mime_type = header.split(";")[0].replace("data:", "") or "application/octet-stream"
+    try:
+        file_data = base64.b64decode(encoded, validate=True)
+    except Exception:
+        return None
+    extension = mimetypes.guess_extension(mime_type) or ".bin"
+    return file_data, extension
+
+
+def _secure_filename(filename: str) -> str:
+    filename = filename or "attachment"
+    filename = filename.strip().replace("\\", "/").split("/")[-1]
+    filename = re.sub(r"[^A-Za-z0-9.\-_]+", "_", filename)
+    if not filename:
+        filename = "attachment"
+    return filename
+
+
+def _safe_design_file_list(design_files: Any) -> List[Any]:
+    if design_files is None:
+        return []
+    if isinstance(design_files, list):
+        return [entry for entry in design_files if entry is not None]
+    if isinstance(design_files, (tuple, set)):
+        return [entry for entry in design_files if entry is not None]
+    if isinstance(design_files, str):
+        try:
+            parsed = json.loads(design_files)
+            return _safe_design_file_list(parsed)
+        except Exception:
+            return [design_files]
+    if isinstance(design_files, dict):
+        return [design_files]
+    return [design_files]
+
+
+def _persist_design_files(
+    order_number: str,
+    item_index: int,
+    design_files: Optional[List[Any]]
+) -> List[Any]:
+    if not design_files:
+        return []
+
+    base_dir = os.path.join("uploads", "orders", order_number, f"item-{item_index + 1}")
+    os.makedirs(base_dir, exist_ok=True)
+    web_base = f"/uploads/orders/{order_number}/item-{item_index + 1}"
+
+    persisted_entries: List[Any] = []
+
+    for idx, entry in enumerate(design_files):
+        try:
+            if isinstance(entry, str):
+                if entry.startswith("data:"):
+                    result = _decode_data_url(entry)
+                    if not result:
+                        continue
+                    file_bytes, extension = result
+                    filename = _secure_filename(f"attachment-{idx + 1}{extension}")
+                    file_path = os.path.join(base_dir, filename)
+                    with open(file_path, "wb") as file_obj:
+                        file_obj.write(file_bytes)
+                    persisted_entries.append({
+                        "filename": filename,
+                        "url": f"{web_base}/{filename}",
+                        "download_url": f"{web_base}/{filename}",
+                        "raw_path": f"{web_base}/{filename}",
+                        "size_in_bytes": len(file_bytes)
+                    })
+                else:
+                    persisted_entries.append(entry)
+                continue
+
+            if isinstance(entry, dict):
+                data_url = entry.get("data_url") or entry.get("url") or entry.get("raw_path")
+                saved_entry = dict(entry)
+
+                if data_url and str(data_url).startswith("data:"):
+                    result = _decode_data_url(str(data_url))
+                    if result:
+                        file_bytes, extension = result
+                        filename = _secure_filename(saved_entry.get("filename") or f"attachment-{idx + 1}{extension}")
+                        file_path = os.path.join(base_dir, filename)
+                        with open(file_path, "wb") as file_obj:
+                            file_obj.write(file_bytes)
+                        saved_entry["url"] = f"{web_base}/{filename}"
+                        saved_entry["download_url"] = f"{web_base}/{filename}"
+                        saved_entry["raw_path"] = f"{web_base}/{filename}"
+                        saved_entry["size_in_bytes"] = len(file_bytes)
+                        saved_entry.pop("data_url", None)
+                        saved_entry.pop("file_key", None)
+                elif data_url and isinstance(data_url, str) and data_url.startswith("/uploads/"):
+                    saved_entry["url"] = data_url
+                    saved_entry["download_url"] = data_url
+                    saved_entry["raw_path"] = data_url
+                else:
+                    saved_entry.pop("data_url", None)
+                    saved_entry.pop("file_key", None)
+
+                persisted_entries.append(saved_entry)
+            else:
+                persisted_entries.append(entry)
+        except Exception as persist_error:
+            print(f"⚠️ Failed to persist design file #{idx+1} for order {order_number}: {persist_error}")
+
+    return persisted_entries
 
 @router.post("/")
 async def create_order(
@@ -324,7 +499,7 @@ async def create_order(
         ensure_order_items_columns(db)
         
         # Create order items using raw SQL
-        for item_data in order_data.items:
+        for item_index, item_data in enumerate(order_data.items):
             # Prepare specifications JSON
             specs = {}
             if item_data.specifications:
@@ -336,7 +511,12 @@ async def create_order(
             
             import json
             specs_json = json.dumps(specs) if specs else None
-            design_files_json = json.dumps(item_data.design_files or [])
+            persisted_design_files = _persist_design_files(
+                order_number,
+                item_index,
+                _safe_design_file_list(item_data.design_files)
+            )
+            design_files_json = json.dumps(persisted_design_files or [])
             
             # Get product name if product_id is provided
             product_name = item_data.service_name or "Service Item"
@@ -437,7 +617,7 @@ async def get_orders(db: Session = Depends(get_db)):
         orders_payload = []
         for order in orders:
             order_items_payload = []
-            for item in items_map.get(order.id, []):
+        for idx, item in enumerate(items_map.get(order.id, [])):
                 specs = item.specifications
                 if isinstance(specs, str):
                     try:
@@ -445,22 +625,11 @@ async def get_orders(db: Session = Depends(get_db)):
                     except Exception:
                         specs = {"raw": specs}
 
-                design_files = item.design_files
-                if isinstance(design_files, str):
-                    try:
-                        design_files = json.loads(design_files)
-                    except Exception:
-                        design_files = [design_files]
-                if design_files is None:
-                    design_files = []
-                if isinstance(design_files, list):
-                    normalized_files = []
-                    for design_item in design_files:
-                        if isinstance(design_item, dict):
-                            normalized_files.append(design_item)
-                        else:
-                            normalized_files.append({"filename": str(design_item)})
-                    design_files = normalized_files
+                design_files = _persist_design_files(
+                    order.order_number,
+                    idx,
+                    _safe_design_file_list(item.design_files)
+                )
 
                 order_items_payload.append({
                     "id": item.id,

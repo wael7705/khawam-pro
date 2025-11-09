@@ -8,6 +8,7 @@ type ClothingOption = {
     id: string
     name: string
     colors?: string[]
+    sizes?: string[]
   }>
 }
 
@@ -38,6 +39,8 @@ export const ClothingPrintingService: ServiceHandler = {
       setClothingProduct,
       clothingColor,
       setClothingColor,
+      clothingSize,
+      setClothingSize,
       clothingDesigns,
       setClothingDesigns,
       uploadedFiles,
@@ -57,6 +60,7 @@ export const ClothingPrintingService: ServiceHandler = {
         const products = storeOption?.products || []
         const currentProduct = products.find(product => product.id === clothingProduct) || products[0]
         const availableColors = currentProduct?.colors || []
+        const availableSizes = currentProduct?.sizes || []
 
         const handleSourceChange = (value: 'customer' | 'store') => {
           setClothingSource(value)
@@ -67,6 +71,12 @@ export const ClothingPrintingService: ServiceHandler = {
             if (defaultColors.length > 0) {
               setClothingColor(defaultColors[0])
             }
+            const defaultSizes = products.find(product => product.id === defaultProduct)?.sizes || []
+            if (defaultSizes && defaultSizes.length > 0) {
+              setClothingSize(defaultSizes[0])
+            }
+          } else {
+            setClothingSize('M')
           }
         }
 
@@ -78,6 +88,12 @@ export const ClothingPrintingService: ServiceHandler = {
             setClothingColor(productColors[0])
           } else {
             setClothingColor('')
+          }
+          const productSizes = products.find(product => product.id === productId)?.sizes || []
+          if (productSizes && productSizes.length > 0) {
+            setClothingSize(productSizes[0])
+          } else {
+            setClothingSize('')
           }
         }
 
@@ -129,6 +145,25 @@ export const ClothingPrintingService: ServiceHandler = {
                             onChange={(event) => setClothingColor(event.target.value)}
                           />
                           <span>{color}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {availableSizes.length > 0 && (
+                  <div className="form-group">
+                    <label>اختر المقاس <span className="required">*</span></label>
+                    <div className="delivery-options">
+                      {availableSizes.map(size => (
+                        <label key={size} className="radio-option">
+                          <input
+                            type="radio"
+                            value={size}
+                            checked={clothingSize === size}
+                            onChange={(event) => setClothingSize(event.target.value)}
+                          />
+                          <span>{size.toUpperCase()}</span>
                         </label>
                       ))}
                     </div>
@@ -239,6 +274,8 @@ export const ClothingPrintingService: ServiceHandler = {
       clothingProductLabel,
       clothingColor,
       clothingColorLabel,
+      clothingSize,
+      clothingSizeLabel,
       clothingDesigns,
       quantity,
       notes,
@@ -255,6 +292,10 @@ export const ClothingPrintingService: ServiceHandler = {
       specifications.clothing_product_code = clothingProduct
       specifications.clothing_color = clothingColorLabel || clothingColor
       specifications.clothing_color_code = clothingColor
+      if (clothingSizeLabel || clothingSize) {
+        specifications.clothing_size = clothingSizeLabel || clothingSize
+        specifications.clothing_size_code = clothingSize
+      }
     }
 
     if (designEntries.length > 0) {
@@ -296,6 +337,8 @@ export const ClothingPrintingService: ServiceHandler = {
       clothingProductLabel,
       clothingColor,
       clothingColorLabel,
+      clothingSize,
+      clothingSizeLabel,
       clothingDesigns,
       quantity,
     } = serviceData
@@ -309,6 +352,8 @@ export const ClothingPrintingService: ServiceHandler = {
       clothing_product_code: clothingSource === 'store' ? clothingProduct : undefined,
       clothing_color: clothingSource === 'store' ? (clothingColorLabel || clothingColor) : undefined,
       clothing_color_code: clothingSource === 'store' ? clothingColor : undefined,
+      clothing_size: clothingSource === 'store' ? (clothingSizeLabel || clothingSize) : undefined,
+      clothing_size_code: clothingSource === 'store' ? clothingSize : undefined,
       quantity: quantity || 1,
       design_positions: designEntries.map(([location, file]) => ({
         location,

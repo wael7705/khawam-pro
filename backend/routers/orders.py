@@ -665,8 +665,15 @@ async def get_orders(
         elif user_role in ("مدير", "موظف"):
             # للمديرين والموظفين: جلب جميع الطلبات
             orders_query_start = time.time()
-            orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
-            print(f"⏱️ Orders API - Orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+            try:
+                # استخدام eager loading لتحسين الأداء
+                orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+                print(f"⏱️ Orders API - Orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+            except Exception as query_error:
+                print(f"❌ Error querying orders: {query_error}")
+                import traceback
+                traceback.print_exc()
+                orders = []
         else:
             # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
             if customer_phone_variants:

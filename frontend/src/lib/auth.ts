@@ -57,11 +57,20 @@ export const isAuthenticated = (): boolean => {
 // Get stored token
 export const getToken = (): string | null => {
   const token = localStorage.getItem('auth_token')
-  if (!token) {
-    console.warn('⚠️ No token found in localStorage')
-  } else {
-    console.log('✅ Token found:', token.substring(0, 20) + '...')
+  
+  // التحقق من أن token ليس "null" أو "undefined" كسلسلة نصية
+  if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
+    console.warn('⚠️ No valid token found in localStorage', { token, length: token?.length })
+    return null
   }
+  
+  // التحقق من أن token ليس قصيراً جداً (JWT tokens عادة تكون أطول من 20 حرف)
+  if (token.length < 20) {
+    console.warn('⚠️ Token seems invalid (too short):', token.substring(0, 10) + '...')
+    return null
+  }
+  
+  console.log('✅ Valid token found:', token.substring(0, 20) + '...')
   return token
 }
 

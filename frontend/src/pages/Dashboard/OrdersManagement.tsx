@@ -64,9 +64,10 @@ export default function OrdersManagement() {
       if (showLoading) {
         setLoading(true)
       }
+      console.log('🔄 Loading orders...')
       const res = await adminAPI.orders.getAll()
-      console.log('Orders API response:', res)
-      console.log('Response structure:', {
+      console.log('📦 Orders API response:', res)
+      console.log('📦 Response structure:', {
         data: res.data,
         dataType: typeof res.data,
         isArray: Array.isArray(res.data),
@@ -74,22 +75,22 @@ export default function OrdersManagement() {
       })
       
       // Handle different response structures
-      let data = []
+      let data: Order[] = []
       
+      // Backend returns: {success: True, orders: [...]}
+      if (res.data && res.data.orders && Array.isArray(res.data.orders)) {
+        data = res.data.orders
+        console.log('✅ Found orders in res.data.orders:', data.length)
+      }
       // Direct array
-      if (Array.isArray(res.data)) {
+      else if (Array.isArray(res.data)) {
         data = res.data
-        console.log('Found orders as direct array:', data.length)
+        console.log('✅ Found orders as direct array:', data.length)
       } 
       // Nested in data.data
       else if (res.data && res.data.data && Array.isArray(res.data.data)) {
         data = res.data.data
-        console.log('Found orders in res.data.data:', data.length)
-      } 
-      // Nested in data.orders
-      else if (res.data && res.data.orders && Array.isArray(res.data.orders)) {
-        data = res.data.orders
-        console.log('Found orders in res.data.orders:', data.length)
+        console.log('✅ Found orders in res.data.data:', data.length)
       }
       // Try direct access if data is object with array property
       else if (res.data && typeof res.data === 'object') {
@@ -98,15 +99,17 @@ export default function OrdersManagement() {
         for (const key of possibleKeys) {
           if (Array.isArray(res.data[key])) {
             data = res.data[key]
-            console.log(`Found orders in res.data.${key}:`, data.length)
+            console.log(`✅ Found orders in res.data.${key}:`, data.length)
             break
           }
         }
       }
       
-      console.log('Final parsed orders:', data.length, 'orders')
+      console.log('✅ Final parsed orders:', data.length, 'orders')
       if (data.length > 0) {
-        console.log('Sample order:', data[0])
+        console.log('📋 Sample order:', data[0])
+      } else {
+        console.warn('⚠️ No orders found in response')
       }
       
       setOrders(data)

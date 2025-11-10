@@ -931,91 +931,92 @@ export default function OrderDetail() {
           </div>
         </div>
 
-          {/* Delivery Address Card - عند اختيار التوصيل */}
-          {order.delivery_type === 'delivery' && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) ? (
-            <div className="detail-card delivery-address-card">
-              <h2>
-                <MapPin size={20} />
-                عنوان التوصيل
-              </h2>
-              <div className="delivery-address-content">
-                {order.delivery_address && (
-                  <div className="delivery-address-text">
-                    <label>العنوان:</label>
-                    <p>{order.delivery_address}</p>
-                  </div>
-                )}
-                {order.delivery_latitude && order.delivery_longitude && (
-                  <>
-                    <div className="delivery-coordinates">
-                      <label>الإحداثيات:</label>
-                      <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
-                    </div>
-                    <div className="delivery-map-actions">
-                      <button
-                        className="map-action-btn"
-                        onClick={() => setShowLocationMap(!showLocationMap)}
-                      >
-                        <MapPin size={16} />
-                        {showLocationMap ? 'إخفاء الخريطة' : 'عرض على الخريطة'}
-                      </button>
-                      <a
-                        href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="map-action-btn external"
-                      >
-                        <ExternalLink size={16} />
-                        فتح في Google Maps
-                      </a>
-                    </div>
-                    {showLocationMap && (
-                      <div className="delivery-map-container">
-                        <SimpleMap
-                          address={order.delivery_address}
-                          latitude={order.delivery_latitude}
-                          longitude={order.delivery_longitude}
-                          defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
-                          defaultZoom={17}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+        {/* Status Card - دائماً نعرضه */}
+        <div className="detail-card status-card">
+          <h2>حالة الطلب</h2>
+          <div className="status-controls">
+            <div className="current-status">
+              <span
+                className="status-badge"
+                style={{ backgroundColor: getStatusColor(order.status || 'pending') }}
+              >
+                {getStatusLabel(order.status || 'pending')}
+              </span>
             </div>
-          ) : (
-            <div className="detail-card status-card">
-              <h2>حالة الطلب</h2>
-              <div className="status-controls">
-                <div className="current-status">
-                  <span
-                    className="status-badge"
-                    style={{ backgroundColor: getStatusColor(order.status || 'pending') }}
+            <div className="status-buttons">
+              {STATUS_OPTIONS.map((option) => {
+                const style = { '--status-color': option.color } as CSSProperties
+                const isCurrent = option.id === (order.status || 'pending')
+                return (
+                  <button
+                    key={option.id}
+                    className={`status-btn ${isCurrent ? 'active' : ''}`}
+                    style={style}
+                    onClick={() => handleStatusChange(option.id)}
+                    disabled={isUpdatingStatus || isCurrent}
                   >
-                    {getStatusLabel(order.status || 'pending')}
-                  </span>
-                </div>
-                <div className="status-buttons">
-                  {STATUS_OPTIONS.map((option) => {
-                    const style = { '--status-color': option.color } as CSSProperties
-                    const isCurrent = option.id === (order.status || 'pending')
-                    return (
-                      <button
-                        key={option.id}
-                        className={`status-btn ${isCurrent ? 'active' : ''}`}
-                        style={style}
-                        onClick={() => handleStatusChange(option.id)}
-                        disabled={isUpdatingStatus || isCurrent}
-                      >
-                        {option.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+                    {option.label}
+                  </button>
+                )
+              })}
             </div>
-          )}
+          </div>
+        </div>
+
+        {/* Delivery Address Card - عند اختيار التوصيل */}
+        {order.delivery_type === 'delivery' && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
+          <div className="detail-card delivery-address-card">
+            <h2>
+              <MapPin size={20} />
+              عنوان التوصيل
+            </h2>
+            <div className="delivery-address-content">
+              {order.delivery_address && (
+                <div className="delivery-address-text">
+                  <label>العنوان:</label>
+                  <p>{order.delivery_address}</p>
+                </div>
+              )}
+              {order.delivery_latitude && order.delivery_longitude && (
+                <>
+                  <div className="delivery-coordinates">
+                    <label>الإحداثيات:</label>
+                    <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
+                  </div>
+                  <div className="delivery-map-actions">
+                    <button
+                      className="map-action-btn"
+                      onClick={() => setShowLocationMap(!showLocationMap)}
+                    >
+                      <MapPin size={16} />
+                      {showLocationMap ? 'إخفاء الخريطة' : 'عرض على الخريطة'}
+                    </button>
+                    <a
+                      href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="map-action-btn external"
+                    >
+                      <ExternalLink size={16} />
+                      فتح في Google Maps
+                    </a>
+                  </div>
+                  {showLocationMap && (
+                    <div className="delivery-map-container">
+                      <SimpleMap
+                        address={order.delivery_address}
+                        latitude={order.delivery_latitude}
+                        longitude={order.delivery_longitude}
+                        defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                        defaultZoom={17}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
           {attachmentsOverview}
 

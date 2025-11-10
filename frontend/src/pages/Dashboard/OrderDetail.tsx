@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, type ReactNode, type CSSProperties } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, MessageSquare, Save, MapPin, ExternalLink, Download, FileText, Paperclip } from 'lucide-react'
+import { ArrowRight, MessageSquare, Save, MapPin, ExternalLink, Download, FileText, Paperclip, Navigation, Share2, Plus } from 'lucide-react'
 import { adminAPI, ordersAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
 import SimpleMap from '../../components/SimpleMap'
@@ -616,6 +616,7 @@ export default function OrderDetail() {
   const [orderAttachments, setOrderAttachments] = useState<NormalizedAttachment[]>([])
   const [attachmentsLoading, setAttachmentsLoading] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [showAdditionalAddress, setShowAdditionalAddress] = useState(false)
 
   useEffect(() => {
     // إزالة التحقق الصارم من Token - السماح بالوصول حتى بدون token
@@ -986,60 +987,151 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Delivery Address Card - عرض بطاقة العنوان إذا كانت البيانات موجودة */}
-        {(order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
-          <div className="detail-card delivery-address-card">
-            <h2>
-              <MapPin size={20} />
-              {order.delivery_type === 'delivery' ? 'عنوان التوصيل' : 'عنوان العميل'}
-            </h2>
-            <div className="delivery-address-content">
-              {order.delivery_address && (
-                <div className="delivery-address-text">
-                  <label>العنوان:</label>
-                  <p>{order.delivery_address}</p>
-                </div>
+        {/* Delivery Address Card - دائماً نعرضها */}
+        <div className="detail-card delivery-address-card">
+          <h2>
+            <MapPin size={20} />
+            {order.delivery_type === 'delivery' ? 'عنوان التوصيل' : 'عنوان العميل'}
+          </h2>
+          <div className="delivery-address-content">
+            {order.delivery_address ? (
+              <div className="delivery-address-text">
+                <label>العنوان:</label>
+                <p>{order.delivery_address}</p>
+              </div>
+            ) : (
+              <div className="delivery-address-empty">
+                <p>لا يوجد عنوان مسجل</p>
+              </div>
+            )}
+            
+            {order.delivery_latitude && order.delivery_longitude && (
+              <div className="delivery-coordinates">
+                <label>الإحداثيات:</label>
+                <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
+              </div>
+            )}
+
+            {/* البيانات الإضافية للعنوان */}
+            {showAdditionalAddress && order.delivery_address_details && (
+              <div className="delivery-address-details">
+                <label>بيانات إضافية:</label>
+                <p>{order.delivery_address_details}</p>
+              </div>
+            )}
+
+            {/* أزرار الإجراءات */}
+            <div className="delivery-actions">
+              {/* زر تحديد الموقع في GPS */}
+              <button
+                className="delivery-action-btn gps-btn"
+                onClick={() => {
+                  if (order.delivery_latitude && order.delivery_longitude) {
+                    // افتح Google Maps في GPS
+                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`, '_blank')
+                  } else {
+                    // إذا لم تكن هناك إحداثيات، افتح Google Maps للبحث
+                    const address = encodeURIComponent(order.delivery_address || '')
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+                  }
+                }}
+              >
+                <Navigation size={16} />
+                تحديد الموقع في GPS
+              </button>
+
+              {/* زر عنوان إضافي */}
+              {order.delivery_address_details && (
+                <button
+                  className="delivery-action-btn additional-btn"
+                  onClick={() => setShowAdditionalAddress(!showAdditionalAddress)}
+                >
+                  <Plus size={16} />
+                  {showAdditionalAddress ? 'إخفاء البيانات الإضافية' : 'عرض البيانات الإضافية'}
+                </button>
               )}
+
+              {/* زر عرض على الخريطة */}
               {order.delivery_latitude && order.delivery_longitude && (
-                <>
-                  <div className="delivery-coordinates">
-                    <label>الإحداثيات:</label>
-                    <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
-                  </div>
-                  <div className="delivery-map-actions">
-                    <button
-                      className="map-action-btn"
-                      onClick={() => setShowLocationMap(!showLocationMap)}
-                    >
-                      <MapPin size={16} />
-                      {showLocationMap ? 'إخفاء الخريطة' : 'عرض على الخريطة'}
-                    </button>
-                    <a
-                      href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="map-action-btn external"
-                    >
-                      <ExternalLink size={16} />
-                      فتح في Google Maps
-                    </a>
-                  </div>
-                  {showLocationMap && (
-                    <div className="delivery-map-container">
-                      <SimpleMap
-                        address={order.delivery_address}
-                        latitude={order.delivery_latitude}
-                        longitude={order.delivery_longitude}
-                        defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
-                        defaultZoom={17}
-                      />
-                    </div>
-                  )}
-                </>
+                <button
+                  className="delivery-action-btn map-btn"
+                  onClick={() => setShowLocationMap(!showLocationMap)}
+                >
+                  <MapPin size={16} />
+                  {showLocationMap ? 'إخفاء الخريطة' : 'عرض على الخريطة'}
+                </button>
+              )}
+
+              {/* زر فتح في Google Maps */}
+              {(order.delivery_latitude && order.delivery_longitude) || order.delivery_address ? (
+                <a
+                  href={order.delivery_latitude && order.delivery_longitude
+                    ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address || '')}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="delivery-action-btn external-btn"
+                >
+                  <ExternalLink size={16} />
+                  فتح في Google Maps
+                </a>
+              ) : null}
+
+              {/* زر مشاركة العنوان */}
+              {(order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
+                <button
+                  className="delivery-action-btn share-btn"
+                  onClick={async () => {
+                    try {
+                      const shareText = `عنوان التوصيل:\n${order.delivery_address || ''}\n${order.delivery_latitude && order.delivery_longitude ? `الإحداثيات: ${order.delivery_latitude}, ${order.delivery_longitude}` : ''}\n${order.delivery_address_details ? `\nبيانات إضافية: ${order.delivery_address_details}` : ''}\n\nرقم الطلب: ${order.order_number}`
+                      
+                      if (navigator.share) {
+                        await navigator.share({
+                          title: `عنوان التوصيل - طلب ${order.order_number}`,
+                          text: shareText,
+                          url: order.delivery_latitude && order.delivery_longitude
+                            ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+                            : undefined
+                        })
+                      } else {
+                        // Fallback: نسخ إلى الحافظة
+                        await navigator.clipboard.writeText(shareText)
+                        showSuccess('تم نسخ العنوان إلى الحافظة')
+                      }
+                    } catch (error) {
+                      console.error('Error sharing address:', error)
+                      // Fallback: نسخ إلى الحافظة
+                      try {
+                        const shareText = `عنوان التوصيل:\n${order.delivery_address || ''}\n${order.delivery_latitude && order.delivery_longitude ? `الإحداثيات: ${order.delivery_latitude}, ${order.delivery_longitude}` : ''}\n${order.delivery_address_details ? `\nبيانات إضافية: ${order.delivery_address_details}` : ''}\n\nرقم الطلب: ${order.order_number}`
+                        await navigator.clipboard.writeText(shareText)
+                        showSuccess('تم نسخ العنوان إلى الحافظة')
+                      } catch (clipboardError) {
+                        showError('فشل مشاركة العنوان')
+                      }
+                    }
+                  }}
+                >
+                  <Share2 size={16} />
+                  مشاركة العنوان
+                </button>
               )}
             </div>
+
+            {/* الخريطة */}
+            {showLocationMap && order.delivery_latitude && order.delivery_longitude && (
+              <div className="delivery-map-container">
+                <SimpleMap
+                  address={order.delivery_address}
+                  latitude={order.delivery_latitude}
+                  longitude={order.delivery_longitude}
+                  defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                  defaultZoom={17}
+                />
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
           {attachmentsOverview}
 

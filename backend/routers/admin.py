@@ -1428,6 +1428,17 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 order_type = "service"
                 service_name = specs.get('service_name') if specs else None
             
+            # Parse design_files with logging
+            print(f"📎 Processing item {item_id} - design_files_raw type: {type(design_files_raw)}")
+            parsed_design_files = safe_parse_array(design_files_raw)
+            print(f"📎 Item {item_id}: Parsed {len(parsed_design_files)} design_files")
+            if parsed_design_files:
+                for idx, df in enumerate(parsed_design_files):
+                    df_preview = str(df)[:100] if df else 'None'
+                    print(f"  design_file[{idx}]: {df_preview}... (type: {type(df)})")
+            else:
+                print(f"⚠️ Item {item_id}: No design_files found or all are None")
+            
             items_list.append({
                 "id": item_id,
                 "product_id": product_id,
@@ -1438,7 +1449,7 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "unit_price": unit_price,
                 "total_price": total_price,
                 "specifications": specs,
-                "design_files": safe_parse_array(design_files_raw),
+                "design_files": parsed_design_files,  # استخدام القيمة المحفوظة
                 "status": status
             })
         

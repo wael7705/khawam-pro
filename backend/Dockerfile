@@ -8,10 +8,12 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# Copy requirements.txt from backend directory (build context is project root)
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy all backend files to /app
+COPY backend/ .
 
 # Create uploads directory
 RUN mkdir -p uploads/orders

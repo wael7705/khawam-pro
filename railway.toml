@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
+# Build context is project root, so Dockerfile copies from backend/
 
 [deploy]
 # لا نحدد startCommand - Dockerfile يتعامل مع الأمر

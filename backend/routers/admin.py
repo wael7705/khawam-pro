@@ -1453,6 +1453,16 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "status": status
             })
         
+        # Log delivery information for debugging
+        print(f"📍 Order {order_id} delivery info:", {
+            "delivery_type": order['delivery_type'],
+            "delivery_address": order['delivery_address'],
+            "delivery_latitude": order['delivery_latitude'],
+            "delivery_longitude": order['delivery_longitude'],
+            "has_address": bool(order['delivery_address']),
+            "has_coordinates": bool(order['delivery_latitude'] and order['delivery_longitude'])
+        })
+        
         return {
             "success": True,
             "order": {

@@ -1466,8 +1466,10 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             "delivery_address": order['delivery_address'],
             "delivery_latitude": order['delivery_latitude'],
             "delivery_longitude": order['delivery_longitude'],
+            "delivery_address_details": order.get('delivery_address_details'),
             "has_address": bool(order['delivery_address']),
-            "has_coordinates": bool(order['delivery_latitude'] and order['delivery_longitude'])
+            "has_coordinates": bool(order['delivery_latitude'] and order['delivery_longitude']),
+            "has_details": bool(order.get('delivery_address_details'))
         })
         
         return {

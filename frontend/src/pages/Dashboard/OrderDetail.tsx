@@ -618,10 +618,18 @@ export default function OrderDetail() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
   useEffect(() => {
+    // التحقق من Token قبل تحميل الطلب
+    const token = getToken()
+    if (!token) {
+      console.warn('⚠️ No valid token found, redirecting to login...')
+      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))
+      return
+    }
+    
     if (id) {
       loadOrder(parseInt(id, 10))
     }
-  }, [id])
+  }, [id, navigate])
 
   const fetchOrderAttachments = async (orderId: number) => {
     try {

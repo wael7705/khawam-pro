@@ -319,6 +319,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         # تحديد نوع المعرف (بريد إلكتروني أم رقم هاتف)
         user_row = None
         normalized_phone = None
+        phone_variants = []
         
         if is_valid_email(username):
             # البحث بالبريد الإلكتروني
@@ -330,6 +331,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                 "email1": username.lower(),
                 "email2": username
             }).fetchone()
+            print(f"🔍 Login attempt with email: {username}, found: {user_row is not None}")
         elif is_valid_phone(username):
             # البحث برقم الهاتف - جرب جميع الأشكال الممكنة
             normalized_phone = normalize_phone(username)
@@ -342,6 +344,9 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             if username.startswith('963') and not username.startswith('+'):
                 phone_variants.append('+' + username)
             
+            print(f"🔍 Login attempt with phone: {username}")
+            print(f"🔍 Phone variants to try: {phone_variants}")
+            
             # البحث في جميع الأشكال
             for variant in phone_variants:
                 if variant:
@@ -351,17 +356,33 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                         WHERE phone = :phone
                     """), {"phone": variant}).fetchone()
                     if user_row:
+                        print(f"✅ Found user with phone variant: {variant}")
                         break
+            
+            if not user_row:
+                # محاولة البحث بجزء من رقم الهاتف (في حالة وجود مسافات أو رموز)
+                phone_clean = ''.join(filter(str.isdigit, username))
+                if phone_clean:
+                    # البحث بآخر 9 أرقام
+                    if len(phone_clean) >= 9:
+                        last_9_digits = phone_clean[-9:]
+                        user_row = db.execute(text("""
+                            SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                            FROM users
+                            WHERE phone LIKE :pattern
+                        """), {"pattern": f"%{last_9_digits}"}).fetchone()
+                        if user_row:
+                            print(f"✅ Found user with phone pattern: %{last_9_digits}")
+        else:
+            print(f"❌ Invalid username format: {username}")
+            raise HTTPException(
+                status_code=400,
+                detail="الرجاء إدخال رقم هاتف صحيح أو بريد إلكتروني صحيح"
+            )
         
-        # إذا لم يتم العثور على المستخدم، جرب البحث بالاسم
         if not user_row:
-            user_row = db.execute(text("""
-                SELECT id, name, email, phone, password_hash, user_type_id, is_active
-                FROM users
-                WHERE LOWER(name) = LOWER(:name)
-            """), {"name": username}).fetchone()
-        
-        if not user_row:
+            print(f"❌ User not found for username: {username}")
+            print(f"   Tried phone variants: {phone_variants}")
             raise HTTPException(
                 status_code=401,
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"
@@ -370,18 +391,29 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         user_id, user_name, user_email, user_phone, password_hash, user_type_id, is_active = user_row
         
         if not is_active:
+            print(f"❌ User account is not active: {user_name}")
             raise HTTPException(
                 status_code=403,
                 detail="الحساب غير نشط"
             )
         
         # التحقق من كلمة المرور
+        print(f"🔐 Verifying password for user: {user_name} (ID: {user_id})")
+        print(f"🔐 Stored phone: {user_phone}")
+        print(f"🔐 Password hash prefix: {password_hash[:30] if password_hash else 'None'}...")
         verify_result = verify_password(password, password_hash)
+        print(f"🔐 Password verification result: {verify_result}")
+        
         if not verify_result:
+            print(f"❌ Password verification failed for user: {user_name}")
+            print(f"   Input password length: {len(password)}")
+            print(f"   Hash length: {len(password_hash) if password_hash else 0}")
             raise HTTPException(
                 status_code=401,
                 detail="اسم المستخدم أو كلمة المرور غير صحيحة"
             )
+        
+        print(f"✅ Password verified successfully for user: {user_name}")
         
         # الحصول على name_ar من user_types
         user_type_row = db.execute(text("""

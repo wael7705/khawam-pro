@@ -112,12 +112,16 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
   }
 
   useEffect(() => {
-    if (!(isAdmin() || isEmployee())) {
+    // التحقق من وجود token أولاً - هذا الأهم
+    const token = getToken()
+    if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
+      console.log('WebSocket: Skipping - no token available')
       return
     }
 
-    const token = getToken()
-    if (!token) {
+    // التحقق من أن المستخدم مدير أو موظف
+    if (!(isAdmin() || isEmployee())) {
+      console.log('WebSocket: Skipping - user is not admin or employee')
       return
     }
 
@@ -225,14 +229,15 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
 
     const connect = () => {
       try {
-        // التأكد من وجود token قبل محاولة الاتصال
+        // التأكد من وجود token قبل محاولة الاتصال - تحقق مضاعف
         const currentToken = getToken()
-        if (!currentToken) {
-          console.warn('WebSocket connection skipped: No token available')
+        if (!currentToken || currentToken === 'null' || currentToken === 'undefined' || currentToken.trim() === '') {
+          console.warn('WebSocket: Connection skipped - no valid token available')
           return
         }
         
         const wsUrl = buildWebSocketUrl(`/ws/orders?token=${encodeURIComponent(currentToken)}`)
+        console.log('WebSocket: Attempting to connect...')
         const socket = new WebSocket(wsUrl)
         wsRef.current = socket
 
@@ -247,6 +252,13 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
           stopHeartbeat()
           wsRef.current = null
           if (manualCloseRef.current) {
+            return
+          }
+
+          // التحقق من token قبل إعادة المحاولة
+          const currentToken = getToken()
+          if (!currentToken || currentToken === 'null' || currentToken === 'undefined') {
+            console.warn('WebSocket: Reconnection skipped - no valid token')
             return
           }
 

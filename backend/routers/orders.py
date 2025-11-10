@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import text, inspect
+from sqlalchemy import text, inspect, or_
 from database import get_db
 from models import Order, OrderItem, User
 from pydantic import BaseModel
@@ -652,8 +652,10 @@ async def get_orders(
             if not customer_phone_variants:
                 orders = []
             else:
+                # تحسين الأداء: استخدام OR بدلاً من IN
+                phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
                 orders = db.query(Order).filter(
-                    Order.customer_phone.in_(customer_phone_variants)
+                    or_(*phone_filters)
                 ).order_by(Order.created_at.desc()).limit(100).all()
         elif user_role in ("مدير", "موظف"):
             # للمديرين والموظفين: جلب جميع الطلبات
@@ -661,8 +663,10 @@ async def get_orders(
         else:
             # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
             if customer_phone_variants:
+                # تحسين الأداء: استخدام OR بدلاً من IN
+                phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
                 orders = db.query(Order).filter(
-                    Order.customer_phone.in_(customer_phone_variants)
+                    or_(*phone_filters)
                 ).order_by(Order.created_at.desc()).limit(100).all()
             else:
                 orders = []

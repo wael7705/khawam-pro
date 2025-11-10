@@ -1475,6 +1475,26 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "status": status
             })
         
+        # استخراج بيانات العنوان الكاملة من items إذا كانت موجودة
+        delivery_address_data = None
+        for item in items_list:
+            if item.get('specifications') and isinstance(item.get('specifications'), dict):
+                specs = item.get('specifications')
+                # البحث عن بيانات العنوان في specifications
+                if 'deliveryAddress' in specs and isinstance(specs['deliveryAddress'], dict):
+                    delivery_address_data = specs['deliveryAddress']
+                    break
+                elif 'address' in specs and isinstance(specs['address'], dict):
+                    delivery_address_data = specs['address']
+                    break
+                elif 'delivery_address_data' in specs and isinstance(specs['delivery_address_data'], dict):
+                    delivery_address_data = specs['delivery_address_data']
+                    break
+                # أيضاً البحث في المفاتيح الأخرى التي قد تحتوي على بيانات العنوان
+                elif 'delivery_address' in specs and isinstance(specs['delivery_address'], dict):
+                    delivery_address_data = specs['delivery_address']
+                    break
+        
         # Log delivery information for debugging
         print(f"📍 Order {order_id} delivery info:", {
             "delivery_type": order['delivery_type'],
@@ -1482,9 +1502,11 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             "delivery_latitude": order['delivery_latitude'],
             "delivery_longitude": order['delivery_longitude'],
             "delivery_address_details": order.get('delivery_address_details'),
+            "delivery_address_data": delivery_address_data,
             "has_address": bool(order['delivery_address']),
             "has_coordinates": bool(order['delivery_latitude'] and order['delivery_longitude']),
-            "has_details": bool(order.get('delivery_address_details'))
+            "has_details": bool(order.get('delivery_address_details')),
+            "has_address_data": bool(delivery_address_data)
         })
         
         return {
@@ -1505,6 +1527,7 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "delivery_latitude": order['delivery_latitude'],
                 "delivery_longitude": order['delivery_longitude'],
                 "delivery_address_details": order.get('delivery_address_details'),
+                "delivery_address_data": delivery_address_data,  # بيانات العنوان الكاملة
                 "rating": order['rating'],
                 "rating_comment": order['rating_comment'],
                 "notes": order['notes'],

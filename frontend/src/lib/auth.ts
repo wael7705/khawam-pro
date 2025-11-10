@@ -51,7 +51,18 @@ export const authAPI = {
 
 // Check if user is logged in
 export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('auth_token')
+  const token = getToken() // استخدام getToken للتحقق من صحة Token
+  return !!token
+}
+
+// Cleanup invalid tokens on module load
+if (typeof window !== 'undefined') {
+  const token = localStorage.getItem('auth_token')
+  if (token === 'null' || token === 'undefined' || (token && token.length < 20)) {
+    console.warn('🧹 Cleaning up invalid token on module load')
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_data')
+  }
 }
 
 // Get stored token

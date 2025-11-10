@@ -798,7 +798,21 @@ export default function OrderDetail() {
     order.items.forEach((item) => {
       const attachments = attachmentsByItem[item.id] || []
       const fallbackNames = fallbackNamesByItem[item.id] || []
-      if (attachments.length === 0 && fallbackNames.length === 0) {
+      
+      console.log(`📋 Processing item ${item.id} for attachments display:`, {
+        attachments_count: attachments.length,
+        fallbackNames_count: fallbackNames.length,
+        has_design_files: !!item.design_files,
+        design_files_length: Array.isArray(item.design_files) ? item.design_files.length : 'N/A',
+        has_specifications: !!item.specifications,
+        specifications_keys: item.specifications ? Object.keys(item.specifications) : []
+      })
+      
+      // عرض المرفقات حتى لو كانت فارغة، لإظهار البطاقة
+      // لكن نتحقق من وجود بيانات فعلية قبل إضافة section
+      const hasAnyData = attachments.length > 0 || fallbackNames.length > 0
+      if (!hasAnyData) {
+        console.log(`  ⚠️ No attachments found for item ${item.id}, skipping section`)
         return
       }
 

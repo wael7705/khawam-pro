@@ -328,43 +328,56 @@ def _persist_design_files(
     item_index: int,
     design_files: Optional[List[Any]]
 ) -> List[Any]:
+    print(f"📎 _persist_design_files called for order {order_number}, item {item_index}")
+    print(f"📎 Input design_files: {design_files}, type: {type(design_files)}, length: {len(design_files) if design_files else 0}")
+    
     if not design_files:
+        print(f"⚠️ No design_files provided for order {order_number}, item {item_index}")
         return []
 
     base_dir = os.path.join("uploads", "orders", order_number, f"item-{item_index + 1}")
     os.makedirs(base_dir, exist_ok=True)
     web_base = f"/uploads/orders/{order_number}/item-{item_index + 1}"
+    print(f"📁 Base directory: {base_dir}, web_base: {web_base}")
 
     persisted_entries: List[Any] = []
 
     for idx, entry in enumerate(design_files):
         try:
+            print(f"  Processing entry[{idx}]: type={type(entry)}, value preview={str(entry)[:100] if entry else 'None'}...")
             if isinstance(entry, str):
                 if entry.startswith("data:"):
+                    print(f"    Found data URL, decoding...")
                     result = _decode_data_url(entry)
                     if not result:
+                        print(f"    ⚠️ Failed to decode data URL")
                         continue
                     file_bytes, extension = result
                     filename = _secure_filename(f"attachment-{idx + 1}{extension}")
                     file_path = os.path.join(base_dir, filename)
                     with open(file_path, "wb") as file_obj:
                         file_obj.write(file_bytes)
-                    persisted_entries.append({
+                    persisted_entry = {
                         "filename": filename,
                         "url": f"{web_base}/{filename}",
                         "download_url": f"{web_base}/{filename}",
                         "raw_path": f"{web_base}/{filename}",
                         "size_in_bytes": len(file_bytes)
-                    })
+                    }
+                    persisted_entries.append(persisted_entry)
+                    print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes)")
                 else:
+                    print(f"    ✅ Keeping string entry as-is: {entry[:50]}...")
                     persisted_entries.append(entry)
                 continue
 
             if isinstance(entry, dict):
-                data_url = entry.get("data_url") or entry.get("url") or entry.get("raw_path")
+                data_url = entry.get("data_url") or entry.get("url") or entry.get("raw_path") or entry.get("file")
                 saved_entry = dict(entry)
+                print(f"    Found dict entry with data_url: {data_url[:50] if data_url else 'None'}...")
 
                 if data_url and str(data_url).startswith("data:"):
+                    print(f"    Found data URL in dict, decoding...")
                     result = _decode_data_url(str(data_url))
                     if result:
                         file_bytes, extension = result
@@ -378,20 +391,34 @@ def _persist_design_files(
                         saved_entry["size_in_bytes"] = len(file_bytes)
                         saved_entry.pop("data_url", None)
                         saved_entry.pop("file_key", None)
+                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes)")
+                    else:
+                        print(f"    ⚠️ Failed to decode data URL from dict")
                 elif data_url and isinstance(data_url, str) and data_url.startswith("/uploads/"):
                     saved_entry["url"] = data_url
                     saved_entry["download_url"] = data_url
                     saved_entry["raw_path"] = data_url
+                    print(f"    ✅ Using existing upload path: {data_url}")
                 else:
+                    # إذا لم يكن data URL، احتفظ بالـ URL الأصلي
+                    if data_url:
+                        saved_entry["url"] = data_url
+                        saved_entry["download_url"] = data_url
+                        saved_entry["raw_path"] = data_url
                     saved_entry.pop("data_url", None)
                     saved_entry.pop("file_key", None)
+                    print(f"    ✅ Keeping dict entry with URL: {data_url}")
 
                 persisted_entries.append(saved_entry)
             else:
+                print(f"    ✅ Keeping entry as-is (type: {type(entry)})")
                 persisted_entries.append(entry)
         except Exception as persist_error:
             print(f"⚠️ Failed to persist design file #{idx+1} for order {order_number}: {persist_error}")
+            import traceback
+            traceback.print_exc()
 
+    print(f"✅ _persist_design_files completed: {len(persisted_entries)} entries persisted")
     return persisted_entries
 
 @router.post("/")
@@ -511,13 +538,28 @@ async def create_order(
                 specs["colors"] = item_data.colors
             
             import json
-            specs_json = json.dumps(specs) if specs else None
+            
+            # Collect design_files
+            design_files_list = _safe_design_file_list(item_data.design_files)
+            print(f"📎 Order {order_number}, Item {item_index}: Found {len(design_files_list)} design_files to persist")
+            
+            # Persist design files to disk
             persisted_design_files = _persist_design_files(
                 order_number,
                 item_index,
-                _safe_design_file_list(item_data.design_files)
+                design_files_list
             )
+            print(f"📎 Order {order_number}, Item {item_index}: Persisted {len(persisted_design_files)} design_files")
+            
+            # Save design_files in both design_files column AND specifications (as backup)
             design_files_json = json.dumps(persisted_design_files or [])
+            
+            # Also add design_files to specifications as backup (if not already there)
+            if persisted_design_files and 'design_files' not in specs:
+                specs['design_files'] = persisted_design_files
+                print(f"📎 Added design_files to specifications as backup")
+            
+            specs_json = json.dumps(specs) if specs else None
             
             # Get product name if product_id is provided
             product_name = item_data.service_name or "Service Item"

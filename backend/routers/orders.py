@@ -559,28 +559,28 @@ def _persist_design_files(
                         filename = _secure_filename(saved_entry.get("filename") or f"attachment-{idx + 1}{extension}")
                         file_path = os.path.join(base_dir, filename)
                         try:
-                        with open(file_path, "wb") as file_obj:
-                            file_obj.write(file_bytes)
-                            # Verify file was written
-                            if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
-                        # تحديث جميع URLs في saved_entry
-                        file_url = f"{web_base}/{filename}"
-                        saved_entry["url"] = file_url
-                        saved_entry["download_url"] = file_url
-                        saved_entry["raw_path"] = file_url
-                        saved_entry["size_in_bytes"] = len(file_bytes)
-                        # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
-                        # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
-                        saved_entry.pop("file_key", None)
-                        
-                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
-                                print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
-                            else:
-                                print(f"    ❌ File verification failed: {file_path}")
-                                # احتفظ بالـ data URL كنسخة احتياطية
-                                saved_entry["url"] = data_url
-                                saved_entry["download_url"] = data_url
-                                saved_entry["raw_path"] = data_url
+                            with open(file_path, "wb") as file_obj:
+                                file_obj.write(file_bytes)
+                                # Verify file was written
+                                if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
+                                    # تحديث جميع URLs في saved_entry
+                                    file_url = f"{web_base}/{filename}"
+                                    saved_entry["url"] = file_url
+                                    saved_entry["download_url"] = file_url
+                                    saved_entry["raw_path"] = file_url
+                                    saved_entry["size_in_bytes"] = len(file_bytes)
+                                    # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
+                                    # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
+                                    saved_entry.pop("file_key", None)
+                                    
+                                    print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
+                                    print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
+                                else:
+                                    print(f"    ❌ File verification failed: {file_path}")
+                                    # احتفظ بالـ data URL كنسخة احتياطية
+                                    saved_entry["url"] = data_url
+                                    saved_entry["download_url"] = data_url
+                                    saved_entry["raw_path"] = data_url
                         except Exception as write_error:
                             print(f"    ❌ Failed to write file {file_path}: {write_error}")
                             import traceback
@@ -1112,10 +1112,10 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db), re
             if normalized:
                 # Only include attachments that have valid URLs
                 if normalized.get("url") or normalized.get("download_url"):
-                if normalized.get("file_key"):
-                    attachments_by_key[str(normalized["file_key"])] = normalized
-                normalized["order_item_service_name"] = getattr(item, "product_name", None)
-                attachments.append(normalized)
+                    if normalized.get("file_key"):
+                        attachments_by_key[str(normalized["file_key"])] = normalized
+                    normalized["order_item_service_name"] = getattr(item, "product_name", None)
+                    attachments.append(normalized)
 
     return {
         "success": True,

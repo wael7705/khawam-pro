@@ -2768,13 +2768,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           final_amount: safeTotalPrice,
           delivery_type: deliveryType,
           delivery_address: deliveryType === 'delivery'
-            ? (deliveryAddress?.street || shopName || null)
+            ? (deliveryAddress?.street || deliveryAddress?.formattedAddress || deliveryAddress?.description || deliveryAddress?.label || shopName || null)
             : null,
           delivery_latitude: deliveryType === 'delivery' && deliveryAddress?.latitude
             ? deliveryAddress.latitude
             : null,
           delivery_longitude: deliveryType === 'delivery' && deliveryAddress?.longitude
             ? deliveryAddress.longitude
+            : null,
+          delivery_address_details: deliveryType === 'delivery' && deliveryAddress
+            ? (deliveryAddress.description || deliveryAddress.additionalInfo || deliveryAddress.notes || deliveryAddress.floor || deliveryAddress.apartment || null)
             : null,
           notes: notes || workType || null
         }

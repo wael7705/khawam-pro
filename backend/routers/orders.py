@@ -547,9 +547,41 @@ async def create_order(
             
             import json
             
-            # Collect design_files
+            # Collect design_files - من item_data.design_files أولاً
             design_files_list = _safe_design_file_list(item_data.design_files)
-            print(f"📎 Order {order_number}, Item {item_index}: Found {len(design_files_list)} design_files to persist")
+            print(f"📎 Order {order_number}, Item {item_index}: Found {len(design_files_list)} design_files from item_data.design_files")
+            
+            # أيضاً استخرج design_files من specifications إذا كانت موجودة
+            if specs and 'design_files' in specs:
+                spec_design_files = _safe_design_file_list(specs.get('design_files'))
+                print(f"📎 Order {order_number}, Item {item_index}: Found {len(spec_design_files)} design_files from specifications")
+                # دمج الملفات من item_data.design_files و specifications
+                all_design_files = design_files_list.copy()
+                for spec_file in spec_design_files:
+                    # تجنب التكرار
+                    if spec_file not in all_design_files:
+                        all_design_files.append(spec_file)
+                        print(f"  ✅ Added design_file from specifications: {str(spec_file)[:50]}")
+                design_files_list = all_design_files
+                print(f"📎 Order {order_number}, Item {item_index}: Total {len(design_files_list)} design_files after merging")
+            
+            # أيضاً ابحث في جميع مفاتيح specifications عن ملفات
+            if specs:
+                for key, value in specs.items():
+                    if key != 'design_files' and value:
+                        # إذا كان المفتاح يحتوي على "file" أو "upload" أو "attachment"
+                        key_lower = key.lower()
+                        if any(term in key_lower for term in ['file', 'upload', 'attachment', 'image', 'document', 'pdf']):
+                            print(f"📎 Order {order_number}, Item {item_index}: Found potential file key '{key}' in specifications")
+                            file_entries = _safe_design_file_list(value)
+                            if file_entries:
+                                print(f"  ✅ Found {len(file_entries)} files in '{key}'")
+                                for file_entry in file_entries:
+                                    if file_entry not in design_files_list:
+                                        design_files_list.append(file_entry)
+                                        print(f"  ✅ Added file from '{key}': {str(file_entry)[:50]}")
+            
+            print(f"📎 Order {order_number}, Item {item_index}: Final design_files count: {len(design_files_list)}")
             
             # Persist design files to disk
             persisted_design_files = _persist_design_files(
@@ -563,9 +595,9 @@ async def create_order(
             design_files_json = json.dumps(persisted_design_files or [])
             
             # Also add design_files to specifications as backup (if not already there)
-            if persisted_design_files and 'design_files' not in specs:
+            if persisted_design_files:
                 specs['design_files'] = persisted_design_files
-                print(f"📎 Added design_files to specifications as backup")
+                print(f"📎 Added {len(persisted_design_files)} design_files to specifications")
             
             specs_json = json.dumps(specs) if specs else None
             

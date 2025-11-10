@@ -6,29 +6,20 @@ WORKDIR /frontend
 # Copy package files first
 COPY frontend/package.json ./
 
-# Install pnpm (latest stable version)
-RUN npm install -g pnpm@latest
-
-# Copy frontend source files (needed for pnpm to resolve dependencies correctly)
+# Copy frontend source files
 COPY frontend/ .
 
-# Install dependencies with pnpm
-# Use --no-frozen-lockfile to allow pnpm to create/update lockfile if it doesn't exist
-# Use --shamefully-hoist to handle peer dependency conflicts (similar to --legacy-peer-deps in npm)
-# Fallback to npm with --legacy-peer-deps if pnpm fails
-RUN if [ -f pnpm-lock.yaml ]; then \
-        echo "📦 Lockfile found, using frozen lockfile with shamefully-hoist"; \
-        pnpm install --frozen-lockfile --shamefully-hoist || \
-        pnpm install --no-frozen-lockfile --shamefully-hoist; \
-    else \
-        echo "📦 No lockfile found, installing dependencies with shamefully-hoist"; \
-        pnpm install --no-frozen-lockfile --shamefully-hoist || \
-        (echo "⚠️ pnpm failed, trying npm with --legacy-peer-deps" && \
-         npm install --legacy-peer-deps); \
-    fi
+# Install dependencies using npm with --legacy-peer-deps
+# This handles React 19 peer dependency conflicts reliably
+# --legacy-peer-deps tells npm to ignore peer dependency conflicts
+RUN echo "📦 Installing dependencies with npm --legacy-peer-deps..." && \
+    npm install --legacy-peer-deps && \
+    echo "✅ Dependencies installed successfully"
 
 # Build frontend
-RUN pnpm build || npm run build
+RUN echo "🔨 Building frontend..." && \
+    npm run build && \
+    echo "✅ Frontend build completed"
 
 # Verify build output exists
 RUN if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then \

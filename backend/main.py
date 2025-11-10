@@ -10,22 +10,31 @@ import os
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler - بديل لـ @app.on_event("startup")"""
-    # Startup
-    try:
-        import asyncio
-        # تشغيل المهام بشكل متوازي
-        loop = asyncio.get_event_loop()
-        loop.create_task(_init_pricing_table())
-        loop.create_task(_setup_lecture_printing_service())
-        loop.create_task(_setup_clothing_printing_service())
-        loop.create_task(_ensure_default_services())
-    except Exception as e:
-        print(f"Warning: Failed to initialize: {str(e)[:100]}")
+    # Startup - تشغيل المهام في الخلفية بدون انتظار أو منع بدء التطبيق
+    print("🚀 Application starting...")
     
+    import asyncio
+    
+    # بدء المهام في الخلفية - لا ننتظرها ولا نمنع بدء التطبيق
+    try:
+        # استخدام create_task مباشرة - ستعمل في الخلفية
+        asyncio.create_task(_init_pricing_table())
+        asyncio.create_task(_setup_lecture_printing_service())
+        asyncio.create_task(_setup_clothing_printing_service())
+        asyncio.create_task(_ensure_default_services())
+        print("✅ Startup tasks initiated in background")
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to create startup tasks: {str(e)[:200]}")
+        import traceback
+        traceback.print_exc()
+        # نستمر في البدء حتى لو فشلت المهام - التطبيق يجب أن يبدأ
+    
+    # yield مباشرة - لا ننتظر اكتمال المهام
+    print("✅ Application ready to serve requests")
     yield
     
-    # Shutdown (if needed)
-    pass
+    # Shutdown
+    print("🛑 Application shutting down")
 
 app = FastAPI(
     title="Khawam API",
@@ -36,8 +45,8 @@ app = FastAPI(
 
 async def _init_pricing_table():
     """Create pricing_rules table"""
-    import time
-    time.sleep(2)  # Wait a bit for database to be ready
+    import asyncio
+    await asyncio.sleep(2)  # Wait a bit for database to be ready
     
     conn = None
     try:
@@ -223,10 +232,8 @@ async def _init_pricing_table():
 
 async def _setup_lecture_printing_service():
     """إعداد خدمة طباعة المحاضرات تلقائياً عند بدء التطبيق"""
-    import time
     import json
     import asyncio
-    import json
     await asyncio.sleep(5)  # انتظار أكثر حتى تكون قاعدة البيانات جاهزة
     
     conn = None
@@ -557,7 +564,6 @@ async def _setup_clothing_printing_service():
 
 async def _ensure_default_services():
     """التأكد من وجود الخدمات الأساسية في قاعدة البيانات"""
-    import time
     import asyncio
     await asyncio.sleep(8)  # انتظار حتى تكون قاعدة البيانات جاهزة
     

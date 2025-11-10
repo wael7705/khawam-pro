@@ -72,6 +72,8 @@ def ensure_order_columns(db: Session):
         column_statements.append("ADD COLUMN delivery_latitude DECIMAL(10, 8)")
     if 'delivery_longitude' not in current:
         column_statements.append("ADD COLUMN delivery_longitude DECIMAL(11, 8)")
+    if 'delivery_address_details' not in current:
+        column_statements.append("ADD COLUMN delivery_address_details TEXT")
     if 'notes' not in current:
         column_statements.append("ADD COLUMN notes TEXT")
     if 'staff_notes' not in current:

@@ -1326,28 +1326,34 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             WHERE order_id = :order_id
         """), {"order_id": order_id}).fetchall()
         
-        # Extract order data from raw SQL result
+        # Extract order data from raw SQL result - استخدام الفهرس مباشرة مع معرفة الترتيب
+        # الترتيب: id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+        #          shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+        #          delivery_address, notes, created_at, staff_notes, delivery_latitude, delivery_longitude,
+        #          delivery_address_details, rating, rating_comment
+        result_len = len(order_result)
         order = {
-            'id': order_result[0],
-            'order_number': order_result[1],
-            'customer_id': order_result[2],
-            'customer_name': order_result[3] or "",
-            'customer_phone': order_result[4] or "",
-            'customer_whatsapp': order_result[5] or order_result[4] or "",
-            'shop_name': order_result[6] or "",
-            'status': order_result[7] or 'pending',
-            'total_amount': order_result[8] or 0,
-            'final_amount': order_result[9] or 0,
-            'payment_status': order_result[10] or 'pending',
-            'delivery_type': order_result[11] or 'self',
-            'delivery_address': order_result[12],
-            'notes': order_result[13],
-            'staff_notes': order_result[14],
-            'delivery_latitude': float(order_result[15]) if order_result[15] is not None else None,
-            'delivery_longitude': float(order_result[16]) if order_result[16] is not None else None,
-            'rating': int(order_result[17]) if order_result[17] is not None else None,
-            'rating_comment': order_result[18],
-            'created_at': order_result[19]
+            'id': order_result[0] if result_len > 0 else None,
+            'order_number': order_result[1] if result_len > 1 else None,
+            'customer_id': order_result[2] if result_len > 2 else None,
+            'customer_name': order_result[3] or "" if result_len > 3 else "",
+            'customer_phone': order_result[4] or "" if result_len > 4 else "",
+            'customer_whatsapp': order_result[5] or (order_result[4] if result_len > 4 else "") or "" if result_len > 5 else "",
+            'shop_name': order_result[6] or "" if result_len > 6 else "",
+            'status': order_result[7] or 'pending' if result_len > 7 else 'pending',
+            'total_amount': order_result[8] or 0 if result_len > 8 else 0,
+            'final_amount': order_result[9] or 0 if result_len > 9 else 0,
+            'payment_status': order_result[10] or 'pending' if result_len > 10 else 'pending',
+            'delivery_type': order_result[11] or 'self' if result_len > 11 else 'self',
+            'delivery_address': order_result[12] if result_len > 12 else None,
+            'notes': order_result[13] if result_len > 13 else None,
+            'created_at': order_result[14] if result_len > 14 else None,
+            'staff_notes': order_result[15] if result_len > 15 else None,
+            'delivery_latitude': float(order_result[16]) if result_len > 16 and order_result[16] is not None else None,
+            'delivery_longitude': float(order_result[17]) if result_len > 17 and order_result[17] is not None else None,
+            'delivery_address_details': order_result[18] if result_len > 18 else None,
+            'rating': int(order_result[19]) if result_len > 19 and order_result[19] is not None else None,
+            'rating_comment': order_result[20] if result_len > 20 else None,
         }
         
         # Helper function to safely parse JSONB/JSON from raw SQL
@@ -1481,6 +1487,7 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "delivery_address": order['delivery_address'],
                 "delivery_latitude": order['delivery_latitude'],
                 "delivery_longitude": order['delivery_longitude'],
+                "delivery_address_details": order.get('delivery_address_details'),
                 "rating": order['rating'],
                 "rating_comment": order['rating_comment'],
                 "notes": order['notes'],

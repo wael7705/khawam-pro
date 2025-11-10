@@ -225,7 +225,14 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
 
     const connect = () => {
       try {
-        const wsUrl = buildWebSocketUrl(`/ws/orders?token=${encodeURIComponent(token)}`)
+        // التأكد من وجود token قبل محاولة الاتصال
+        const currentToken = getToken()
+        if (!currentToken) {
+          console.warn('WebSocket connection skipped: No token available')
+          return
+        }
+        
+        const wsUrl = buildWebSocketUrl(`/ws/orders?token=${encodeURIComponent(currentToken)}`)
         const socket = new WebSocket(wsUrl)
         wsRef.current = socket
 

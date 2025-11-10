@@ -601,10 +601,9 @@ async def get_orders(
     If user is a customer, only returns their orders.
     If user is admin or employee, returns all orders."""
     try:
-        ensure_order_columns(db)
-        ensure_order_items_columns(db)
-        
         # تحديد نوع المستخدم - إذا كان "عميل" نفلتر الطلبات
+        # ملاحظة: ensure_order_columns و ensure_order_items_columns يتم استدعاؤهما فقط عند الحاجة
+        # (مثلاً في create_order) لتجنب إبطاء get_orders
         user_role = None
         customer_phone_variants = []
         
@@ -619,9 +618,8 @@ async def get_orders(
             if user_type_row:
                 user_role = user_type_row[0]
             
-            # إذا كان المستخدم "عميل"، نفلتر الطلبات حسب رقم الهاتف
-            if user_role == "عميل" and current_user.phone:
-                # تطبيع رقم الهاتف وإضافة جميع الأشكال الممكنة
+            # بناء قائمة بأشكال رقم الهاتف الممكنة للبحث
+            if current_user.phone:
                 from routers.auth import normalize_phone
                 normalized_phone = normalize_phone(current_user.phone)
                 customer_phone_variants = [
@@ -641,26 +639,33 @@ async def get_orders(
                     customer_phone_variants.append('+' + current_user.phone)
         
         # جلب الطلبات مع الفلترة
-        if user_role == "عميل":
-            # للعملاء: يجب تسجيل الدخول وفلترة الطلبات
-            if not current_user or not customer_phone_variants:
-                raise HTTPException(
-                    status_code=401,
-                    detail="يجب تسجيل الدخول لعرض طلباتك"
-                )
-            # فلترة الطلبات حسب رقم الهاتف للعميل
-            orders = db.query(Order).filter(
-                Order.customer_phone.in_(customer_phone_variants)
-            ).order_by(Order.created_at.desc()).limit(100).all()
-        elif user_role in ("مدير", "موظف"):
-            # للمديرين والموظفين: جلب جميع الطلبات
-            orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
-        else:
+        if not current_user:
             # إذا لم يكن هناك مستخدم مسجل دخول، نرجع خطأ
             raise HTTPException(
                 status_code=401,
                 detail="يجب تسجيل الدخول لعرض الطلبات"
             )
+        
+        # تحديد نوع المستخدم والفلترة المناسبة
+        if user_role == "عميل":
+            # للعملاء: فلترة الطلبات حسب رقم الهاتف
+            if not customer_phone_variants:
+                orders = []
+            else:
+                orders = db.query(Order).filter(
+                    Order.customer_phone.in_(customer_phone_variants)
+                ).order_by(Order.created_at.desc()).limit(100).all()
+        elif user_role in ("مدير", "موظف"):
+            # للمديرين والموظفين: جلب جميع الطلبات
+            orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+        else:
+            # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
+            if customer_phone_variants:
+                orders = db.query(Order).filter(
+                    Order.customer_phone.in_(customer_phone_variants)
+                ).order_by(Order.created_at.desc()).limit(100).all()
+            else:
+                orders = []
         
         order_ids = [order.id for order in orders]
 
@@ -681,33 +686,44 @@ async def get_orders(
         orders_payload = []
         for order in orders:
             order_items_payload = []
-        for idx, item in enumerate(items_map.get(order.id, [])):
-            specs = item.specifications
-            if isinstance(specs, str):
-                try:
-                    specs = json.loads(specs)
-                except Exception:
-                    specs = {"raw": specs}
+            for idx, item in enumerate(items_map.get(order.id, [])):
+                specs = item.specifications
+                if isinstance(specs, str):
+                    try:
+                        specs = json.loads(specs)
+                    except Exception:
+                        specs = {"raw": specs}
 
-            design_files = _persist_design_files(
-                order.order_number,
-                idx,
-                _safe_design_file_list(item.design_files)
-            )
+                # تحسين الأداء: استخدام design_files كما هي بدون حفظها مرة أخرى
+                # هذا يسرع عملية جلب الطلبات بشكل كبير
+                design_files_raw = item.design_files
+                if design_files_raw is None:
+                    design_files = []
+                elif isinstance(design_files_raw, str):
+                    try:
+                        design_files = json.loads(design_files_raw)
+                        if not isinstance(design_files, list):
+                            design_files = [design_files] if design_files else []
+                    except Exception:
+                        design_files = []
+                elif isinstance(design_files_raw, list):
+                    design_files = design_files_raw
+                else:
+                    design_files = []
 
-            order_items_payload.append({
-                "id": item.id,
-                "service_name": getattr(item, "product_name", None),
-                "quantity": item.quantity,
-                "unit_price": serialize_decimal(item.unit_price),
-                "total_price": serialize_decimal(item.total_price),
-                "specifications": specs,
-                "design_files": design_files,
-                "status": item.status,
-                "created_at": item.created_at.isoformat() if item.created_at else None
-            })
+                order_items_payload.append({
+                    "id": item.id,
+                    "service_name": getattr(item, "product_name", None),
+                    "quantity": item.quantity,
+                    "unit_price": serialize_decimal(item.unit_price),
+                    "total_price": serialize_decimal(item.total_price),
+                    "specifications": specs,
+                    "design_files": design_files,
+                    "status": item.status,
+                    "created_at": item.created_at.isoformat() if item.created_at else None
+                })
 
-        orders_payload.append({
+            orders_payload.append({
                 "id": order.id,
                 "order_number": order.order_number,
                 "status": order.status,

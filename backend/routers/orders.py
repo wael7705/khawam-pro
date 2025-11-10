@@ -375,9 +375,21 @@ def _persist_design_files(
                 continue
 
             if isinstance(entry, dict):
-                data_url = entry.get("data_url") or entry.get("url") or entry.get("raw_path") or entry.get("file")
+                # البحث عن data URL في جميع المفاتيح المحتملة
+                data_url = (
+                    entry.get("data_url") or 
+                    entry.get("url") or 
+                    entry.get("download_url") or 
+                    entry.get("raw_path") or 
+                    entry.get("file") or
+                    entry.get("path") or
+                    entry.get("href") or
+                    entry.get("location_url") or
+                    entry.get("src") or
+                    entry.get("data")
+                )
                 saved_entry = dict(entry)
-                print(f"    Found dict entry with data_url: {data_url[:50] if data_url else 'None'}...")
+                print(f"    Found dict entry - keys: {list(entry.keys())}, data_url preview: {str(data_url)[:80] if data_url else 'None'}...")
 
                 if data_url and str(data_url).startswith("data:"):
                     print(f"    Found data URL in dict, decoding...")
@@ -388,30 +400,59 @@ def _persist_design_files(
                         file_path = os.path.join(base_dir, filename)
                         with open(file_path, "wb") as file_obj:
                             file_obj.write(file_bytes)
-                        saved_entry["url"] = f"{web_base}/{filename}"
-                        saved_entry["download_url"] = f"{web_base}/{filename}"
-                        saved_entry["raw_path"] = f"{web_base}/{filename}"
+                        
+                        # تحديث جميع URLs في saved_entry
+                        file_url = f"{web_base}/{filename}"
+                        saved_entry["url"] = file_url
+                        saved_entry["download_url"] = file_url
+                        saved_entry["raw_path"] = file_url
                         saved_entry["size_in_bytes"] = len(file_bytes)
-                        saved_entry.pop("data_url", None)
+                        # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
+                        # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
                         saved_entry.pop("file_key", None)
-                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes)")
+                        
+                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
                     else:
                         print(f"    ⚠️ Failed to decode data URL from dict")
-                elif data_url and isinstance(data_url, str) and data_url.startswith("/uploads/"):
-                    saved_entry["url"] = data_url
-                    saved_entry["download_url"] = data_url
-                    saved_entry["raw_path"] = data_url
-                    print(f"    ✅ Using existing upload path: {data_url}")
-                else:
-                    # إذا لم يكن data URL، احتفظ بالـ URL الأصلي
-                    if data_url:
+                        # إذا فشل decoding، احتفظ بالـ data URL الأصلي
+                        if data_url:
+                            saved_entry["url"] = data_url
+                            saved_entry["download_url"] = data_url
+                            saved_entry["raw_path"] = data_url
+                elif data_url and isinstance(data_url, str):
+                    # إذا كان URL موجود لكن ليس data URL
+                    if data_url.startswith("/uploads/"):
+                        # رابط موجود بالفعل في uploads
                         saved_entry["url"] = data_url
                         saved_entry["download_url"] = data_url
                         saved_entry["raw_path"] = data_url
-                    saved_entry.pop("data_url", None)
-                    saved_entry.pop("file_key", None)
-                    print(f"    ✅ Keeping dict entry with URL: {data_url}")
+                        print(f"    ✅ Using existing upload path: {data_url}")
+                    elif data_url.startswith("http://") or data_url.startswith("https://"):
+                        # رابط HTTP/HTTPS خارجي
+                        saved_entry["url"] = data_url
+                        saved_entry["download_url"] = data_url
+                        saved_entry["raw_path"] = data_url
+                        print(f"    ✅ Using external URL: {data_url[:80]}...")
+                    else:
+                        # رابط آخر - احتفظ به كما هو
+                        saved_entry["url"] = data_url
+                        saved_entry["download_url"] = data_url
+                        saved_entry["raw_path"] = data_url
+                        print(f"    ✅ Keeping dict entry with URL: {data_url[:80]}...")
+                else:
+                    # إذا لم يكن هناك URL، لكن لدينا filename، جرب إنشاء URL
+                    filename = saved_entry.get("filename") or saved_entry.get("name") or saved_entry.get("original_name")
+                    if filename:
+                        file_url = f"{web_base}/{_secure_filename(filename)}"
+                        saved_entry["url"] = file_url
+                        saved_entry["download_url"] = file_url
+                        saved_entry["raw_path"] = file_url
+                        print(f"    ✅ Created URL from filename: {file_url}")
+                    else:
+                        print(f"    ⚠️ No URL or filename found in dict entry: {list(entry.keys())}")
 
+                # تنظيف المفاتيح غير الضرورية
+                saved_entry.pop("file_key", None)
                 persisted_entries.append(saved_entry)
             else:
                 print(f"    ✅ Keeping entry as-is (type: {type(entry)})")

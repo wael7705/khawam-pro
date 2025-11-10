@@ -8,25 +8,26 @@ const api = axios.create({
   timeout: 0, // لا timeout - لإلغاء timeout بسبب رداءة الإنترنت
 })
 
-// Add request interceptor to include auth token - مع دعم Token مخصص
-api.interceptors.request.use((config) => {
-  // تنظيف token غير صالح (لكن نحتفظ بـ tokens القصيرة لأنها قد تكون tokens مخصصة)
-  const token = localStorage.getItem('auth_token')
-  if (token === 'null' || token === 'undefined') {
-    console.warn('⚠️ Invalid token found in interceptor, removing it')
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user_data')
+  // Add request interceptor to include auth token - مع دعم Token مخصص
+  api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('auth_token')
+    
+    // تنظيف token غير صالح (فقط إذا كانت القيمة حرفياً 'null' أو 'undefined' كسلسلة)
+    if (token === 'null' || token === 'undefined') {
+      console.warn('⚠️ Invalid token string found in interceptor, removing it:', token)
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('user_data')
+      return config
+    }
+    
+    // إضافة token إذا كان موجوداً (حتى لو كان قصيراً - قد يكون token مخصص مثل admin_token_1)
+    if (token && token.trim() !== '') {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
-  }
-  
-  // إضافة token إذا كان موجوداً (حتى لو كان قصيراً - قد يكون token مخصص)
-  if (token && token.trim() !== '') {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-}, (error) => {
-  return Promise.reject(error)
-})
+  }, (error) => {
+    return Promise.reject(error)
+  })
 
 // Add response interceptor for error handling and retry logic
 api.interceptors.response.use(

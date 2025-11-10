@@ -55,14 +55,17 @@ export const isAuthenticated = (): boolean => {
   return !!token
 }
 
-// Cleanup invalid tokens on module load
+// Cleanup invalid tokens on module load - فقط نزيل tokens غير صالحة (null/undefined كسلسلة)
+// لا نحذف tokens القصيرة لأنها قد تكون tokens مخصصة (مثل admin_token_1)
 if (typeof window !== 'undefined') {
   const token = localStorage.getItem('auth_token')
-  if (token === 'null' || token === 'undefined' || (token && token.length < 20)) {
-    console.warn('🧹 Cleaning up invalid token on module load')
+  // فقط نحذف إذا كانت القيمة حرفياً 'null' أو 'undefined' كسلسلة نصية
+  if (token === 'null' || token === 'undefined') {
+    console.warn('🧹 Cleaning up invalid token string on module load:', token)
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user_data')
   }
+  // لا نحذف tokens القصيرة - قد تكون tokens مخصصة صالحة
 }
 
 // Get stored token - مع دعم Token مخصص (لا نحذف tokens القصيرة لأنها قد تكون tokens مخصصة)
@@ -83,14 +86,15 @@ export const getToken = (): string | null => {
   }
   
   // لا نحذف tokens القصيرة لأنها قد تكون tokens مخصصة (مثل "admin_token_1")
-  // فقط نتحقق من أنها ليست فارغة
-  if (token.length < 5) {
-    console.warn('⚠️ Token seems too short, removing it:', token)
+  // فقط نتحقق من أنها ليست فارغة تماماً
+  if (token.trim().length === 0) {
+    console.warn('⚠️ Token is empty, removing it')
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user_data')
     return null
   }
   
+  // إذا كان Token موجوداً وليس 'null' أو 'undefined'، نرجعه (حتى لو كان قصيراً)
   return token
 }
 

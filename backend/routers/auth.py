@@ -22,7 +22,7 @@ router = APIRouter()
 # Security configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-use-env-variable")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days - للمستخدمين المصرح لهم يبقون مسجلين دخول حتى يقوموا بتسجيل الخروج يدوياً
 
 # نظام Token مخصص للمستخدمين المصرح لهم (3 مستخدمين: مديرين وموظف)
 # قائمة بأرقام الهواتف أو البريد الإلكتروني للمستخدمين المصرح لهم

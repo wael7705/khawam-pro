@@ -26,8 +26,10 @@ export default function Dashboard() {
   const { notifications, dismissNotification } = useOrderNotifications()
 
   useEffect(() => {
-    // Check authentication
-    if (!isAuthenticated()) {
+    // Check authentication - لا نحذف Token تلقائياً، نترك المستخدم مسجل دخول
+    const token = isAuthenticated()
+    if (!token) {
+      // فقط إذا لم يكن هناك Token، نرسل إلى صفحة تسجيل الدخول
       navigate('/login?redirect=' + encodeURIComponent(location.pathname))
       return
     }
@@ -39,11 +41,16 @@ export default function Dashboard() {
 
       // Only admins and employees may stay in dashboard
       if (role !== 'مدير' && role !== 'موظف') {
+        // إذا كان المستخدم ليس مديراً أو موظفاً، أرسله إلى الصفحة الرئيسية
+        // لكن لا نحذف Token - قد يكون مسجل دخول كعميل
         navigate('/')
       }
     } else {
-      // If no user data, force logout to home
-      navigate('/')
+      // إذا لم تكن هناك بيانات مستخدم، لا نحذف Token تلقائياً
+      // قد يكون Token صالحاً لكن البيانات غير موجودة - حاول الحصول عليها من API
+      // لكن الآن فقط أرسل إلى الصفحة الرئيسية
+      console.warn('⚠️ No user data found, but token exists. User may need to login again.')
+      // لا نحذف Token - قد يكون المستخدم مسجل دخول
     }
   }, [navigate, location])
 

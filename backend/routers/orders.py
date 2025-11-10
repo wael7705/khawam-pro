@@ -482,6 +482,11 @@ async def create_order(
             if order_data.delivery_longitude is not None:
                 order_dict['delivery_longitude'] = order_data.delivery_longitude
         
+        # Add delivery_address_details if column exists and value provided
+        if 'delivery_address_details' in existing_columns and order_data.delivery_type == "delivery":
+            if order_data.delivery_address_details is not None:
+                order_dict['delivery_address_details'] = order_data.delivery_address_details
+        
         # Create order using raw SQL to avoid SQLAlchemy trying to insert into non-existent columns
         # Build INSERT statement with only existing columns
         columns_list = []

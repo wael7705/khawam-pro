@@ -334,7 +334,18 @@ def normalize_attachment_entry(
                     pass
             if file_exists and not mime_type:
                 mime_type, _ = mimetypes.guess_type(local_path)
+            
+            # Always build URL (even if file doesn't exist, it might be served by StaticFiles)
             file_url = build_file_url(raw_path, request)
+            
+            # If file doesn't exist locally, check if we have a data_url fallback
+            if not file_exists and isinstance(entry, dict):
+                data_url = entry.get("data_url")
+                if data_url and data_url.startswith("data:"):
+                    # We have a data URL fallback - mark it as available
+                    # But still prefer the file path URL if it can be served
+                    print(f"⚠️ File {local_path} not found, but data URL fallback available")
+                    # Keep file_exists = False to indicate we should use data URL if file request fails
         else:
             # Relative path, assume it might exist
             file_exists = False
@@ -352,6 +363,15 @@ def normalize_attachment_entry(
     # Generate file key for identification
     file_key = f"{order_id}-{order_item_id or 'item'}-{index}"
 
+    # Get data_url from entry if available (for fallback)
+    data_url = None
+    if isinstance(entry, dict):
+        data_url = entry.get("data_url")
+        if data_url and not data_url.startswith("data:"):
+            data_url = None
+    elif isinstance(entry, str) and entry.startswith("data:"):
+        data_url = entry
+
     return {
         "id": file_key,
         "file_key": file_key,
@@ -365,6 +385,7 @@ def normalize_attachment_entry(
         "size_label": size_label,
         "size_in_bytes": size_in_bytes,
         "file_exists": file_exists,  # Add flag to indicate if file exists locally
+        "data_url": data_url,  # Keep data URL as fallback if file doesn't exist
     }
 # Background task for notifications
 async def send_order_notification(payload: Dict[str, Any]):
@@ -518,7 +539,8 @@ def _persist_design_files(
                                 "url": f"{web_base}/{filename}",
                                 "download_url": f"{web_base}/{filename}",
                                 "raw_path": f"{web_base}/{filename}",
-                                "size_in_bytes": len(file_bytes)
+                                "size_in_bytes": len(file_bytes),
+                                "data_url": entry  # Keep original data URL as fallback
                             }
                             persisted_entries.append(persisted_entry)
                             print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes) -> {file_path}")
@@ -1082,47 +1104,69 @@ async def get_orders(
 @router.get("/{order_id}/attachments")
 async def get_order_attachments(order_id: int, db: Session = Depends(get_db), request: Request = None):
     """Get all attachments for an order, verifying file existence"""
-    ensure_order_columns(db)
-    ensure_order_items_columns(db)
+    try:
+        ensure_order_columns(db)
+        ensure_order_items_columns(db)
 
-    order = db.query(Order).filter(Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
 
-    items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
-    attachments: List[Dict[str, Any]] = []
-    attachments_by_key: Dict[str, Dict[str, Any]] = {}
+        items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+        attachments: List[Dict[str, Any]] = []
+        attachments_by_key: Dict[str, Dict[str, Any]] = {}
 
-    for item in items:
-        design_files = item.design_files
-        if not design_files:
-            continue
-
-        if isinstance(design_files, str):
+        for item in items:
             try:
-                design_files = json.loads(design_files)
-            except Exception:
-                design_files = [design_files]
+                design_files = item.design_files
+                if not design_files:
+                    continue
 
-        if not isinstance(design_files, list):
-            design_files = [design_files]
+                if isinstance(design_files, str):
+                    try:
+                        design_files = json.loads(design_files)
+                    except Exception:
+                        design_files = [design_files]
 
-        for idx, design_entry in enumerate(design_files):
-            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx, request)
-            if normalized:
-                # Only include attachments that have valid URLs
-                if normalized.get("url") or normalized.get("download_url"):
-                    if normalized.get("file_key"):
-                        attachments_by_key[str(normalized["file_key"])] = normalized
-                    normalized["order_item_service_name"] = getattr(item, "product_name", None)
-                    attachments.append(normalized)
+                if not isinstance(design_files, list):
+                    design_files = [design_files]
 
-    return {
-        "success": True,
-        "attachments": attachments,
-        "count": len(attachments),
-        "attachments_map": attachments_by_key,
-    }
+                for idx, design_entry in enumerate(design_files):
+                    try:
+                        normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx, request)
+                        if normalized:
+                            # Only include attachments that have valid URLs
+                            if normalized.get("url") or normalized.get("download_url"):
+                                if normalized.get("file_key"):
+                                    attachments_by_key[str(normalized["file_key"])] = normalized
+                                normalized["order_item_service_name"] = getattr(item, "product_name", None)
+                                attachments.append(normalized)
+                    except Exception as e:
+                        print(f"⚠️ Error normalizing attachment entry {idx} for item {item.id}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Continue processing other attachments
+                        continue
+            except Exception as e:
+                print(f"⚠️ Error processing design_files for item {item.id}: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue processing other items
+                continue
+
+        return {
+            "success": True,
+            "attachments": attachments,
+            "count": len(attachments),
+            "attachments_map": attachments_by_key,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in get_order_attachments for order {order_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب المرفقات: {str(e)}")
 
 
 @router.get("/{order_id}/attachments/{file_key}")
@@ -1167,15 +1211,23 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
     file_url = normalized_entry.get("url") or normalized_entry.get("download_url")
     raw_path = normalized_entry.get("raw_path")
     filename = normalized_entry.get("filename", "attachment")
+    data_url = normalized_entry.get("data_url")  # Get data_url from normalized entry
     
-    if not file_url:
+    if not file_url and not data_url:
         raise HTTPException(status_code=400, detail="لا يوجد رابط صالح للملف")
 
-    # Handle data URLs
-    if file_url.startswith("data:") or (raw_path and raw_path.startswith("data:")):
+    # Handle data URLs (either from file_url or data_url field)
+    data_url_to_use = None
+    if file_url and file_url.startswith("data:"):
+        data_url_to_use = file_url
+    elif raw_path and raw_path.startswith("data:"):
+        data_url_to_use = raw_path
+    elif data_url and data_url.startswith("data:"):
+        data_url_to_use = data_url
+    
+    if data_url_to_use:
         try:
-            data_url = file_url if file_url.startswith("data:") else raw_path
-            header, encoded = data_url.split(",", 1)
+            header, encoded = data_url_to_use.split(",", 1)
             mime_type = "application/octet-stream"
             if ";" in header:
                 mime_type = header.split(";")[0].replace("data:", "") or mime_type
@@ -1184,7 +1236,9 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
             response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
             return response
         except Exception as e:
-            print(f"Error decoding data URL: {e}")
+            print(f"❌ Error decoding data URL: {e}")
+            import traceback
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail="تعذر تحويل الملف من base64")
 
     # Handle local files - serve them directly if they exist
@@ -1205,15 +1259,52 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
                 filename=filename,
                 headers={"Content-Disposition": f'attachment; filename="{filename}"'}
             )
+        else:
+            # File doesn't exist locally - try to use data_url as fallback
+            if data_url and data_url.startswith("data:"):
+                print(f"⚠️ File {local_path} not found, using data URL fallback")
+                try:
+                    header, encoded = data_url.split(",", 1)
+                    mime_type = "application/octet-stream"
+                    if ";" in header:
+                        mime_type = header.split(";")[0].replace("data:", "") or mime_type
+                    file_bytes = base64.b64decode(encoded)
+                    response = StreamingResponse(BytesIO(file_bytes), media_type=mime_type)
+                    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+                    return response
+                except Exception as e:
+                    print(f"❌ Error decoding data URL fallback: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # Continue to try redirect
 
     # For external URLs or files that don't exist locally, redirect
-    if file_url.startswith("http://") or file_url.startswith("https://"):
+    if file_url and (file_url.startswith("http://") or file_url.startswith("https://")):
         return RedirectResponse(file_url, status_code=302)
     
     # For relative paths, try to serve them if they exist
     if raw_path and raw_path.startswith("/uploads/"):
         # File doesn't exist, but we have a path - redirect to the URL
-        return RedirectResponse(file_url, status_code=302)
+        # This will work if StaticFiles is serving the directory
+        if file_url:
+            return RedirectResponse(file_url, status_code=302)
+    
+    # Last resort: if we have data_url, use it
+    if data_url and data_url.startswith("data:"):
+        print(f"⚠️ Using data URL as last resort")
+        try:
+            header, encoded = data_url.split(",", 1)
+            mime_type = "application/octet-stream"
+            if ";" in header:
+                mime_type = header.split(";")[0].replace("data:", "") or mime_type
+            file_bytes = base64.b64decode(encoded)
+            response = StreamingResponse(BytesIO(file_bytes), media_type=mime_type)
+            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            print(f"❌ Error decoding data URL as last resort: {e}")
+            import traceback
+            traceback.print_exc()
     
     raise HTTPException(status_code=404, detail="الملف غير موجود")
 

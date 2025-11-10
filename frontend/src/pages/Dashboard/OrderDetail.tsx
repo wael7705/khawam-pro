@@ -759,7 +759,7 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttach
           }
         })
         console.log(`  ✅ Added ${validEntries.length} entries from ${key} (${value.length - validEntries.length} duplicates skipped)`)
-      } else {
+    } else {
         console.log(`  ⏭️ Skipped all entries from ${key} (all duplicates or empty)`)
       }
     } else if (typeof value === 'string') {
@@ -816,7 +816,7 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttach
           // إذا فشل التحليل، تحقق إذا كانت data URL أو رابط
           if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
             if (!existingUrls.has(value)) {
-              entries.push(value)
+      entries.push(value)
               existingUrls.add(value)
               console.log(`  ✅ Added string URL from ${key}`)
             } else {
@@ -902,7 +902,7 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttach
                 if (item.startsWith('data:') || item.startsWith('http') || item.startsWith('/uploads/')) {
                   // التحقق من التكرار
                   if (!existingUrls.has(item)) {
-                    entries.push(item)
+            entries.push(item)
                     existingUrls.add(item)
                     console.log(`    ✅ Added item[${idx}] from "${key}" (string URL)`)
                   } else {
@@ -982,9 +982,9 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttach
         if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
           // التحقق من التكرار
           if (!existingUrls.has(value)) {
-            entries.push(value)
+          entries.push(value)
             existingUrls.add(value)
-            console.log(`    ✅ Added string file from "${key}":`, value.substring(0, 50))
+          console.log(`    ✅ Added string file from "${key}":`, value.substring(0, 50))
           } else {
             console.log(`    ⏭️ Skipped duplicate string file from "${key}"`)
           }
@@ -1048,7 +1048,7 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttach
           const objUrl = value.url || value.file_url || value.download_url || value.raw_path || value.data_url
           const objFilename = value.filename || value.name
           if ((!objUrl || !existingUrls.has(objUrl)) && (!objFilename || !existingFilenames.has(objFilename))) {
-            entries.push(value)
+        entries.push(value)
             if (objUrl) existingUrls.add(objUrl)
             if (objFilename) existingFilenames.add(objFilename)
             console.log(`    ✅ Added object from "${key}" (has file properties)`)
@@ -1200,8 +1200,8 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
         (existing.filename === normalized.filename && existing.url && normalized.url)
       )
       if (!isDuplicate) {
-        console.log(`  ✅ Normalized spec attachment:`, normalized)
-        entries.push(normalized)
+      console.log(`  ✅ Normalized spec attachment:`, normalized)
+      entries.push(normalized)
       } else {
         console.log(`  ⏭️ Skipped duplicate spec attachment (already in design_files):`, normalized.filename)
       }
@@ -1272,7 +1272,6 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true)
   const [staffNotes, setStaffNotes] = useState('')
   const [isSavingNotes, setIsSavingNotes] = useState(false)
-  const [showLocationMap, setShowLocationMap] = useState(false)
   const [orderAttachments, setOrderAttachments] = useState<NormalizedAttachment[]>([])
   const [attachmentsLoading, setAttachmentsLoading] = useState(false)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
@@ -1444,6 +1443,65 @@ export default function OrderDetail() {
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '')
     window.open(`https://wa.me/${cleanPhone}`, '_blank')
+  }
+
+  // دالة لبناء العنوان الكامل
+  const buildFullAddress = (orderData: Order): string => {
+    const parts: string[] = []
+    
+    if (orderData.delivery_address_data) {
+      if (orderData.delivery_address_data.street) parts.push(orderData.delivery_address_data.street)
+      if (orderData.delivery_address_data.neighborhood) parts.push(orderData.delivery_address_data.neighborhood)
+      if (orderData.delivery_address_data.building) parts.push(`بناء ${orderData.delivery_address_data.building}`)
+      if (orderData.delivery_address_data.floor) parts.push(`طابق ${orderData.delivery_address_data.floor}`)
+      if (orderData.delivery_address_data.apartment) parts.push(`شقة ${orderData.delivery_address_data.apartment}`)
+      if (orderData.delivery_address_data.description) parts.push(orderData.delivery_address_data.description)
+      if (orderData.delivery_address_data.formattedAddress && parts.length === 0) {
+        parts.push(orderData.delivery_address_data.formattedAddress)
+      }
+    }
+    
+    if (parts.length === 0 && orderData.delivery_address) {
+      parts.push(orderData.delivery_address)
+    }
+    
+    if (parts.length === 0 && orderData.delivery_address_details) {
+      parts.push(orderData.delivery_address_details)
+    }
+    
+    if (orderData.delivery_latitude && orderData.delivery_longitude) {
+      parts.push(`(${orderData.delivery_latitude.toFixed(6)}, ${orderData.delivery_longitude.toFixed(6)})`)
+    }
+    
+    return parts.join('، ') || 'لا يوجد عنوان'
+  }
+
+  // دالة لبناء نص المشاركة
+  const buildShareText = (orderData: Order, fullAddress: string): string => {
+    const parts: string[] = []
+    parts.push(`📍 موقع التوصيل - الطلب ${orderData.order_number}`)
+    parts.push('')
+    parts.push('العنوان الكامل:')
+    parts.push(fullAddress)
+    
+    if (orderData.delivery_address_data) {
+      if (orderData.delivery_address_data.street) parts.push(`\nالشارع: ${orderData.delivery_address_data.street}`)
+      if (orderData.delivery_address_data.neighborhood) parts.push(`الحي: ${orderData.delivery_address_data.neighborhood}`)
+      if (orderData.delivery_address_data.building) parts.push(`البناء: ${orderData.delivery_address_data.building}`)
+      if (orderData.delivery_address_data.floor) parts.push(`الطابق: ${orderData.delivery_address_data.floor}`)
+      if (orderData.delivery_address_data.apartment) parts.push(`الشقة: ${orderData.delivery_address_data.apartment}`)
+      if (orderData.delivery_address_data.description) parts.push(`وصف إضافي: ${orderData.delivery_address_data.description}`)
+    }
+    
+    if (orderData.delivery_latitude && orderData.delivery_longitude) {
+      parts.push(`\nالإحداثيات: ${orderData.delivery_latitude.toFixed(6)}, ${orderData.delivery_longitude.toFixed(6)}`)
+    }
+    
+    if (orderData.customer_name) {
+      parts.push(`\nالعميل: ${orderData.customer_name}`)
+    }
+    
+    return parts.join('\n')
   }
 
   const attachmentsByItem = useMemo(() => {
@@ -1850,28 +1908,90 @@ export default function OrderDetail() {
                   </div>
                 )}
 
-                {/* زر واحد لتحديد الموقع في GPS */}
+                {/* أزرار الإجراءات: GPS، مشاركة، فتح الخريطة */}
                 {(order.delivery_latitude && order.delivery_longitude) || order.delivery_address || order.delivery_address_data ? (
-                  <div className="delivery-actions-single">
+                  <div className="delivery-actions">
+                    {/* زر فتح GPS مع الاتجاهات */}
+                    {(order.delivery_latitude && order.delivery_longitude) && (
+                      <button
+                        className="delivery-action-btn gps-btn"
+                        onClick={() => {
+                          // افتح Google Maps في GPS مع الاتجاهات
+                          const gpsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`
+                          window.open(gpsUrl, '_blank')
+                        }}
+                        title="فتح الموقع في تطبيق GPS مع الاتجاهات"
+                      >
+                        <Navigation size={18} />
+                        فتح في GPS
+                      </button>
+                    )}
+                    
+                    {/* زر مشاركة الموقع */}
                     <button
-                      className="delivery-action-btn gps-btn"
+                      className="delivery-action-btn share-btn"
+                      onClick={async () => {
+                        try {
+                          const fullAddress = buildFullAddress(order)
+                          const shareText = buildShareText(order, fullAddress)
+                          const shareUrl = order.delivery_latitude && order.delivery_longitude
+                            ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+                          
+                          // محاولة استخدام Web Share API إذا كان متاحاً
+                          if (navigator.share) {
+                            await navigator.share({
+                              title: `موقع التوصيل - ${order.order_number}`,
+                              text: shareText,
+                              url: shareUrl
+                            })
+                          } else {
+                            // Fallback: نسخ إلى الحافظة
+                            const shareContent = `${shareText}\n\n${shareUrl}`
+                            await navigator.clipboard.writeText(shareContent)
+                            showSuccess('تم نسخ معلومات الموقع إلى الحافظة')
+                          }
+                        } catch (error: any) {
+                          // إذا كان المستخدم ألغى المشاركة أو حدث خطأ
+                          if (error.name !== 'AbortError') {
+                            console.error('Error sharing location:', error)
+                            // Fallback: نسخ إلى الحافظة
+                            try {
+                              const fullAddress = buildFullAddress(order)
+                              const shareText = buildShareText(order, fullAddress)
+                              const shareUrl = order.delivery_latitude && order.delivery_longitude
+                                ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+                                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+                              await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`)
+                              showSuccess('تم نسخ معلومات الموقع إلى الحافظة')
+                            } catch (copyError) {
+                              showError('فشل مشاركة الموقع')
+                            }
+                          }
+                        }
+                      }}
+                      title="مشاركة الموقع مع جميع التفاصيل"
+                    >
+                      <Share2 size={18} />
+                      مشاركة الموقع
+                    </button>
+                    
+                    {/* زر فتح في Google Maps */}
+                    <button
+                      className="delivery-action-btn map-btn"
                       onClick={() => {
                         if (order.delivery_latitude && order.delivery_longitude) {
-                          // افتح Google Maps في GPS مع الاتجاهات
-                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`, '_blank')
+                          window.open(`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`, '_blank')
                         } else {
-                          // إذا لم تكن هناك إحداثيات، افتح Google Maps للبحث
-                          const addressText = order.delivery_address_data?.formattedAddress || 
-                                           order.delivery_address_data?.street || 
-                                           order.delivery_address || 
-                                           ''
-                          const address = encodeURIComponent(addressText)
+                          const fullAddress = buildFullAddress(order)
+                          const address = encodeURIComponent(fullAddress)
                           window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
                         }
                       }}
+                      title="فتح في Google Maps"
                     >
-                      <Navigation size={18} />
-                      تحديد الموقع في GPS
+                      <ExternalLink size={18} />
+                      فتح في الخريطة
                     </button>
                   </div>
                 ) : null}
@@ -1880,7 +2000,7 @@ export default function OrderDetail() {
                 {order.delivery_latitude && order.delivery_longitude && (
                   <div className="delivery-map-container">
                     <SimpleMap
-                      address={order.delivery_address || order.delivery_address_data?.formattedAddress || order.delivery_address_data?.street}
+                      address={buildFullAddress(order)}
                       latitude={order.delivery_latitude}
                       longitude={order.delivery_longitude}
                       defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
@@ -2094,72 +2214,9 @@ export default function OrderDetail() {
             </div>
             <div className="summary-item">
               <label>نوع التوصيل:</label>
-              <div className="delivery-info-wrapper">
-                <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-                {order.delivery_type === 'delivery' && (order.delivery_latitude && order.delivery_longitude) && (
-                  <button
-                    className="show-location-btn"
-                    onClick={() => setShowLocationMap(!showLocationMap)}
-                  >
-                    <MapPin size={16} />
-                    {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
-                  </button>
-                )}
-              </div>
+              <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
             </div>
-            {order.delivery_type === 'delivery' && (
-              <>
-                {order.delivery_address && (
-                  <div className="summary-item">
-                    <label>عنوان التوصيل:</label>
-                    <span>{order.delivery_address}</span>
-                  </div>
-                )}
-                {order.delivery_latitude && order.delivery_longitude && (
-                  <>
-                    <div className="summary-item">
-                      <label>الإحداثيات:</label>
-                      <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
-                    </div>
-                    <div className="summary-item">
-                      <label>رابط الخريطة:</label>
-                      <a 
-                        href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="map-link"
-                      >
-                        <MapPin size={16} />
-                        فتح في Google Maps
-                      </a>
-                    </div>
-                    <div className="summary-item">
-                      <button
-                        className="show-location-btn"
-                        onClick={() => setShowLocationMap(!showLocationMap)}
-                      >
-                        <MapPin size={16} />
-                        {showLocationMap ? 'إخفاء الخريطة' : 'عرض الموقع على الخريطة'}
-                      </button>
-                    </div>
-                    {showLocationMap && (
-                      <div className="summary-item location-map-item">
-                        <label>الموقع على الخريطة:</label>
-                        <div className="location-map-container">
-                          <SimpleMap
-                            address={order.delivery_address}
-                            latitude={order.delivery_latitude}
-                            longitude={order.delivery_longitude}
-                            defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
-                            defaultZoom={17}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
+            {/* تم نقل معلومات العنوان إلى بطاقة العنوان الرئيسية أعلاه */}
             <div className="summary-item">
               <label>حالة الدفع:</label>
               <span>{order.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}</span>

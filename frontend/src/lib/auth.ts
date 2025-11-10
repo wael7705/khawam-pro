@@ -65,7 +65,7 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Get stored token
+// Get stored token - مع دعم Token مخصص (لا نحذف tokens القصيرة لأنها قد تكون tokens مخصصة)
 export const getToken = (): string | null => {
   const token = localStorage.getItem('auth_token')
   
@@ -82,9 +82,10 @@ export const getToken = (): string | null => {
     return null
   }
   
-  // التحقق من أن token ليس قصيراً جداً (JWT tokens عادة تكون أطول من 20 حرف)
-  if (token.length < 20) {
-    console.warn('⚠️ Token seems invalid (too short), removing it:', token.substring(0, 10) + '...')
+  // لا نحذف tokens القصيرة لأنها قد تكون tokens مخصصة (مثل "admin_token_1")
+  // فقط نتحقق من أنها ليست فارغة
+  if (token.length < 5) {
+    console.warn('⚠️ Token seems too short, removing it:', token)
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user_data')
     return null

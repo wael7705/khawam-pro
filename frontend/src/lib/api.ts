@@ -8,18 +8,19 @@ const api = axios.create({
   timeout: 0, // لا timeout - لإلغاء timeout بسبب رداءة الإنترنت
 })
 
-// Add request interceptor to include auth token
+// Add request interceptor to include auth token - مع دعم Token مخصص
 api.interceptors.request.use((config) => {
-  // تنظيف token غير صالح
+  // تنظيف token غير صالح (لكن نحتفظ بـ tokens القصيرة لأنها قد تكون tokens مخصصة)
   const token = localStorage.getItem('auth_token')
-  if (token === 'null' || token === 'undefined' || (token && token.length < 20)) {
+  if (token === 'null' || token === 'undefined') {
     console.warn('⚠️ Invalid token found in interceptor, removing it')
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user_data')
     return config
   }
   
-  if (token) {
+  // إضافة token إذا كان موجوداً (حتى لو كان قصيراً - قد يكون token مخصص)
+  if (token && token.trim() !== '') {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config

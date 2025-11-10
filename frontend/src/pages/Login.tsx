@@ -41,15 +41,15 @@ export default function Login() {
         return
       }
       
-      // تنظيف أي tokens غير صالحة أولاً
+      // تنظيف أي tokens غير صالحة أولاً (لكن نحتفظ بـ tokens القصيرة لأنها قد تكون tokens مخصصة)
       const oldToken = localStorage.getItem('auth_token')
-      if (oldToken === 'null' || oldToken === 'undefined' || (oldToken && oldToken.length < 20)) {
+      if (oldToken === 'null' || oldToken === 'undefined') {
         console.warn('⚠️ Removing invalid old token:', oldToken)
         localStorage.removeItem('auth_token')
         localStorage.removeItem('user_data')
       }
       
-      // حفظ Token وبيانات المستخدم
+      // حفظ Token وبيانات المستخدم (مع دعم Token مخصص - قد يكون قصيراً)
       if (!loginData.access_token || loginData.access_token === 'null' || loginData.access_token === 'undefined') {
         console.error('⚠️ Invalid token received from server:', loginData.access_token)
         showError('خطأ في token المستلم من الخادم')

@@ -24,6 +24,25 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-use-e
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
+# نظام Token مخصص للمستخدمين المصرح لهم (3 مستخدمين: مديرين وموظف)
+# قائمة بأرقام الهواتف أو البريد الإلكتروني للمستخدمين المصرح لهم
+AUTHORIZED_USERS = [
+    "0966320114",  # المستخدم الأول
+    "963966320114",  # نفس المستخدم بصيغة مختلفة
+    "+963966320114",  # نفس المستخدم بصيغة مختلفة
+    # أضف المستخدمين الآخرين هنا
+    # "رقم_الهاتف_أو_البريد_الإلكتروني",
+]
+
+# Tokens مخصصة للمستخدمين المصرح لهم (يمكن استخدامها مباشرة)
+CUSTOM_TOKENS = {
+    "0966320114": "admin_token_1",
+    "963966320114": "admin_token_1",
+    "+963966320114": "admin_token_1",
+    # أضف tokens أخرى للمستخدمين الآخرين
+    # "رقم_الهاتف": "custom_token_here",
+}
+
 # استخدام pbkdf2_sha256 فقط للتشفير الجديد (يدعم أي طول لكلمة المرور)
 # لا نستخدم bcrypt في pwd_context لأن bcrypt له حد 72 بايت
 pwd_context = CryptContext(
@@ -168,6 +187,60 @@ def is_valid_phone(phone: str) -> bool:
     digits_only = re.sub(r'[^\d]', '', normalized)
     return len(digits_only) >= 9
 
+def is_authorized_user(username: str) -> bool:
+    """التحقق من أن المستخدم من المستخدمين المصرح لهم"""
+    username_clean = username.strip()
+    
+    # التحقق من رقم الهاتف
+    if is_valid_phone(username_clean):
+        normalized = normalize_phone(username_clean)
+        variants = [username_clean, normalized, '+' + normalized]
+        if username_clean.startswith('0'):
+            variants.extend(['963' + username_clean[1:], '+963' + username_clean[1:]])
+        if username_clean.startswith('+963'):
+            variants.append(username_clean[1:])
+        if username_clean.startswith('963') and not username_clean.startswith('+'):
+            variants.append('+' + username_clean)
+        
+        for variant in variants:
+            if variant in AUTHORIZED_USERS:
+                return True
+    
+    # التحقق من البريد الإلكتروني
+    if is_valid_email(username_clean):
+        if username_clean.lower() in AUTHORIZED_USERS or username_clean in AUTHORIZED_USERS:
+            return True
+    
+    return False
+
+def get_custom_token(username: str) -> Optional[str]:
+    """الحصول على token مخصص للمستخدم"""
+    username_clean = username.strip()
+    
+    # التحقق من رقم الهاتف
+    if is_valid_phone(username_clean):
+        normalized = normalize_phone(username_clean)
+        variants = [username_clean, normalized, '+' + normalized]
+        if username_clean.startswith('0'):
+            variants.extend(['963' + username_clean[1:], '+963' + username_clean[1:]])
+        if username_clean.startswith('+963'):
+            variants.append(username_clean[1:])
+        if username_clean.startswith('963') and not username_clean.startswith('+'):
+            variants.append('+' + username_clean)
+        
+        for variant in variants:
+            if variant in CUSTOM_TOKENS:
+                return CUSTOM_TOKENS[variant]
+    
+    # التحقق من البريد الإلكتروني
+    if is_valid_email(username_clean):
+        if username_clean.lower() in CUSTOM_TOKENS:
+            return CUSTOM_TOKENS[username_clean.lower()]
+        if username_clean in CUSTOM_TOKENS:
+            return CUSTOM_TOKENS[username_clean]
+    
+    return None
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """إنشاء JWT token"""
     to_encode = data.copy()
@@ -243,12 +316,51 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
-    """الحصول على المستخدم الحالي من الـ token - استخدام raw SQL"""
+    """الحصول على المستخدم الحالي من الـ token - استخدام raw SQL مع دعم Token مخصص"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # التحقق من Token مخصص أولاً
+    if token in CUSTOM_TOKENS.values():
+        # Token مخصص - البحث عن المستخدم المرتبط بهذا Token
+        for username, custom_token in CUSTOM_TOKENS.items():
+            if custom_token == token:
+                # البحث عن المستخدم في قاعدة البيانات
+                from sqlalchemy import text
+                user_row = None
+                
+                if is_valid_phone(username):
+                    normalized = normalize_phone(username)
+                    variants = [username, normalized, '+' + normalized]
+                    if username.startswith('0'):
+                        variants.extend(['963' + username[1:], '+963' + username[1:]])
+                    
+                    for variant in variants:
+                        user_row = db.execute(text("""
+                            SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                            FROM users
+                            WHERE phone = :phone
+                        """), {"phone": variant}).fetchone()
+                        if user_row:
+                            break
+                elif is_valid_email(username):
+                    user_row = db.execute(text("""
+                        SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                        FROM users
+                        WHERE email = :email
+                    """), {"email": username.lower()}).fetchone()
+                
+                if user_row:
+                    user = User()
+                    user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
+                    if user.is_active:
+                        print(f"✅ Custom token validated for user: {user.name}")
+                        return user
+    
+    # التحقق من JWT token
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("sub")
@@ -286,7 +398,7 @@ async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(http_bearer_optional),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
-    """الحصول على المستخدم الحالي (اختياري) - لا يرمي خطأ إذا لم يكن هناك token"""
+    """الحصول على المستخدم الحالي (اختياري) - لا يرمي خطأ إذا لم يكن هناك token - مع دعم Token مخصص"""
     if not credentials:
         return None
     
@@ -294,6 +406,41 @@ async def get_current_user_optional(
     if not token:
         return None
     
+    # التحقق من Token مخصص أولاً
+    if token in CUSTOM_TOKENS.values():
+        for username, custom_token in CUSTOM_TOKENS.items():
+            if custom_token == token:
+                from sqlalchemy import text
+                user_row = None
+                
+                if is_valid_phone(username):
+                    normalized = normalize_phone(username)
+                    variants = [username, normalized, '+' + normalized]
+                    if username.startswith('0'):
+                        variants.extend(['963' + username[1:], '+963' + username[1:]])
+                    
+                    for variant in variants:
+                        user_row = db.execute(text("""
+                            SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                            FROM users
+                            WHERE phone = :phone
+                        """), {"phone": variant}).fetchone()
+                        if user_row:
+                            break
+                elif is_valid_email(username):
+                    user_row = db.execute(text("""
+                        SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                        FROM users
+                        WHERE email = :email
+                    """), {"email": username.lower()}).fetchone()
+                
+                if user_row:
+                    user = User()
+                    user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
+                    if user.is_active:
+                        return user
+    
+    # التحقق من JWT token
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("sub")
@@ -460,12 +607,18 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         if user_type_row:
             _, user_type_name_ar = user_type_row
         
-        # إنشاء token
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user_id},
-            expires_delta=access_token_expires
-        )
+        # التحقق من أن المستخدم من المستخدمين المصرح لهم - استخدام Token مخصص
+        custom_token = get_custom_token(username)
+        if custom_token:
+            print(f"✅ Using custom token for authorized user: {user_name}")
+            access_token = custom_token
+        else:
+            # إنشاء JWT token عادي
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"sub": user_id},
+                expires_delta=access_token_expires
+            )
         
         return {
             "access_token": access_token,

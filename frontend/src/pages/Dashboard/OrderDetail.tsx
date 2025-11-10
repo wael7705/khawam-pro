@@ -618,14 +618,8 @@ export default function OrderDetail() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
 
   useEffect(() => {
-    // التحقق من Token قبل تحميل الطلب
-    const token = getToken()
-    if (!token) {
-      console.warn('⚠️ No valid token found, redirecting to login...')
-      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))
-      return
-    }
-    
+    // إزالة التحقق الصارم من Token - السماح بالوصول حتى بدون token
+    // (سيتم التحقق في Backend)
     if (id) {
       loadOrder(parseInt(id, 10))
     }

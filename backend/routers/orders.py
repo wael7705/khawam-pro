@@ -790,7 +790,7 @@ async def get_orders(
             orders_query_start = time.time()
             try:
                 # استخدام eager loading لتحسين الأداء
-        orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+                orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
                 print(f"⏱️ Orders API - Orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
             except Exception as query_error:
                 print(f"❌ Error querying orders: {query_error}")

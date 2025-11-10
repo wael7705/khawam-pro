@@ -16,6 +16,7 @@ import mimetypes
 import re
 from notifications import order_notifications
 import asyncio
+from routers.auth import get_current_active_user, get_current_user_optional
 
 router = APIRouter()
 
@@ -592,12 +593,75 @@ async def create_order(
         raise HTTPException(status_code=500, detail=f"خطأ في إنشاء الطلب: {str(e)}")
 
 @router.get("/")
-async def get_orders(db: Session = Depends(get_db)):
-    """Get all orders with their details and items"""
+async def get_orders(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Get all orders with their details and items. 
+    If user is a customer, only returns their orders.
+    If user is admin or employee, returns all orders."""
     try:
         ensure_order_columns(db)
         ensure_order_items_columns(db)
-        orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+        
+        # تحديد نوع المستخدم - إذا كان "عميل" نفلتر الطلبات
+        user_role = None
+        customer_phone_variants = []
+        
+        if current_user:
+            # الحصول على نوع المستخدم من قاعدة البيانات
+            user_type_row = db.execute(text("""
+                SELECT name_ar 
+                FROM user_types 
+                WHERE id = :id
+            """), {"id": current_user.user_type_id}).fetchone()
+            
+            if user_type_row:
+                user_role = user_type_row[0]
+            
+            # إذا كان المستخدم "عميل"، نفلتر الطلبات حسب رقم الهاتف
+            if user_role == "عميل" and current_user.phone:
+                # تطبيع رقم الهاتف وإضافة جميع الأشكال الممكنة
+                from routers.auth import normalize_phone
+                normalized_phone = normalize_phone(current_user.phone)
+                customer_phone_variants = [
+                    current_user.phone,
+                    normalized_phone,
+                    '+' + normalized_phone,
+                ]
+                
+                if current_user.phone.startswith('0'):
+                    customer_phone_variants.extend([
+                        '963' + current_user.phone[1:],
+                        '+963' + current_user.phone[1:]
+                    ])
+                if current_user.phone.startswith('+963'):
+                    customer_phone_variants.append(current_user.phone[1:])
+                if current_user.phone.startswith('963') and not current_user.phone.startswith('+'):
+                    customer_phone_variants.append('+' + current_user.phone)
+        
+        # جلب الطلبات مع الفلترة
+        if user_role == "عميل":
+            # للعملاء: يجب تسجيل الدخول وفلترة الطلبات
+            if not current_user or not customer_phone_variants:
+                raise HTTPException(
+                    status_code=401,
+                    detail="يجب تسجيل الدخول لعرض طلباتك"
+                )
+            # فلترة الطلبات حسب رقم الهاتف للعميل
+            orders = db.query(Order).filter(
+                Order.customer_phone.in_(customer_phone_variants)
+            ).order_by(Order.created_at.desc()).limit(100).all()
+        elif user_role in ("مدير", "موظف"):
+            # للمديرين والموظفين: جلب جميع الطلبات
+            orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+        else:
+            # إذا لم يكن هناك مستخدم مسجل دخول، نرجع خطأ
+            raise HTTPException(
+                status_code=401,
+                detail="يجب تسجيل الدخول لعرض الطلبات"
+            )
+        
         order_ids = [order.id for order in orders]
 
         items_map: Dict[int, List[OrderItem]] = defaultdict(list)

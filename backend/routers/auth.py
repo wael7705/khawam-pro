@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db
@@ -30,6 +30,7 @@ pwd_context = CryptContext(
     pbkdf2_sha256__rounds=320000
 )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+http_bearer_optional = HTTPBearer(auto_error=False)
 
 # Pydantic models
 class LoginRequest(BaseModel):
@@ -247,6 +248,47 @@ async def get_current_active_user(
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(http_bearer_optional),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """الحصول على المستخدم الحالي (اختياري) - لا يرمي خطأ إذا لم يكن هناك token"""
+    if not credentials:
+        return None
+    
+    token = credentials.credentials
+    if not token:
+        return None
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+    
+    try:
+        from sqlalchemy import text
+        user_row = db.execute(text("""
+            SELECT id, name, email, phone, password_hash, user_type_id, is_active
+            FROM users
+            WHERE id = :id
+        """), {"id": user_id}).fetchone()
+        
+        if user_row is None:
+            return None
+        
+        user = User()
+        user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
+        
+        if not user.is_active:
+            return None
+        
+        return user
+    except Exception:
+        return None
+
 def require_role(allowed_roles: list[str]):
     """Decorator للتحقق من الصلاحيات"""
     async def role_checker(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
@@ -310,11 +352,14 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
                     """), {"phone": variant}).fetchone()
                     if user_row:
                         break
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="الرجاء إدخال رقم هاتف صحيح أو بريد إلكتروني صحيح"
-            )
+        
+        # إذا لم يتم العثور على المستخدم، جرب البحث بالاسم
+        if not user_row:
+            user_row = db.execute(text("""
+                SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                FROM users
+                WHERE LOWER(name) = LOWER(:name)
+            """), {"name": username}).fetchone()
         
         if not user_row:
             raise HTTPException(

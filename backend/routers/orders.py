@@ -509,22 +509,22 @@ def _persist_design_files(
                     filename = _secure_filename(f"attachment-{idx + 1}{extension}")
                     file_path = os.path.join(base_dir, filename)
                     try:
-                    with open(file_path, "wb") as file_obj:
-                        file_obj.write(file_bytes)
-                        # Verify file was written
-                        if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
-                    persisted_entry = {
-                        "filename": filename,
-                        "url": f"{web_base}/{filename}",
-                        "download_url": f"{web_base}/{filename}",
-                        "raw_path": f"{web_base}/{filename}",
-                        "size_in_bytes": len(file_bytes)
-                    }
-                    persisted_entries.append(persisted_entry)
-                            print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes) -> {file_path}")
-                            print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
-                        else:
-                            print(f"    ❌ File verification failed: {file_path}")
+                        with open(file_path, "wb") as file_obj:
+                            file_obj.write(file_bytes)
+                            # Verify file was written
+                            if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
+                                persisted_entry = {
+                                    "filename": filename,
+                                    "url": f"{web_base}/{filename}",
+                                    "download_url": f"{web_base}/{filename}",
+                                    "raw_path": f"{web_base}/{filename}",
+                                    "size_in_bytes": len(file_bytes)
+                                }
+                                persisted_entries.append(persisted_entry)
+                                print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes) -> {file_path}")
+                                print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
+                            else:
+                                print(f"    ❌ File verification failed: {file_path}")
                     except Exception as write_error:
                         print(f"    ❌ Failed to write file {file_path}: {write_error}")
                         import traceback

@@ -1913,9 +1913,9 @@ export default function OrderDetail() {
                   <div className="delivery-actions">
                     {/* زر فتح GPS مع الاتجاهات */}
                     {(order.delivery_latitude && order.delivery_longitude) && (
-                      <button
-                        className="delivery-action-btn gps-btn"
-                        onClick={() => {
+                    <button
+                      className="delivery-action-btn gps-btn"
+                      onClick={() => {
                           // افتح Google Maps في GPS مع الاتجاهات
                           const gpsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`
                           window.open(gpsUrl, '_blank')
@@ -1945,7 +1945,7 @@ export default function OrderDetail() {
                               text: shareText,
                               url: shareUrl
                             })
-                          } else {
+                        } else {
                             // Fallback: نسخ إلى الحافظة
                             const shareContent = `${shareText}\n\n${shareUrl}`
                             await navigator.clipboard.writeText(shareContent)
@@ -2214,8 +2214,8 @@ export default function OrderDetail() {
             </div>
             <div className="summary-item">
               <label>نوع التوصيل:</label>
-              <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
-            </div>
+                <span>{order.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+              </div>
             {/* تم نقل معلومات العنوان إلى بطاقة العنوان الرئيسية أعلاه */}
             <div className="summary-item">
               <label>حالة الدفع:</label>

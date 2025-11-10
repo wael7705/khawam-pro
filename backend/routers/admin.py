@@ -1562,11 +1562,31 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                     df_preview = str(df)[:100] if df else 'None'
                     df_type = type(df).__name__
                     print(f"  design_file[{idx}]: type={df_type}, preview={df_preview}...")
-                    # إذا كان كائناً، اطبع المفاتيح
+                    # إذا كان كائناً، اطبع المفاتيح والقيم المهمة
                     if isinstance(df, dict):
                         print(f"    keys: {list(df.keys())}")
+                        # اطبع URL أو raw_path إذا كان موجوداً
+                        for url_key in ['url', 'raw_path', 'download_url', 'file_url', 'data_url']:
+                            if url_key in df and df[url_key]:
+                                print(f"    {url_key}: {str(df[url_key])[:80]}...")
+                    # إذا كان string، اطبع جزء منه
+                    elif isinstance(df, str):
+                        if df.startswith('data:'):
+                            print(f"    data URL: {df[:50]}... (length: {len(df)})")
+                        elif df.startswith('/uploads/'):
+                            print(f"    upload path: {df}")
+                        elif df.startswith('http'):
+                            print(f"    HTTP URL: {df[:80]}...")
+                        else:
+                            print(f"    string value: {df[:80]}...")
             else:
-                print(f"⚠️ Item {item_id}: No design_files found - checking specifications keys: {list(specs.keys()) if specs else 'N/A'}")
+                print(f"⚠️ Item {item_id}: No design_files found")
+                print(f"  design_files_raw type: {type(design_files_raw)}")
+                print(f"  design_files_raw value: {str(design_files_raw)[:200] if design_files_raw else 'None'}...")
+                print(f"  specifications keys: {list(specs.keys()) if specs else 'N/A'}")
+                # اطبع specifications كاملة للتحقق
+                if specs:
+                    print(f"  specifications content: {json.dumps(specs, ensure_ascii=False, indent=2)[:500]}...")
             
             items_list.append({
                 "id": item_id,

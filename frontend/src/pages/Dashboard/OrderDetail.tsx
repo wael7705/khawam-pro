@@ -50,6 +50,8 @@ type NormalizedAttachment = {
   sizeLabel?: string
   orderItemId?: number
   originLabel?: string
+  data_url?: string
+  file_exists?: boolean
 }
 
 type OrderAttachment = {
@@ -64,6 +66,8 @@ type OrderAttachment = {
   mime_type?: string
   size_label?: string
   size_in_bytes?: number
+  data_url?: string
+  file_exists?: boolean
 }
 
 const ATTACHMENT_SPEC_KEYS = ['design_files', 'files', 'attachments', 'uploaded_files', 'documents', 'images']
@@ -123,12 +127,13 @@ const normalizeAttachmentEntry = (
         }
       }
       
-      const result = {
+      const result: NormalizedAttachment = {
         url: trimmed, // استخدم data URL مباشرة
         filename: filename,
         isImage: isImageFromMime && !isPDFFromMime,
         orderItemId,
         originLabel,
+        data_url: trimmed, // Preserve data URL for consistency
       }
       console.log('✅ Returning data URL attachment:', result)
       return result
@@ -298,7 +303,12 @@ const normalizeAttachmentEntry = (
       }
     }
 
-    const result = {
+    // Preserve data_url if available (for fallback when primary URL fails)
+    const dataUrl = entry.data_url && isDataUrl(String(entry.data_url)) ? String(entry.data_url) : undefined
+    // If the URL is not a data URL but we have a data_url in the entry, preserve it
+    const preservedDataUrl = (!isDataUrl(url) && dataUrl) ? dataUrl : (isDataUrl(url) ? url : undefined)
+    
+    const result: NormalizedAttachment = {
       url,
       filename,
       isImage,
@@ -306,6 +316,8 @@ const normalizeAttachmentEntry = (
       sizeLabel,
       orderItemId,
       originLabel,
+      data_url: preservedDataUrl,
+      file_exists: entry.file_exists,
     }
     console.log('✅ Returning normalized attachment:', result)
     return result
@@ -317,7 +329,9 @@ const normalizeAttachmentEntry = (
 
 const mapAttachmentToNormalized = (attachment: OrderAttachment): NormalizedAttachment | null => {
   if (!attachment) return null
-  const raw = attachment.url || attachment.download_url || attachment.raw_path || ''
+  // Priority: url > download_url > data_url > raw_path
+  // The backend now returns data_url in url when file doesn't exist, so this should work
+  const raw = attachment.url || attachment.download_url || attachment.data_url || attachment.raw_path || ''
   const normalized = normalizeAttachmentEntry(
     raw || attachment,
     attachment.order_item_id,
@@ -335,6 +349,18 @@ const mapAttachmentToNormalized = (attachment: OrderAttachment): NormalizedAttac
   }
   if (!normalized.sizeLabel) {
     normalized.sizeLabel = attachment.size_label || prettyFileSize(attachment.size_in_bytes)
+  }
+  // Preserve data_url and file_exists from backend response
+  if (attachment.data_url && !normalized.data_url) {
+    normalized.data_url = attachment.data_url
+  }
+  if (attachment.file_exists !== undefined && normalized.file_exists === undefined) {
+    normalized.file_exists = attachment.file_exists
+  }
+  // If the URL is not a data URL but we have a data_url, use it as fallback
+  // The backend should already prioritize data_url, but we keep it as an extra fallback
+  if (normalized.url && !isDataUrl(normalized.url) && attachment.data_url && isDataUrl(attachment.data_url)) {
+    normalized.data_url = attachment.data_url
   }
   return normalized
 }
@@ -477,13 +503,28 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                   loading="lazy" 
                   onError={(e) => {
                     console.error('❌ Error loading image:', file.url, file.filename)
-                  // إذا فشل تحميل الصورة، استبدلها بأيقونة
                     const target = e.currentTarget as HTMLImageElement
+                    const currentSrc = target.src
+                    
+                    // Try to use data_url as fallback if available and different from current URL
+                    if (file.data_url && isDataUrl(file.data_url) && currentSrc !== file.data_url) {
+                      console.log('🔄 Trying data_url fallback for image:', file.filename)
+                      target.src = file.data_url
+                      // Don't hide the image yet, let it try to load the data URL
+                      return
+                    }
+                    
+                    // If no data_url fallback or it also failed, show error icon
                     target.style.display = 'none'
                     const parent = target.parentElement
-                  if (parent) {
+                    if (parent) {
+                      // Check if error icon already exists
+                      const existingError = parent.querySelector('.image-error-fallback')
+                      if (existingError) return
+                      
                       // إنشاء عنصر div مع أيقونة
                       const iconDiv = document.createElement('div')
+                      iconDiv.className = 'image-error-fallback'
                       iconDiv.style.display = 'flex'
                       iconDiv.style.alignItems = 'center'
                       iconDiv.style.justifyContent = 'center'
@@ -502,7 +543,7 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                         <span style="font-size: 10px; color: #666;">خطأ في التحميل</span>
                       `
                       parent.appendChild(iconDiv)
-                  }
+                    }
                   }}
                   onLoad={() => {
                     console.log('✅ Image loaded successfully:', file.url)
@@ -531,38 +572,51 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                   onClick={async () => {
                     console.log('🔗 Opening file:', file.url, file.filename)
                     try {
-                      // التحقق من أن الملف موجود قبل فتحه
-                      if (file.url.startsWith('data:')) {
+                      // Determine which URL to use (prioritize file URL, fallback to data_url)
+                      let urlToUse = file.url
+                      if (!file.url.startsWith('data:') && file.data_url && isDataUrl(file.data_url)) {
+                        // If file URL is not a data URL but we have a data_url, check if file exists first
+                        try {
+                          const response = await fetch(file.url, { method: 'HEAD' })
+                          if (!response.ok) {
+                            console.log('⚠️ File URL failed, using data_url fallback')
+                            urlToUse = file.data_url
+                          }
+                        } catch (e) {
+                          // If HEAD fails (CORS, etc.), try to use data_url if available
+                          console.log('⚠️ Could not verify file URL, using data_url fallback if available')
+                          if (file.data_url && isDataUrl(file.data_url)) {
+                            urlToUse = file.data_url
+                          }
+                        }
+                      }
+                      
+                      if (urlToUse.startsWith('data:')) {
                         // Data URL - يمكن فتحه مباشرة
-                      window.open(file.url, '_blank', 'noopener,noreferrer')
-                    } else {
+                        window.open(urlToUse, '_blank', 'noopener,noreferrer')
+                      } else {
                         // للروابط العادية، جرب فتحها مع معالجة الأخطاء
-                        const newWindow = window.open(file.url, '_blank', 'noopener,noreferrer')
+                        const newWindow = window.open(urlToUse, '_blank', 'noopener,noreferrer')
                         if (!newWindow) {
                           // إذا فشل فتح النافذة (مثلاً بسبب popup blocker)، جرب التحميل
                           const link = document.createElement('a')
-                          link.href = file.url
+                          link.href = urlToUse
                           link.download = file.filename || 'attachment'
                           link.target = '_blank'
                           document.body.appendChild(link)
                           link.click()
                           document.body.removeChild(link)
-                        } else {
-                          // تحقق من أن الملف تم تحميله بنجاح بعد ثانية
-                          setTimeout(() => {
-                            try {
-                              if (newWindow.location.href === 'about:blank') {
-                                console.warn('⚠️ File may not have loaded:', file.url)
-                              }
-                            } catch (e) {
-                              // Cross-origin error - هذا طبيعي
-                            }
-                          }, 1000)
                         }
                       }
                     } catch (error) {
                       console.error('❌ Error opening file:', error)
-                      showError('فشل فتح الملف. يرجى المحاولة مرة أخرى.')
+                      // Try data_url as last resort
+                      if (file.data_url && isDataUrl(file.data_url) && file.url !== file.data_url) {
+                        console.log('🔄 Trying data_url as last resort')
+                        window.open(file.data_url, '_blank', 'noopener,noreferrer')
+                      } else {
+                        showError('فشل فتح الملف. يرجى المحاولة مرة أخرى.')
+                      }
                     }
                   }}
                   title="عرض الملف"
@@ -576,10 +630,59 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                   onClick={async () => {
                     console.log('💾 Downloading file:', file.url, file.filename)
                     try {
+                      // Determine which URL to use (prioritize file URL, fallback to data_url)
+                      let urlToUse = file.url
+                      let isDataUrlToUse = file.url.startsWith('data:')
+                      
+                      if (!isDataUrlToUse) {
+                        // Check if file URL exists, if not, try data_url
+                        try {
+                          const response = await fetch(file.url, { method: 'HEAD' })
+                          if (!response.ok && file.data_url && isDataUrl(file.data_url)) {
+                            console.log('⚠️ File URL failed, using data_url fallback for download')
+                            urlToUse = file.data_url
+                            isDataUrlToUse = true
+                          }
+                        } catch (fetchError) {
+                          // If HEAD fails, try data_url if available
+                          if (file.data_url && isDataUrl(file.data_url)) {
+                            console.log('⚠️ Could not verify file URL, using data_url fallback')
+                            urlToUse = file.data_url
+                            isDataUrlToUse = true
+                          }
+                        }
+                      }
+                      
                       // للـ data URLs، استخدم blob
-                      if (file.url.startsWith('data:')) {
-                        const response = await fetch(file.url)
+                      if (isDataUrlToUse) {
+                        const response = await fetch(urlToUse)
                         const blob = await response.blob()
+                        const url = window.URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.download = file.filename || 'attachment'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        window.URL.revokeObjectURL(url)
+                      } else {
+                        // للروابط العادية، قم بالتحميل مباشرة
+                        const link = document.createElement('a')
+                        link.href = urlToUse
+                        link.download = file.filename || 'attachment'
+                        link.target = '_blank'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                      }
+                    } catch (error) {
+                      console.error('❌ Error downloading file:', error)
+                      // Try data_url as last resort
+                      if (file.data_url && isDataUrl(file.data_url) && file.url !== file.data_url) {
+                        console.log('🔄 Trying data_url as last resort for download')
+                        try {
+                          const response = await fetch(file.data_url)
+                          const blob = await response.blob()
                           const url = window.URL.createObjectURL(blob)
                           const link = document.createElement('a')
                           link.href = url
@@ -588,39 +691,13 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                           link.click()
                           document.body.removeChild(link)
                           window.URL.revokeObjectURL(url)
-                      } else {
-                        // للروابط العادية، استخدم fetch للتحقق من وجود الملف
-                        try {
-                          const response = await fetch(file.url, { method: 'HEAD' })
-                          if (response.ok) {
-                            // الملف موجود، قم بالتحميل
-                        const link = document.createElement('a')
-                        link.href = file.url
-                        link.download = file.filename || 'attachment'
-                        link.target = '_blank'
-                        document.body.appendChild(link)
-                        link.click()
-                        document.body.removeChild(link)
-                          } else {
-                            // الملف غير موجود، عرض رسالة خطأ
-                            console.error('❌ File not found:', file.url, response.status)
-                            showError(`الملف غير موجود (${response.status}). قد يكون الملف محذوفاً أو الرابط غير صحيح.`)
-                          }
-                        } catch (fetchError) {
-                          // إذا فشل HEAD request (مثلاً بسبب CORS)، جرب التحميل مباشرة
-                          console.warn('⚠️ HEAD request failed, trying direct download:', fetchError)
-                          const link = document.createElement('a')
-                          link.href = file.url
-                          link.download = file.filename || 'attachment'
-                          link.target = '_blank'
-                          document.body.appendChild(link)
-                          link.click()
-                          document.body.removeChild(link)
+                        } catch (fallbackError) {
+                          console.error('❌ Fallback download also failed:', fallbackError)
+                          showError('فشل تحميل الملف. يرجى المحاولة مرة أخرى.')
                         }
+                      } else {
+                        showError('فشل تحميل الملف. يرجى المحاولة مرة أخرى.')
                       }
-                    } catch (error) {
-                      console.error('❌ Error downloading file:', error)
-                      showError('فشل تحميل الملف. يرجى المحاولة مرة أخرى.')
                     }
                   }}
                   title="تحميل الملف"

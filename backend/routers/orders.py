@@ -337,33 +337,32 @@ def normalize_attachment_entry(
             
             # Always build URL (even if file doesn't exist, it might be served by StaticFiles)
             file_url = build_file_url(raw_path, request)
-            
-            # If file doesn't exist locally, check if we have a data_url fallback
-            if not file_exists and isinstance(entry, dict):
-                data_url = entry.get("data_url")
-                if data_url and data_url.startswith("data:"):
-                    # We have a data URL fallback - mark it as available
-                    # But still prefer the file path URL if it can be served
-                    print(f"⚠️ File {local_path} not found, but data URL fallback available")
-                    # Keep file_exists = False to indicate we should use data URL if file request fails
         else:
             # Relative path, assume it might exist
             file_exists = False
             file_url = build_file_url(raw_path, request)
 
-    if not file_url:
-        return None
-
     # Extract filename from path if not set
     if not filename and raw_path:
-        filename = os.path.basename(raw_path.split("?")[0])
+        if raw_path.startswith("data:"):
+            # For data URLs, try to extract filename from header
+            try:
+                header = raw_path.split(",")[0]
+                if "filename=" in header:
+                    filename_match = re.search(r'filename=([^;]+)', header)
+                    if filename_match:
+                        filename = filename_match.group(1)
+            except:
+                pass
+        if not filename:
+            filename = os.path.basename(raw_path.split("?")[0])
         if not filename or filename == "/":
             filename = "ملف"
 
     # Generate file key for identification
     file_key = f"{order_id}-{order_item_id or 'item'}-{index}"
 
-    # Get data_url from entry if available (for fallback)
+    # Get data_url from entry if available (for fallback or primary use)
     data_url = None
     if isinstance(entry, dict):
         data_url = entry.get("data_url")
@@ -371,6 +370,32 @@ def normalize_attachment_entry(
             data_url = None
     elif isinstance(entry, str) and entry.startswith("data:"):
         data_url = entry
+    
+    # If raw_path is a data URL and we're using it, also set it as data_url
+    # This ensures data_url is always available when we have a data URL
+    if raw_path and raw_path.startswith("data:") and file_url == raw_path:
+        data_url = raw_path
+
+    # Priority: If file doesn't exist locally and we have data_url, use data_url as primary URL
+    # This is crucial for Railway's ephemeral filesystem where files may not persist
+    primary_url = file_url
+    if not file_exists and data_url and data_url.startswith("data:"):
+        print(f"⚠️ File {raw_path} not found locally, using data URL as primary URL")
+        primary_url = data_url
+        # Also update mime_type from data URL if not set
+        if not mime_type:
+            try:
+                header = data_url.split(",")[0]
+                if ";" in header:
+                    mime_type = header.split(";")[0].replace("data:", "").strip()
+            except:
+                pass
+    # Also, if file_url is already a data URL, ensure data_url is set to it
+    elif file_url and file_url.startswith("data:") and not data_url:
+        data_url = file_url
+
+    if not primary_url:
+        return None
 
     return {
         "id": file_key,
@@ -378,14 +403,14 @@ def normalize_attachment_entry(
         "order_item_id": order_item_id,
         "filename": filename or "ملف",
         "raw_path": raw_path,
-        "url": file_url,
-        "download_url": file_url,
+        "url": primary_url,  # Use data_url if file doesn't exist, otherwise use file_url
+        "download_url": primary_url,
         "location": location,
         "mime_type": mime_type,
         "size_label": size_label,
         "size_in_bytes": size_in_bytes,
         "file_exists": file_exists,  # Add flag to indicate if file exists locally
-        "data_url": data_url,  # Keep data URL as fallback if file doesn't exist
+        "data_url": data_url,  # Keep data URL as fallback/primary source
     }
 # Background task for notifications
 async def send_order_notification(payload: Dict[str, Any]):
@@ -1135,12 +1160,14 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db), re
                     try:
                         normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx, request)
                         if normalized:
-                            # Only include attachments that have valid URLs
-                            if normalized.get("url") or normalized.get("download_url"):
+                            # Include attachments that have valid URLs (file URL, download URL, or data URL)
+                            if normalized.get("url") or normalized.get("download_url") or normalized.get("data_url"):
                                 if normalized.get("file_key"):
                                     attachments_by_key[str(normalized["file_key"])] = normalized
                                 normalized["order_item_service_name"] = getattr(item, "product_name", None)
                                 attachments.append(normalized)
+                            else:
+                                print(f"⚠️ Skipping attachment {idx} for item {item.id}: no valid URL found")
                     except Exception as e:
                         print(f"⚠️ Error normalizing attachment entry {idx} for item {item.id}: {e}")
                         import traceback

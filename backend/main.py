@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -766,35 +766,56 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Serve Frontend static files
 static_dir = "static"
+print(f"📁 Checking for static directory: {static_dir}")
+print(f"📁 Static directory exists: {os.path.exists(static_dir)}")
+
 if os.path.exists(static_dir):
-    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+    print(f"✅ Static directory found, serving frontend files")
+    # Serve static assets (CSS, JS, images, etc.)
+    assets_dir = os.path.join(static_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+        print(f"✅ Mounted /assets from {assets_dir}")
     
-    # Serve index.html for all non-API routes
+    # Serve other static files (vite.svg, etc.)
+    @app.get("/vite.svg")
+    async def serve_vite_svg():
+        vite_svg_path = os.path.join(static_dir, "vite.svg")
+        if os.path.exists(vite_svg_path):
+            return FileResponse(vite_svg_path)
+        return {"message": "vite.svg not found"}
+    
+    # Serve index.html for root and all non-API routes (for React Router)
+    @app.get("/")
+    async def root():
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return {"message": "Khawam API is running", "frontend": "not found"}
+    
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        # Don't serve frontend for API routes
+        # Don't serve frontend for API routes or uploads
         if full_path.startswith("api/") or full_path.startswith("uploads/"):
-            return {"message": "Not found"}
+            raise HTTPException(status_code=404, detail="Not found")
         
         # Try to serve the file from static directory
         file_path = os.path.join(static_dir, full_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return FileResponse(file_path)
         
-        # For any route, serve index.html (for React Router)
+        # For any route (like /dashboard/orders/68), serve index.html (React Router will handle routing)
         index_path = os.path.join(static_dir, "index.html")
         if os.path.exists(index_path):
             return FileResponse(index_path)
         
-        return {"message": "Frontend files not found"}
-
-@app.get("/")
-async def root():
-    # Try to serve index.html, otherwise show API message
-    index_path = os.path.join("static", "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"message": "Khawam API is running"}
+        raise HTTPException(status_code=404, detail="Frontend files not found")
+else:
+    print(f"⚠️ Static directory not found at {static_dir}, frontend will not be served")
+    # If static directory doesn't exist, just serve API message
+    @app.get("/")
+    async def root():
+        return {"message": "Khawam API is running", "frontend": "not built"}
 
 @app.post("/api/setup-lecture-printing-now")
 async def setup_lecture_printing_now():

@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all backend files to /app
 COPY backend/ .
 
+# Copy frontend dist files to static directory
+COPY frontend/dist /app/static
+
 # Create uploads directory
 RUN mkdir -p uploads/orders
 

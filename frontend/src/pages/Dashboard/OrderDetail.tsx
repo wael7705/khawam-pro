@@ -994,140 +994,141 @@ export default function OrderDetail() {
             {order.delivery_type === 'delivery' ? 'عنوان التوصيل' : 'عنوان العميل'}
           </h2>
           <div className="delivery-address-content">
-            {order.delivery_address ? (
-              <div className="delivery-address-text">
-                <label>العنوان:</label>
-                <p>{order.delivery_address}</p>
+            {/* عرض جميع بيانات العنوان */}
+            {order.delivery_address || order.delivery_address_details || order.delivery_address_data || (order.delivery_latitude && order.delivery_longitude) ? (
+              <div className="delivery-address-info">
+                {/* بيانات العنوان الكاملة من delivery_address_data */}
+                {order.delivery_address_data && (
+                  <>
+                    {order.delivery_address_data.street && (
+                      <div className="address-field">
+                        <label>اسم الشارع:</label>
+                        <p>{order.delivery_address_data.street}</p>
+                      </div>
+                    )}
+                    {order.delivery_address_data.neighborhood && (
+                      <div className="address-field">
+                        <label>الحي:</label>
+                        <p>{order.delivery_address_data.neighborhood}</p>
+                      </div>
+                    )}
+                    {order.delivery_address_data.building && (
+                      <div className="address-field">
+                        <label>البناء:</label>
+                        <p>{order.delivery_address_data.building}</p>
+                      </div>
+                    )}
+                    {order.delivery_address_data.floor && (
+                      <div className="address-field">
+                        <label>الطابق:</label>
+                        <p>{order.delivery_address_data.floor}</p>
+                      </div>
+                    )}
+                    {order.delivery_address_data.apartment && (
+                      <div className="address-field">
+                        <label>رقم الشقة:</label>
+                        <p>{order.delivery_address_data.apartment}</p>
+                      </div>
+                    )}
+                    {order.delivery_address_data.description && (
+                      <div className="address-field">
+                        <label>وصف إضافي:</label>
+                        <p>{order.delivery_address_data.description}</p>
+                      </div>
+                    )}
+                    {order.delivery_address_data.formattedAddress && (
+                      <div className="address-field">
+                        <label>العنوان الكامل:</label>
+                        <p>{order.delivery_address_data.formattedAddress}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* العنوان الأساسي - إذا لم تكن هناك بيانات مفصلة */}
+                {!order.delivery_address_data && order.delivery_address && (
+                  <div className="address-field">
+                    <label>العنوان:</label>
+                    <p>{order.delivery_address}</p>
+                  </div>
+                )}
+
+                {/* البيانات الإضافية */}
+                {order.delivery_address_details && (
+                  <div className="address-field">
+                    <label>تفاصيل إضافية:</label>
+                    <p>{order.delivery_address_details}</p>
+                  </div>
+                )}
+
+                {/* صور إضافية للعنوان */}
+                {order.delivery_address_data?.images && Array.isArray(order.delivery_address_data.images) && order.delivery_address_data.images.length > 0 && (
+                  <div className="address-field">
+                    <label>صور إضافية للعنوان:</label>
+                    <div className="address-images-grid">
+                      {order.delivery_address_data.images.map((imageUrl: string, idx: number) => (
+                        <div key={idx} className="address-image-item">
+                          <img 
+                            src={imageUrl.startsWith('http') || imageUrl.startsWith('data:') ? imageUrl : `${PUBLIC_BASE_URL}${imageUrl}`} 
+                            alt={`صورة العنوان ${idx + 1}`}
+                            onClick={() => window.open(imageUrl.startsWith('http') || imageUrl.startsWith('data:') ? imageUrl : `${PUBLIC_BASE_URL}${imageUrl}`, '_blank')}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* الإحداثيات */}
+                {order.delivery_latitude && order.delivery_longitude && (
+                  <div className="address-field">
+                    <label>الإحداثيات:</label>
+                    <span className="coordinates">{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
+                  </div>
+                )}
+
+                {/* زر واحد لتحديد الموقع في GPS */}
+                {(order.delivery_latitude && order.delivery_longitude) || order.delivery_address || order.delivery_address_data ? (
+                  <div className="delivery-actions-single">
+                    <button
+                      className="delivery-action-btn gps-btn"
+                      onClick={() => {
+                        if (order.delivery_latitude && order.delivery_longitude) {
+                          // افتح Google Maps في GPS مع الاتجاهات
+                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`, '_blank')
+                        } else {
+                          // إذا لم تكن هناك إحداثيات، افتح Google Maps للبحث
+                          const addressText = order.delivery_address_data?.formattedAddress || 
+                                           order.delivery_address_data?.street || 
+                                           order.delivery_address || 
+                                           ''
+                          const address = encodeURIComponent(addressText)
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+                        }
+                      }}
+                    >
+                      <Navigation size={18} />
+                      تحديد الموقع في GPS
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* الخريطة - عرض تلقائي إذا كانت هناك إحداثيات */}
+                {order.delivery_latitude && order.delivery_longitude && (
+                  <div className="delivery-map-container">
+                    <SimpleMap
+                      address={order.delivery_address || order.delivery_address_data?.formattedAddress || order.delivery_address_data?.street}
+                      latitude={order.delivery_latitude}
+                      longitude={order.delivery_longitude}
+                      defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                      defaultZoom={17}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="delivery-address-empty">
                 <p>لا يوجد عنوان مسجل</p>
-              </div>
-            )}
-            
-            {order.delivery_latitude && order.delivery_longitude && (
-              <div className="delivery-coordinates">
-                <label>الإحداثيات:</label>
-                <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
-              </div>
-            )}
-
-            {/* البيانات الإضافية للعنوان */}
-            {showAdditionalAddress && order.delivery_address_details && (
-              <div className="delivery-address-details">
-                <label>بيانات إضافية:</label>
-                <p>{order.delivery_address_details}</p>
-              </div>
-            )}
-
-            {/* أزرار الإجراءات */}
-            <div className="delivery-actions">
-              {/* زر تحديد الموقع في GPS */}
-              <button
-                className="delivery-action-btn gps-btn"
-                onClick={() => {
-                  if (order.delivery_latitude && order.delivery_longitude) {
-                    // افتح Google Maps في GPS
-                    window.open(`https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`, '_blank')
-                  } else {
-                    // إذا لم تكن هناك إحداثيات، افتح Google Maps للبحث
-                    const address = encodeURIComponent(order.delivery_address || '')
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
-                  }
-                }}
-              >
-                <Navigation size={16} />
-                تحديد الموقع في GPS
-              </button>
-
-              {/* زر عنوان إضافي */}
-              {order.delivery_address_details && (
-                <button
-                  className="delivery-action-btn additional-btn"
-                  onClick={() => setShowAdditionalAddress(!showAdditionalAddress)}
-                >
-                  <Plus size={16} />
-                  {showAdditionalAddress ? 'إخفاء البيانات الإضافية' : 'عرض البيانات الإضافية'}
-                </button>
-              )}
-
-              {/* زر عرض على الخريطة */}
-              {order.delivery_latitude && order.delivery_longitude && (
-                <button
-                  className="delivery-action-btn map-btn"
-                  onClick={() => setShowLocationMap(!showLocationMap)}
-                >
-                  <MapPin size={16} />
-                  {showLocationMap ? 'إخفاء الخريطة' : 'عرض على الخريطة'}
-                </button>
-              )}
-
-              {/* زر فتح في Google Maps */}
-              {(order.delivery_latitude && order.delivery_longitude) || order.delivery_address ? (
-                <a
-                  href={order.delivery_latitude && order.delivery_longitude
-                    ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
-                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address || '')}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="delivery-action-btn external-btn"
-                >
-                  <ExternalLink size={16} />
-                  فتح في Google Maps
-                </a>
-              ) : null}
-
-              {/* زر مشاركة العنوان */}
-              {(order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
-                <button
-                  className="delivery-action-btn share-btn"
-                  onClick={async () => {
-                    try {
-                      const shareText = `عنوان التوصيل:\n${order.delivery_address || ''}\n${order.delivery_latitude && order.delivery_longitude ? `الإحداثيات: ${order.delivery_latitude}, ${order.delivery_longitude}` : ''}\n${order.delivery_address_details ? `\nبيانات إضافية: ${order.delivery_address_details}` : ''}\n\nرقم الطلب: ${order.order_number}`
-                      
-                      if (navigator.share) {
-                        await navigator.share({
-                          title: `عنوان التوصيل - طلب ${order.order_number}`,
-                          text: shareText,
-                          url: order.delivery_latitude && order.delivery_longitude
-                            ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
-                            : undefined
-                        })
-                      } else {
-                        // Fallback: نسخ إلى الحافظة
-                        await navigator.clipboard.writeText(shareText)
-                        showSuccess('تم نسخ العنوان إلى الحافظة')
-                      }
-                    } catch (error) {
-                      console.error('Error sharing address:', error)
-                      // Fallback: نسخ إلى الحافظة
-                      try {
-                        const shareText = `عنوان التوصيل:\n${order.delivery_address || ''}\n${order.delivery_latitude && order.delivery_longitude ? `الإحداثيات: ${order.delivery_latitude}, ${order.delivery_longitude}` : ''}\n${order.delivery_address_details ? `\nبيانات إضافية: ${order.delivery_address_details}` : ''}\n\nرقم الطلب: ${order.order_number}`
-                        await navigator.clipboard.writeText(shareText)
-                        showSuccess('تم نسخ العنوان إلى الحافظة')
-                      } catch (clipboardError) {
-                        showError('فشل مشاركة العنوان')
-                      }
-                    }
-                  }}
-                >
-                  <Share2 size={16} />
-                  مشاركة العنوان
-                </button>
-              )}
-            </div>
-
-            {/* الخريطة */}
-            {showLocationMap && order.delivery_latitude && order.delivery_longitude && (
-              <div className="delivery-map-container">
-                <SimpleMap
-                  address={order.delivery_address}
-                  latitude={order.delivery_latitude}
-                  longitude={order.delivery_longitude}
-                  defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
-                  defaultZoom={17}
-                />
               </div>
             )}
           </div>

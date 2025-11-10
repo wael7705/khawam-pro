@@ -1435,6 +1435,21 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 order_type = "service"
                 service_name = specs.get('service_name') if specs else None
             
+            # استخراج بيانات العنوان الكاملة من specs إذا كانت موجودة
+            delivery_address_data = None
+            if specs:
+                # البحث عن بيانات العنوان في specifications
+                if 'deliveryAddress' in specs:
+                    delivery_address_data = specs['deliveryAddress']
+                elif 'address' in specs:
+                    delivery_address_data = specs['address']
+                elif 'delivery_address_data' in specs:
+                    delivery_address_data = specs['delivery_address_data']
+            
+            # إضافة delivery_address_data إلى specs إذا كانت موجودة
+            if delivery_address_data:
+                specs['delivery_address_data'] = delivery_address_data
+            
             # Parse design_files with logging
             print(f"📎 Processing item {item_id} - design_files_raw type: {type(design_files_raw)}")
             parsed_design_files = safe_parse_array(design_files_raw)

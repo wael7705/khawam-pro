@@ -1115,19 +1115,27 @@ export default function OrderDetail() {
           ) : (
             <div className="attachments-missing">
               <p>لم يتم العثور على روابط مباشرة لتحميل الملفات لهذا العنصر حتى الآن.</p>
-              {/* عرض معلومات debug */}
-              {(item.design_files || item.specifications) && (
-                <div className="attachments-debug-info" style={{ marginTop: '12px', padding: '12px', background: '#f8f9fa', borderRadius: '8px', fontSize: '12px' }}>
+              {/* عرض معلومات debug - فقط في وضع التطوير */}
+              {process.env.NODE_ENV === 'development' && (item.design_files || item.specifications) && (
+                <div className="attachments-debug-info" style={{ marginTop: '12px', padding: '12px', background: '#f8f9fa', borderRadius: '8px', fontSize: '12px', maxHeight: '300px', overflow: 'auto' }}>
                   <strong>معلومات Debug:</strong>
-                  <pre style={{ marginTop: '8px', overflow: 'auto', maxHeight: '200px' }}>
-                    {JSON.stringify({
-                      design_files: item.design_files,
-                      specifications_keys: item.specifications ? Object.keys(item.specifications) : [],
-                      specifications_sample: item.specifications ? Object.fromEntries(
-                        Object.entries(item.specifications).slice(0, 3)
-                      ) : {}
-                    }, null, 2)}
-                  </pre>
+                  <details style={{ marginTop: '8px' }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: '600', marginBottom: '8px' }}>إظهار تفاصيل البيانات</summary>
+                    <pre style={{ marginTop: '8px', overflow: 'auto', fontSize: '11px', background: '#fff', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}>
+                      {JSON.stringify({
+                        item_id: item.id,
+                        design_files: item.design_files,
+                        design_files_type: typeof item.design_files,
+                        design_files_is_array: Array.isArray(item.design_files),
+                        design_files_length: Array.isArray(item.design_files) ? item.design_files.length : 'N/A',
+                        specifications_keys: item.specifications ? Object.keys(item.specifications) : [],
+                        specifications: item.specifications,
+                        collected_attachments_count: collectedAttachments.length,
+                        all_attachments_count: allAttachments.length,
+                        final_attachments_count: finalAttachments.length
+                      }, null, 2)}
+                    </pre>
+                  </details>
                 </div>
               )}
             </div>

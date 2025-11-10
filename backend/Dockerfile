@@ -2,10 +2,24 @@ FROM node:18-slim AS frontend-builder
 
 # Build frontend
 WORKDIR /frontend
-COPY frontend/package.json frontend/package-lock.json* frontend/pnpm-lock.yaml* ./
-RUN npm install -g pnpm && pnpm install --frozen-lockfile || npm install
+
+# Copy package files
+COPY frontend/package.json ./
+COPY frontend/pnpm-lock.yaml* ./
+
+# Install pnpm and dependencies
+RUN npm install -g pnpm@8.15.0 && \
+    pnpm install --frozen-lockfile || \
+    (npm install && echo "⚠️ Using npm instead of pnpm")
+
+# Copy frontend source files
 COPY frontend/ .
+
+# Build frontend
 RUN pnpm build || npm run build
+
+# Verify build output
+RUN ls -la dist/ && echo "✅ Frontend build completed"
 
 FROM python:3.11-slim
 

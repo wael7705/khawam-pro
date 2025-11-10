@@ -3,23 +3,37 @@ FROM node:18-slim AS frontend-builder
 # Build frontend
 WORKDIR /frontend
 
-# Copy package files
+# Copy package files first
 COPY frontend/package.json ./
-COPY frontend/pnpm-lock.yaml* ./
 
-# Install pnpm and dependencies
-RUN npm install -g pnpm@8.15.0 && \
-    pnpm install --frozen-lockfile || \
-    (npm install && echo "⚠️ Using npm instead of pnpm")
+# Install pnpm (latest stable version)
+RUN npm install -g pnpm@latest
 
-# Copy frontend source files
+# Copy frontend source files (needed for pnpm to resolve dependencies correctly)
 COPY frontend/ .
+
+# Install dependencies with pnpm (without frozen-lockfile if lockfile doesn't exist)
+# Use --no-frozen-lockfile to allow pnpm to create/update lockfile
+# Fallback to npm with --legacy-peer-deps to handle React 19 peer dependency issues
+RUN if [ -f pnpm-lock.yaml ]; then \
+        pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile; \
+    else \
+        pnpm install --no-frozen-lockfile || \
+        (npm install --legacy-peer-deps && echo "⚠️ Used npm with --legacy-peer-deps"); \
+    fi
 
 # Build frontend
 RUN pnpm build || npm run build
 
-# Verify build output
-RUN ls -la dist/ && echo "✅ Frontend build completed"
+# Verify build output exists
+RUN if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then \
+        echo "❌ Frontend build failed - dist directory not found or empty"; \
+        ls -la; \
+        exit 1; \
+    else \
+        echo "✅ Frontend build completed successfully"; \
+        ls -la dist/; \
+    fi
 
 FROM python:3.11-slim
 

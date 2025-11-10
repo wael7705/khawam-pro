@@ -723,11 +723,15 @@ async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Sessio
 
 @router.get("/orders/all")
 async def get_all_orders(db: Session = Depends(get_db)):
-    """Get all orders"""
+    """Get all orders - optimized for performance"""
+    import time
+    start_time = time.time()
+    
     try:
         # First try using raw SQL to avoid issues with missing columns
         from sqlalchemy import text
         try:
+            print(f"⏱️ Admin Orders API - Starting...")
             # Check which columns exist in the database
             check_cols = db.execute(text("""
                 SELECT column_name 
@@ -822,17 +826,35 @@ async def get_all_orders(db: Session = Depends(get_db)):
             result = db.execute(text(query))
             rows = result.fetchall()
             
+            # تحسين الأداء: جلب جميع items دفعة واحدة بدلاً من loop
+            order_ids = [row[0] for row in rows]
+            items_query_start = time.time()
+            
+            # جلب جميع items دفعة واحدة
+            all_items = {}
+            if order_ids:
+                items_query = db.execute(text("""
+                    SELECT order_id, product_id, quantity, specifications
+                    FROM order_items
+                    WHERE order_id = ANY(:order_ids)
+                    ORDER BY order_id, id ASC
+                """), {"order_ids": order_ids}).fetchall()
+                
+                for item_row in items_query:
+                    order_id = item_row[0]
+                    if order_id not in all_items:
+                        all_items[order_id] = []
+                    all_items[order_id].append(item_row[1:])  # product_id, quantity, specifications
+            
+            print(f"⏱️ Admin Orders API - Items query: {time.time() - items_query_start:.2f}s (found items for {len(all_items)} orders)")
+            
             # Get order items for each order to determine order type and quantity
             orders_with_items = []
             for row in rows:
                 order_id = row[0]
-                # Get items for this order
-                items_query = db.execute(text("""
-                    SELECT product_id, quantity, specifications
-                    FROM order_items
-                    WHERE order_id = :order_id
-                    LIMIT 1
-                """), {"order_id": order_id}).fetchone()
+                # Get items for this order from pre-fetched data
+                items_for_order = all_items.get(order_id, [])
+                items_query = items_for_order[0] if items_for_order else None
                 
                 order_type = "product"
                 total_quantity = 0
@@ -879,14 +901,16 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 order_id = row[0]
                 order_info = order_info_map.get(order_id, {'order_type': 'product', 'total_quantity': 0, 'service_name': None})
                 
-                # Get image from first order item
-                first_item = db.query(OrderItem).filter(OrderItem.order_id == order_id).order_by(OrderItem.id.asc()).first()
+                # Get image from first order item - استخدام البيانات المحفوظة
                 raw_image = None
-                if first_item and first_item.design_files:
-                    for u in first_item.design_files:
-                        if u and str(u).strip():
-                            raw_image = str(u).strip()
-                            break
+                if order_id in all_items and all_items[order_id]:
+                    # محاولة جلب design_files من first item
+                    first_item_db = db.query(OrderItem).filter(OrderItem.order_id == order_id).order_by(OrderItem.id.asc()).first()
+                    if first_item_db and first_item_db.design_files:
+                        for u in first_item_db.design_files:
+                            if u and str(u).strip():
+                                raw_image = str(u).strip()
+                                break
                 
                 # حساب مؤشرات الأعمدة الجديدة للتقسيط (يجب تعريفها أولاً)
                 paid_amount = float(row[9]) if len(row) > 9 and row[9] is not None else 0.0
@@ -982,7 +1006,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                     "total_quantity": order_info['total_quantity'],
                     "service_name": order_info['service_name']
                 })
-            print(f"Returning {len(orders_list)} orders from raw SQL")
+            total_time = time.time() - start_time
+            print(f"⏱️ Admin Orders API - Total time: {total_time:.2f}s (returning {len(orders_list)} orders)")
             return orders_list
         except Exception as sql_err:
             print(f"Raw SQL failed, trying ORM: {sql_err}")
@@ -1139,10 +1164,12 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 "created_at": o.created_at.isoformat() if o.created_at else None,
                 "image_url": image_url
             })
-        print(f"Returning {len(orders_list)} orders")
+        total_time = time.time() - start_time
+        print(f"⏱️ Admin Orders API - Total time: {total_time:.2f}s (returning {len(orders_list)} orders via ORM)")
         return orders_list
     except Exception as e:
-        print(f"Error fetching orders: {e}")
+        total_time = time.time() - start_time
+        print(f"❌ Admin Orders API - Error after {total_time:.2f}s: {e}")
         import traceback
         traceback.print_exc()
         # Return empty list on error instead of crashing

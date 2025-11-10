@@ -35,9 +35,25 @@ export default function Login() {
       const loginData = response.data
       
       // Store token and user data
+      if (!loginData.access_token) {
+        showError('لم يتم استلام token من الخادم')
+        setLoading(false)
+        return
+      }
+      
       localStorage.setItem('auth_token', loginData.access_token)
       localStorage.setItem('user_data', JSON.stringify(loginData.user))
       
+      // التحقق من أن token تم حفظه بشكل صحيح
+      const savedToken = localStorage.getItem('auth_token')
+      if (!savedToken || savedToken !== loginData.access_token) {
+        console.error('⚠️ Token was not saved correctly!')
+        showError('حدث خطأ في حفظ بيانات تسجيل الدخول')
+        setLoading(false)
+        return
+      }
+      
+      console.log('✅ Token saved successfully:', savedToken.substring(0, 20) + '...')
       showSuccess(`مرحباً ${loginData.user.name}!`)
       
       // Redirect based on redirect parameter or user type

@@ -56,7 +56,13 @@ export const isAuthenticated = (): boolean => {
 
 // Get stored token
 export const getToken = (): string | null => {
-  return localStorage.getItem('auth_token')
+  const token = localStorage.getItem('auth_token')
+  if (!token) {
+    console.warn('⚠️ No token found in localStorage')
+  } else {
+    console.log('✅ Token found:', token.substring(0, 20) + '...')
+  }
+  return token
 }
 
 // Get stored user data

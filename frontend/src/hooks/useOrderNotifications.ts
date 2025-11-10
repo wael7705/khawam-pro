@@ -114,16 +114,25 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
   useEffect(() => {
     // التحقق من وجود token أولاً - هذا الأهم
     const token = getToken()
+    console.log('🔍 WebSocket hook - Token check:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      isAdmin: isAdmin(),
+      isEmployee: isEmployee(),
+    })
+    
     if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
-      console.log('WebSocket: Skipping - no token available')
+      console.warn('⚠️ WebSocket: Skipping - no token available')
       return
     }
 
     // التحقق من أن المستخدم مدير أو موظف
     if (!(isAdmin() || isEmployee())) {
-      console.log('WebSocket: Skipping - user is not admin or employee')
+      console.log('ℹ️ WebSocket: Skipping - user is not admin or employee')
       return
     }
+    
+    console.log('✅ WebSocket: All checks passed, connecting...')
 
     manualCloseRef.current = false
 

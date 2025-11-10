@@ -151,39 +151,56 @@ const normalizeAttachmentEntry = (
   }
 
   if (typeof entry === 'object') {
-    console.log('🔍 Processing object entry:', Object.keys(entry))
+    console.log('🔍 Processing object entry:', Object.keys(entry), entry)
+    
+    // البحث عن URL في جميع المفاتيح المحتملة
     const rawUrl =
       entry.url ||
       entry.file_url ||
-      entry.file ||
-      entry.path ||
-      entry.href ||
-      entry.location_url ||
       entry.download_url ||
       entry.raw_path ||
-      entry.data_url || // إضافة دعم data_url
-      entry.data || // إضافة دعم data
+      entry.path ||
+      entry.file ||
+      entry.href ||
+      entry.location_url ||
+      entry.data_url ||
+      entry.data ||
+      entry.src ||
       ''
+    
     const rawUrlString = String(rawUrl).trim()
-    console.log('🔍 Raw URL string:', rawUrlString.substring(0, 100))
+    console.log('🔍 Raw URL string from object:', rawUrlString ? rawUrlString.substring(0, 100) : 'empty')
+    
     let url = ''
     
     // إذا كانت data URL، استخدمها مباشرة
     if (rawUrlString && isDataUrl(rawUrlString)) {
       console.log('✅ Found data URL in object:', rawUrlString.substring(0, 50) + '...')
       url = rawUrlString
-    } else if (rawUrlString && !rawUrlString.startsWith(':')) {
-      url = resolveToAbsoluteUrl(rawUrlString)
-      console.log('✅ Resolved URL from object:', url)
+    } else if (rawUrlString) {
+      // للروابط النسبية أو المطلقة
+      if (rawUrlString.startsWith('http://') || rawUrlString.startsWith('https://')) {
+        url = rawUrlString
+        console.log('✅ Found absolute URL:', url)
+      } else if (rawUrlString.startsWith('/uploads/') || rawUrlString.startsWith('/')) {
+        // رابط نسبي يبدأ بـ /uploads/
+        url = resolveToAbsoluteUrl(rawUrlString)
+        console.log('✅ Resolved relative URL:', url)
+      } else if (!rawUrlString.startsWith(':')) {
+        // أي رابط آخر غير فارغ
+        url = resolveToAbsoluteUrl(rawUrlString)
+        console.log('✅ Resolved URL from object:', url)
+      }
     }
 
+    // إذا لم نجد URL بعد، جرب entry.location
     if (!url && entry.location) {
       const locationUrl = String(entry.location).trim()
       console.log('🔍 Trying location URL:', locationUrl.substring(0, 50))
       if (isDataUrl(locationUrl)) {
         url = locationUrl
         console.log('✅ Found data URL in location')
-      } else {
+      } else if (locationUrl.startsWith('http') || locationUrl.startsWith('/')) {
         url = resolveToAbsoluteUrl(locationUrl)
         console.log('✅ Resolved location URL:', url)
       }
@@ -192,14 +209,41 @@ const normalizeAttachmentEntry = (
     // إذا لم نجد URL بعد، قد يكون entry نفسه هو data URL ككائن
     if (!url && typeof entry === 'object' && entry.toString) {
       const entryString = entry.toString()
-      if (entryString && isDataUrl(entryString)) {
-        url = entryString
-        console.log('✅ Found data URL in entry.toString()')
+      if (entryString && (isDataUrl(entryString) || entryString.startsWith('http') || entryString.startsWith('/'))) {
+        if (isDataUrl(entryString)) {
+          url = entryString
+          console.log('✅ Found data URL in entry.toString()')
+        } else {
+          url = resolveToAbsoluteUrl(entryString)
+          console.log('✅ Found URL in entry.toString():', url)
+        }
+      }
+    }
+
+    // إذا لم نجد URL بعد، لكن لدينا filename، جرب إنشاء URL من filename
+    if (!url && entry.filename) {
+      const filename = String(entry.filename).trim()
+      if (filename) {
+        // إذا كان filename يحتوي على مسار
+        if (filename.includes('/')) {
+          url = resolveToAbsoluteUrl(filename)
+          console.log('✅ Created URL from filename with path:', url)
+        } else {
+          // إذا كان filename فقط، أضفه إلى /uploads/
+          url = resolveToAbsoluteUrl(`/uploads/${filename}`)
+          console.log('✅ Created URL from filename:', url)
+        }
       }
     }
 
     if (!url) {
-      console.warn('⚠️ No URL found in object entry:', entry)
+      console.warn('⚠️ No URL found in object entry after all attempts:', {
+        entry,
+        keys: Object.keys(entry),
+        rawUrl: rawUrlString,
+        location: entry.location,
+        filename: entry.filename
+      })
       return null
     }
 
@@ -999,16 +1043,58 @@ export default function OrderDetail() {
       // عرض المرفقات حتى لو كانت فارغة، لإظهار البطاقة
       // لكن نتحقق من وجود بيانات فعلية قبل إضافة section
       const hasAnyData = allAttachments.length > 0 || fallbackNames.length > 0 || 
-                        (item.design_files && Array.isArray(item.design_files) && item.design_files.length > 0) ||
+                        (item.design_files && (
+                          (Array.isArray(item.design_files) && item.design_files.length > 0) ||
+                          (typeof item.design_files === 'string' && item.design_files.trim().length > 0) ||
+                          (typeof item.design_files === 'object' && item.design_files !== null)
+                        )) ||
                         (item.specifications && typeof item.specifications === 'object' && Object.keys(item.specifications).length > 0)
       
-      if (!hasAnyData) {
+      // إذا لم نجد مرفقات لكن design_files موجودة، حاول استخراجها مرة أخرى
+      if (allAttachments.length === 0 && item.design_files) {
+        console.log(`  🔄 No attachments found, re-attempting to extract from design_files:`, item.design_files)
+        // محاولة إضافية لاستخراج الملفات
+        try {
+          let filesToExtract: any[] = []
+          if (Array.isArray(item.design_files)) {
+            filesToExtract = item.design_files
+          } else if (typeof item.design_files === 'string') {
+            try {
+              const parsed = JSON.parse(item.design_files)
+              filesToExtract = Array.isArray(parsed) ? parsed : [parsed]
+            } catch {
+              filesToExtract = [item.design_files]
+            }
+          } else if (typeof item.design_files === 'object') {
+            filesToExtract = [item.design_files]
+          }
+          
+          filesToExtract.forEach((fileEntry, idx) => {
+            console.log(`    Re-extracting file[${idx}]:`, fileEntry)
+            const normalized = normalizeAttachmentEntry(fileEntry, item.id, item.service_name || item.product_name)
+            if (normalized && !allAttachments.find(a => a.url === normalized.url)) {
+              allAttachments.push(normalized)
+              console.log(`    ✅ Re-extracted attachment:`, normalized)
+            }
+          })
+        } catch (e) {
+          console.error(`    ❌ Error re-extracting files:`, e)
+        }
+      }
+      
+      if (!hasAnyData && allAttachments.length === 0) {
         console.log(`  ⚠️ No attachments found for item ${item.id}, skipping section`)
         return
       }
       
       // استخدام allAttachments بدلاً من attachments
       const finalAttachments = allAttachments.length > 0 ? allAttachments : attachments
+      
+      console.log(`  ✅ Final attachments for item ${item.id}:`, finalAttachments.length, finalAttachments.map(a => ({
+        filename: a.filename,
+        url: a.url.substring(0, 50),
+        isImage: a.isImage
+      })))
 
       const unmatchedFallbacks =
         finalAttachments.length > 0

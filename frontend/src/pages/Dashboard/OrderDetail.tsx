@@ -73,26 +73,47 @@ const normalizeAttachmentEntry = (
   orderItemId?: number,
   originLabel?: string
 ): NormalizedAttachment | null => {
-  if (!entry) return null
+  if (!entry) {
+    console.log('⚠️ normalizeAttachmentEntry: entry is null/undefined')
+    return null
+  }
+
+  console.log('🔍 normalizeAttachmentEntry:', {
+    entry,
+    entry_type: typeof entry,
+    entry_is_string: typeof entry === 'string',
+    entry_is_object: typeof entry === 'object',
+    isDataUrl: typeof entry === 'string' && isDataUrl(entry)
+  })
 
   if (typeof entry === 'string') {
     const trimmed = entry.trim()
-    if (!trimmed || trimmed.startsWith(':')) return null
+    if (!trimmed || trimmed.startsWith(':')) {
+      console.log('⚠️ Invalid string entry:', trimmed)
+      return null
+    }
     
     // إذا كانت data URL، استخدمها مباشرة بدون resolve
     if (isDataUrl(trimmed)) {
-      return {
+      console.log('✅ Found data URL:', trimmed.substring(0, 50) + '...')
+      const result = {
         url: trimmed, // استخدم data URL مباشرة
         filename: extractFileName(trimmed) || 'ملف',
         isImage: looksLikeImage(trimmed) || trimmed.startsWith('data:image/'),
         orderItemId,
         originLabel,
       }
+      console.log('✅ Returning data URL attachment:', result)
+      return result
     }
     
     // للروابط الأخرى، استخدم resolveToAbsoluteUrl
     const url = resolveToAbsoluteUrl(trimmed)
-    if (!url) return null
+    if (!url) {
+      console.log('⚠️ Failed to resolve URL:', trimmed)
+      return null
+    }
+    console.log('✅ Resolved URL:', url)
     return {
       url,
       filename: extractFileName(trimmed) || 'ملف',
@@ -103,6 +124,7 @@ const normalizeAttachmentEntry = (
   }
 
   if (typeof entry === 'object') {
+    console.log('🔍 Processing object entry:', Object.keys(entry))
     const rawUrl =
       entry.url ||
       entry.file_url ||
@@ -113,27 +135,44 @@ const normalizeAttachmentEntry = (
       entry.download_url ||
       entry.raw_path ||
       entry.data_url || // إضافة دعم data_url
+      entry.data || // إضافة دعم data
       ''
     const rawUrlString = String(rawUrl).trim()
+    console.log('🔍 Raw URL string:', rawUrlString.substring(0, 100))
     let url = ''
     
     // إذا كانت data URL، استخدمها مباشرة
     if (rawUrlString && isDataUrl(rawUrlString)) {
+      console.log('✅ Found data URL in object:', rawUrlString.substring(0, 50) + '...')
       url = rawUrlString
     } else if (rawUrlString && !rawUrlString.startsWith(':')) {
       url = resolveToAbsoluteUrl(rawUrlString)
+      console.log('✅ Resolved URL from object:', url)
     }
 
     if (!url && entry.location) {
       const locationUrl = String(entry.location).trim()
+      console.log('🔍 Trying location URL:', locationUrl.substring(0, 50))
       if (isDataUrl(locationUrl)) {
         url = locationUrl
+        console.log('✅ Found data URL in location')
       } else {
         url = resolveToAbsoluteUrl(locationUrl)
+        console.log('✅ Resolved location URL:', url)
+      }
+    }
+
+    // إذا لم نجد URL بعد، قد يكون entry نفسه هو data URL ككائن
+    if (!url && typeof entry === 'object' && entry.toString) {
+      const entryString = entry.toString()
+      if (entryString && isDataUrl(entryString)) {
+        url = entryString
+        console.log('✅ Found data URL in entry.toString()')
       }
     }
 
     if (!url) {
+      console.warn('⚠️ No URL found in object entry:', entry)
       return null
     }
 
@@ -151,11 +190,13 @@ const normalizeAttachmentEntry = (
     let isImage = false
     if (isDataUrl(url)) {
       isImage = url.startsWith('data:image/')
+      console.log('✅ Detected image from data URL MIME type')
     } else {
       isImage = mimeType.includes('image') || looksLikeImage(url) || looksLikeImage(filename)
+      console.log('✅ Detected image from:', { mimeType, url, filename, isImage })
     }
 
-    return {
+    const result = {
       url,
       filename,
       isImage,
@@ -164,8 +205,11 @@ const normalizeAttachmentEntry = (
       orderItemId,
       originLabel,
     }
+    console.log('✅ Returning normalized attachment:', result)
+    return result
   }
 
+  console.warn('⚠️ Unknown entry type:', typeof entry, entry)
   return null
 }
 
@@ -429,23 +473,57 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
 
 const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
   const entries: NormalizedAttachment[] = []
+  
+  console.log('🔍 collectItemAttachments - Item:', {
+    id: item.id,
+    design_files: item.design_files,
+    design_files_type: typeof item.design_files,
+    design_files_is_array: Array.isArray(item.design_files),
+    specifications: item.specifications
+  })
+  
   if (Array.isArray(item.design_files)) {
-    item.design_files.forEach((entry) => {
+    console.log(`✅ Found ${item.design_files.length} design_files in array`)
+    item.design_files.forEach((entry, idx) => {
+      console.log(`  Processing design_file[${idx}]:`, entry, typeof entry)
       const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
       if (normalized) {
+        console.log(`  ✅ Normalized attachment:`, normalized)
         entries.push(normalized)
+      } else {
+        console.warn(`  ⚠️ Failed to normalize entry:`, entry)
       }
     })
+  } else if (item.design_files) {
+    console.log('⚠️ design_files is not an array:', item.design_files, typeof item.design_files)
+    // محاولة تحويل إلى array
+    try {
+      const filesArray = Array.isArray(item.design_files) ? item.design_files : [item.design_files]
+      filesArray.forEach((entry, idx) => {
+        const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
+        if (normalized) {
+          entries.push(normalized)
+        }
+      })
+    } catch (e) {
+      console.error('Error processing design_files:', e)
+    }
+  } else {
+    console.log('⚠️ No design_files found in item')
   }
 
   const specEntries = collectAttachmentsFromSpecs(item.specifications)
-  specEntries.forEach((entry) => {
+  console.log(`📋 Found ${specEntries.length} attachments from specifications`)
+  specEntries.forEach((entry, idx) => {
+    console.log(`  Processing spec entry[${idx}]:`, entry)
     const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
     if (normalized) {
+      console.log(`  ✅ Normalized spec attachment:`, normalized)
       entries.push(normalized)
     }
   })
 
+  console.log(`✅ Total attachments collected: ${entries.length}`)
   return dedupeAttachments(entries)
 }
 
@@ -540,17 +618,37 @@ export default function OrderDetail() {
     try {
       setLoading(true)
       setOrderAttachments([])
+      console.log('🔄 Loading order:', orderId)
       const response = await adminAPI.orders.getById(orderId)
+      console.log('📦 Order response:', response.data)
+      
       if (response.data.success && response.data.order) {
-        setOrder(response.data.order)
-        setStaffNotes(response.data.order.staff_notes || '')
+        const orderData = response.data.order
+        console.log('📋 Order data:', orderData)
+        console.log('📋 Order items:', orderData.items)
+        
+        // Log design_files for each item
+        if (orderData.items && Array.isArray(orderData.items)) {
+          orderData.items.forEach((item: any, idx: number) => {
+            console.log(`📎 Item[${idx}] design_files:`, {
+              item_id: item.id,
+              design_files: item.design_files,
+              design_files_type: typeof item.design_files,
+              design_files_is_array: Array.isArray(item.design_files),
+              design_files_length: Array.isArray(item.design_files) ? item.design_files.length : 'N/A'
+            })
+          })
+        }
+        
+        setOrder(orderData)
+        setStaffNotes(orderData.staff_notes || '')
         fetchOrderAttachments(orderId)
       } else {
         showError('الطلب غير موجود')
         navigate('/dashboard/orders')
       }
     } catch (error: any) {
-      console.error('Error loading order:', error)
+      console.error('❌ Error loading order:', error)
       showError('حدث خطأ في جلب تفاصيل الطلب')
       navigate('/dashboard/orders')
     } finally {

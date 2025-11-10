@@ -1365,25 +1365,44 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         
         def safe_parse_array(value):
             if value is None:
+                print(f"⚠️ design_files is None")
                 return []
             if isinstance(value, list):
-                return [f for f in value if f is not None]
+                print(f"✅ design_files is list with {len(value)} items")
+                result = [f for f in value if f is not None]
+                print(f"✅ After filtering None: {len(result)} items")
+                return result
             if isinstance(value, str):
+                print(f"⚠️ design_files is string: {value[:100]}...")
                 try:
                     import json
                     parsed = json.loads(value)
+                    print(f"✅ Parsed JSON: type={type(parsed)}, is_list={isinstance(parsed, list)}")
                     if isinstance(parsed, list):
-                        return [f for f in parsed if f is not None]
+                        result = [f for f in parsed if f is not None]
+                        print(f"✅ After filtering: {len(result)} items")
+                        return result
                     elif isinstance(parsed, dict):
-                        return [f for f in parsed.values() if f is not None]
-                except:
-                    pass
+                        result = [f for f in parsed.values() if f is not None]
+                        print(f"✅ Dict values: {len(result)} items")
+                        return result
+                    else:
+                        print(f"⚠️ Parsed value is not list or dict: {type(parsed)}")
+                        return [parsed] if parsed is not None else []
+                except Exception as e:
+                    print(f"❌ Error parsing JSON: {e}")
+                    # إذا فشل parsing، حاول إرجاع القيمة كسلسلة واحدة
+                    return [value] if value.strip() else []
             if isinstance(value, dict):
-                return [f for f in value.values() if f is not None]
+                print(f"⚠️ design_files is dict with {len(value)} keys")
+                result = [f for f in value.values() if f is not None]
+                return result
             try:
                 result = list(value) if value else []
+                print(f"⚠️ Converted to list: {len(result)} items")
                 return [f for f in result if f is not None]
-            except:
+            except Exception as e:
+                print(f"❌ Error converting to list: {e}")
                 return []
         
         # Process items from raw SQL

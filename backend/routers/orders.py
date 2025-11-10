@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect, or_
 from database import get_db
@@ -17,6 +18,7 @@ import re
 from notifications import order_notifications
 import asyncio
 from routers.auth import get_current_active_user, get_current_user_optional
+from io import BytesIO
 
 router = APIRouter()
 
@@ -137,17 +139,29 @@ def ensure_order_items_columns(db: Session):
                     print(f"⚠️ Unable to convert design_files column type: {exc}")
                     db.rollback()
 
-def get_public_base_url() -> str:
+def get_public_base_url(request: Optional[Request] = None) -> str:
+    """Get the public base URL for file serving"""
+    # Try environment variables first
     base = (
         os.getenv("PUBLIC_BASE_URL")
         or os.getenv("FRONTEND_BASE_URL")
         or os.getenv("API_PUBLIC_BASE_URL")
         or os.getenv("APP_BASE_URL")
-        or ""
+        or os.getenv("API_URL")
     )
-    return base.rstrip('/')
+    
+    # If no env variable, try to infer from request
+    if not base and request:
+        base = str(request.base_url).rstrip('/')
+        # Remove /api suffix if present
+        if base.endswith('/api'):
+            base = base[:-4]
+    
+    # If still no base, return empty (will use relative URLs)
+    return base.rstrip('/') if base else ""
 
-def build_file_url(raw_path: Optional[str]) -> str:
+def build_file_url(raw_path: Optional[str], request: Optional[Request] = None) -> str:
+    """Build a file URL, checking if file exists locally"""
     if not raw_path:
         return ""
     raw_path = str(raw_path).strip()
@@ -157,17 +171,42 @@ def build_file_url(raw_path: Optional[str]) -> str:
         return raw_path
     if raw_path.startswith("http://") or raw_path.startswith("https://"):
         return raw_path
-    base = get_public_base_url()
+    
+    # Check if file exists locally
+    if raw_path.startswith("/uploads/"):
+        local_path = raw_path.lstrip("/")
+        # Normalize path separators for Windows
+        local_path = local_path.replace("/", os.sep)
+        if os.path.exists(local_path) and os.path.isfile(local_path):
+            # File exists, return the URL
+            base = get_public_base_url(request)
+            if base:
+                return f"{base}{raw_path}"
+            else:
+                # No base URL, return relative path (will work with static file serving)
+                return raw_path
+        else:
+            # File doesn't exist, but return URL anyway (might be on different server)
+            base = get_public_base_url(request)
+            if base:
+                return f"{base}{raw_path}"
+            else:
+                return raw_path
+    
+    # For other paths, just build URL
+    base = get_public_base_url(request)
     if raw_path.startswith("/"):
         return f"{base}{raw_path}" if base else raw_path
-    return f"{base}/{raw_path}" if base else raw_path
+    return f"{base}/{raw_path}" if base else f"/{raw_path}"
 
 def normalize_attachment_entry(
     entry: Any,
     order_id: int,
     order_item_id: Optional[int],
-    index: int
-) -> Optional[Dict[str, any]]:
+    index: int,
+    request: Optional[Request] = None
+) -> Optional[Dict[str, Any]]:
+    """Normalize an attachment entry and verify file exists if it's a local file"""
     if not entry:
         return None
 
@@ -177,12 +216,14 @@ def normalize_attachment_entry(
     mime_type = None
     size_label = None
     size_in_bytes = None
+    file_exists = False
 
     if isinstance(entry, dict):
         filename = entry.get("filename") or entry.get("name") or entry.get("original_name")
         raw_path = (
             entry.get("url")
             or entry.get("download_url")
+            or entry.get("raw_path")
             or entry.get("path")
             or entry.get("file")
             or entry.get("location_url")
@@ -191,7 +232,11 @@ def normalize_attachment_entry(
         mime_type = entry.get("mime_type") or entry.get("mimetype") or entry.get("content_type")
         size_label = entry.get("size_label")
         size_in_bytes = entry.get("size") or entry.get("size_in_bytes")
+        
+        # If we have a filename but no path, try to construct it
         if not raw_path and filename:
+            # Try to find the file in the order's upload directory
+            # This is a fallback - the path should already be set during order creation
             raw_path = f"/uploads/{filename}"
     else:
         raw_path = str(entry).strip()
@@ -200,12 +245,68 @@ def normalize_attachment_entry(
     if not raw_path:
         return None
 
-    file_url = build_file_url(raw_path)
+    # Check if it's a data URL (base64 encoded)
+    if raw_path.startswith("data:"):
+        file_url = raw_path
+        file_exists = True
+        # Try to extract filename from data URL if not already set
+        if not filename:
+            # Try to get it from the data URL header
+            try:
+                header = raw_path.split(",")[0]
+                if "filename=" in header:
+                    filename_match = re.search(r'filename=([^;]+)', header)
+                    if filename_match:
+                        filename = filename_match.group(1)
+            except:
+                pass
+            if not filename:
+                filename = "ملف"
+        # Try to get file size from data URL
+        if not size_in_bytes and raw_path.startswith("data:"):
+            try:
+                encoded = raw_path.split(",", 1)[1]
+                size_in_bytes = len(base64.b64decode(encoded))
+            except:
+                pass
+    elif raw_path.startswith("http://") or raw_path.startswith("https://"):
+        # External URL, assume it exists
+        file_url = raw_path
+        file_exists = True
+    else:
+        # Local file path - check if it exists
+        if raw_path.startswith("/uploads/"):
+            local_path = raw_path.lstrip("/")
+            local_path = local_path.replace("/", os.sep)
+            file_exists = os.path.exists(local_path) and os.path.isfile(local_path)
+            if file_exists and not size_in_bytes:
+                try:
+                    size_in_bytes = os.path.getsize(local_path)
+                except:
+                    pass
+            if file_exists and not mime_type:
+                mime_type, _ = mimetypes.guess_type(local_path)
+        else:
+            # Relative path, assume it might exist
+            file_exists = False
+        
+        file_url = build_file_url(raw_path, request)
+
     if not file_url:
         return None
 
+    # Extract filename from path if not set
+    if not filename and raw_path:
+        filename = os.path.basename(raw_path.split("?")[0])
+        if not filename or filename == "/":
+            filename = "ملف"
+
+    # Generate file key for identification
+    file_key = f"{order_id}-{order_item_id or 'item'}-{index}"
+
     return {
-        "id": f"{order_id}-{order_item_id or 'item'}-{index}",
+        "id": file_key,
+        "file_key": file_key,
         "order_item_id": order_item_id,
         "filename": filename or "ملف",
         "raw_path": raw_path,
@@ -215,6 +316,7 @@ def normalize_attachment_entry(
         "mime_type": mime_type,
         "size_label": size_label,
         "size_in_bytes": size_in_bytes,
+        "file_exists": file_exists,  # Add flag to indicate if file exists locally
     }
 # Background task for notifications
 async def send_order_notification(payload: Dict[str, Any]):
@@ -358,17 +460,27 @@ def _persist_design_files(
                     file_bytes, extension = result
                     filename = _secure_filename(f"attachment-{idx + 1}{extension}")
                     file_path = os.path.join(base_dir, filename)
-                    with open(file_path, "wb") as file_obj:
-                        file_obj.write(file_bytes)
-                    persisted_entry = {
-                        "filename": filename,
-                        "url": f"{web_base}/{filename}",
-                        "download_url": f"{web_base}/{filename}",
-                        "raw_path": f"{web_base}/{filename}",
-                        "size_in_bytes": len(file_bytes)
-                    }
-                    persisted_entries.append(persisted_entry)
-                    print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes)")
+                    try:
+                        with open(file_path, "wb") as file_obj:
+                            file_obj.write(file_bytes)
+                        # Verify file was written
+                        if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
+                            persisted_entry = {
+                                "filename": filename,
+                                "url": f"{web_base}/{filename}",
+                                "download_url": f"{web_base}/{filename}",
+                                "raw_path": f"{web_base}/{filename}",
+                                "size_in_bytes": len(file_bytes)
+                            }
+                            persisted_entries.append(persisted_entry)
+                            print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes) -> {file_path}")
+                            print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
+                        else:
+                            print(f"    ❌ File verification failed: {file_path}")
+                    except Exception as write_error:
+                        print(f"    ❌ Failed to write file {file_path}: {write_error}")
+                        import traceback
+                        traceback.print_exc()
                 else:
                     print(f"    ✅ Keeping string entry as-is: {entry[:50]}...")
                     persisted_entries.append(entry)
@@ -398,20 +510,37 @@ def _persist_design_files(
                         file_bytes, extension = result
                         filename = _secure_filename(saved_entry.get("filename") or f"attachment-{idx + 1}{extension}")
                         file_path = os.path.join(base_dir, filename)
-                        with open(file_path, "wb") as file_obj:
-                            file_obj.write(file_bytes)
-                        
-                        # تحديث جميع URLs في saved_entry
-                        file_url = f"{web_base}/{filename}"
-                        saved_entry["url"] = file_url
-                        saved_entry["download_url"] = file_url
-                        saved_entry["raw_path"] = file_url
-                        saved_entry["size_in_bytes"] = len(file_bytes)
-                        # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
-                        # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
-                        saved_entry.pop("file_key", None)
-                        
-                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
+                        try:
+                            with open(file_path, "wb") as file_obj:
+                                file_obj.write(file_bytes)
+                            # Verify file was written
+                            if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
+                                # تحديث جميع URLs في saved_entry
+                                file_url = f"{web_base}/{filename}"
+                                saved_entry["url"] = file_url
+                                saved_entry["download_url"] = file_url
+                                saved_entry["raw_path"] = file_url
+                                saved_entry["size_in_bytes"] = len(file_bytes)
+                                # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
+                                # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
+                                saved_entry.pop("file_key", None)
+                                
+                                print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
+                                print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
+                            else:
+                                print(f"    ❌ File verification failed: {file_path}")
+                                # احتفظ بالـ data URL كنسخة احتياطية
+                                saved_entry["url"] = data_url
+                                saved_entry["download_url"] = data_url
+                                saved_entry["raw_path"] = data_url
+                        except Exception as write_error:
+                            print(f"    ❌ Failed to write file {file_path}: {write_error}")
+                            import traceback
+                            traceback.print_exc()
+                            # احتفظ بالـ data URL كنسخة احتياطية
+                            saved_entry["url"] = data_url
+                            saved_entry["download_url"] = data_url
+                            saved_entry["raw_path"] = data_url
                     else:
                         print(f"    ⚠️ Failed to decode data URL from dict")
                         # إذا فشل decoding، احتفظ بالـ data URL الأصلي
@@ -901,7 +1030,8 @@ async def get_orders(
         raise HTTPException(status_code=500, detail=f"خطأ في جلب الطلبات: {str(e)}")
 
 @router.get("/{order_id}/attachments")
-async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
+async def get_order_attachments(order_id: int, db: Session = Depends(get_db), request: Request = None):
+    """Get all attachments for an order, verifying file existence"""
     ensure_order_columns(db)
     ensure_order_items_columns(db)
 
@@ -928,12 +1058,14 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
             design_files = [design_files]
 
         for idx, design_entry in enumerate(design_files):
-            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx)
+            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx, request)
             if normalized:
-                if normalized.get("file_key"):
-                    attachments_by_key[str(normalized["file_key"])] = normalized
-                normalized["order_item_service_name"] = getattr(item, "product_name", None)
-                attachments.append(normalized)
+                # Only include attachments that have valid URLs
+                if normalized.get("url") or normalized.get("download_url"):
+                    if normalized.get("file_key"):
+                        attachments_by_key[str(normalized["file_key"])] = normalized
+                    normalized["order_item_service_name"] = getattr(item, "product_name", None)
+                    attachments.append(normalized)
 
     return {
         "success": True,
@@ -944,7 +1076,8 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{order_id}/attachments/{file_key}")
-async def download_order_attachment(order_id: int, file_key: str, db: Session = Depends(get_db)):
+async def download_order_attachment(order_id: int, file_key: str, db: Session = Depends(get_db), request: Request = None):
+    """Download an attachment file, serving it directly if it exists locally"""
     ensure_order_columns(db)
     ensure_order_items_columns(db)
 
@@ -971,7 +1104,7 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
             design_files = [design_files]
 
         for idx, design_entry in enumerate(design_files):
-            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx)
+            normalized = normalize_attachment_entry(design_entry, order.id, item.id, idx, request)
             if normalized and str(normalized.get("file_key")) == file_key:
                 normalized_entry = normalized
                 break
@@ -982,24 +1115,94 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
         raise HTTPException(status_code=404, detail="الملف غير موجود لهذا الطلب")
 
     file_url = normalized_entry.get("url") or normalized_entry.get("download_url")
+    raw_path = normalized_entry.get("raw_path")
+    filename = normalized_entry.get("filename", "attachment")
+    
     if not file_url:
         raise HTTPException(status_code=400, detail="لا يوجد رابط صالح للملف")
 
-    if file_url.startswith("data:"):
+    # Handle data URLs
+    if file_url.startswith("data:") or (raw_path and raw_path.startswith("data:")):
         try:
-            import base64
-            header, encoded = file_url.split(",", 1)
+            data_url = file_url if file_url.startswith("data:") else raw_path
+            header, encoded = data_url.split(",", 1)
             mime_type = "application/octet-stream"
             if ";" in header:
                 mime_type = header.split(";")[0].replace("data:", "") or mime_type
             file_bytes = base64.b64decode(encoded)
             response = StreamingResponse(BytesIO(file_bytes), media_type=mime_type)
-            response.headers["Content-Disposition"] = f'attachment; filename="{normalized_entry.get("filename", "attachment")}"'
+            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
             return response
-        except Exception:
+        except Exception as e:
+            print(f"Error decoding data URL: {e}")
             raise HTTPException(status_code=500, detail="تعذر تحويل الملف من base64")
 
-    return RedirectResponse(file_url, status_code=302)
+    # Handle local files - serve them directly if they exist
+    if raw_path and raw_path.startswith("/uploads/"):
+        local_path = raw_path.lstrip("/")
+        local_path = local_path.replace("/", os.sep)
+        if os.path.exists(local_path) and os.path.isfile(local_path):
+            # File exists locally, serve it directly
+            mime_type = normalized_entry.get("mime_type")
+            if not mime_type:
+                mime_type, _ = mimetypes.guess_type(local_path)
+            if not mime_type:
+                mime_type = "application/octet-stream"
+            
+            return FileResponse(
+                local_path,
+                media_type=mime_type,
+                filename=filename,
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+
+    # For external URLs or files that don't exist locally, redirect
+    if file_url.startswith("http://") or file_url.startswith("https://"):
+        return RedirectResponse(file_url, status_code=302)
+    
+    # For relative paths, try to serve them if they exist
+    if raw_path and raw_path.startswith("/uploads/"):
+        # File doesn't exist, but we have a path - redirect to the URL
+        return RedirectResponse(file_url, status_code=302)
+    
+    raise HTTPException(status_code=404, detail="الملف غير موجود")
+
+@router.get("/{order_id}/files/{file_path:path}")
+async def serve_order_file(order_id: int, file_path: str, db: Session = Depends(get_db)):
+    """Serve order files directly from the uploads directory"""
+    # Security: Ensure the file path is within uploads/orders directory
+    if ".." in file_path or file_path.startswith("/"):
+        raise HTTPException(status_code=400, detail="مسار غير صالح")
+    
+    # Verify order exists
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="الطلب غير موجود")
+    
+    # Construct the full file path
+    full_path = os.path.join("uploads", "orders", file_path)
+    # Normalize path separators
+    full_path = os.path.normpath(full_path)
+    
+    # Security check: ensure path is still within uploads/orders
+    if not full_path.startswith(os.path.normpath("uploads/orders")):
+        raise HTTPException(status_code=400, detail="مسار غير صالح")
+    
+    # Check if file exists
+    if not os.path.exists(full_path) or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="الملف غير موجود")
+    
+    # Get MIME type
+    mime_type, _ = mimetypes.guess_type(full_path)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+    
+    # Serve the file
+    return FileResponse(
+        full_path,
+        media_type=mime_type,
+        filename=os.path.basename(full_path)
+    )
 
 @router.get("/{order_id}")
 async def get_order(order_id: int, db: Session = Depends(get_db)):

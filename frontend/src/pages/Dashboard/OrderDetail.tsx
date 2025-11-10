@@ -456,15 +456,43 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
           <div key={`${file.url}-${file.filename}-${idx}`} className="attachment-card">
             <div className={`attachment-preview ${file.isImage ? 'image' : isPDF ? 'pdf' : isDocument ? 'document' : 'file'}`}>
               {file.isImage ? (
-                <img src={file.url} alt={file.filename} loading="lazy" onError={(e) => {
-                  console.error('❌ Error loading image:', file.url)
-                  // إذا فشل تحميل الصورة، استبدلها بأيقونة
-                  e.currentTarget.style.display = 'none'
-                  const parent = e.currentTarget.parentElement
-                  if (parent) {
-                    parent.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"><FileText size={26} /></div>'
-                  }
-                }} />
+                <img 
+                  src={file.url} 
+                  alt={file.filename} 
+                  loading="lazy" 
+                  onError={(e) => {
+                    console.error('❌ Error loading image:', file.url, file.filename)
+                    // إذا فشل تحميل الصورة، استبدلها بأيقونة
+                    const target = e.currentTarget as HTMLImageElement
+                    target.style.display = 'none'
+                    const parent = target.parentElement
+                    if (parent) {
+                      // إنشاء عنصر div مع أيقونة
+                      const iconDiv = document.createElement('div')
+                      iconDiv.style.display = 'flex'
+                      iconDiv.style.alignItems = 'center'
+                      iconDiv.style.justifyContent = 'center'
+                      iconDiv.style.width = '100%'
+                      iconDiv.style.height = '100%'
+                      iconDiv.style.flexDirection = 'column'
+                      iconDiv.style.gap = '8px'
+                      iconDiv.innerHTML = `
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                          <line x1="16" y1="13" x2="8" y2="13"></line>
+                          <line x1="16" y1="17" x2="8" y2="17"></line>
+                          <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <span style="font-size: 10px; color: #666;">خطأ في التحميل</span>
+                      `
+                      parent.appendChild(iconDiv)
+                    }
+                  }}
+                  onLoad={() => {
+                    console.log('✅ Image loaded successfully:', file.url)
+                  }}
+                />
               ) : isPDF ? (
                 <div className="file-icon pdf-icon">
                   <FileText size={32} />
@@ -485,13 +513,41 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                 <button
                   className="attachment-action"
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     console.log('🔗 Opening file:', file.url, file.filename)
-                    // للـ PDF والملفات، افتحها في نافذة جديدة
-                    if (isPDF || isDocument) {
-                      window.open(file.url, '_blank', 'noopener,noreferrer')
-                    } else {
-                      window.open(file.url, '_blank', 'noopener,noreferrer')
+                    try {
+                      // التحقق من أن الملف موجود قبل فتحه
+                      if (file.url.startsWith('data:')) {
+                        // Data URL - يمكن فتحه مباشرة
+                        window.open(file.url, '_blank', 'noopener,noreferrer')
+                      } else {
+                        // للروابط العادية، جرب فتحها مع معالجة الأخطاء
+                        const newWindow = window.open(file.url, '_blank', 'noopener,noreferrer')
+                        if (!newWindow) {
+                          // إذا فشل فتح النافذة (مثلاً بسبب popup blocker)، جرب التحميل
+                          const link = document.createElement('a')
+                          link.href = file.url
+                          link.download = file.filename || 'attachment'
+                          link.target = '_blank'
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                        } else {
+                          // تحقق من أن الملف تم تحميله بنجاح بعد ثانية
+                          setTimeout(() => {
+                            try {
+                              if (newWindow.location.href === 'about:blank') {
+                                console.warn('⚠️ File may not have loaded:', file.url)
+                              }
+                            } catch (e) {
+                              // Cross-origin error - هذا طبيعي
+                            }
+                          }, 1000)
+                        }
+                      }
+                    } catch (error) {
+                      console.error('❌ Error opening file:', error)
+                      showError('فشل فتح الملف. يرجى المحاولة مرة أخرى.')
                     }
                   }}
                   title="عرض الملف"
@@ -502,40 +558,54 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                 <button
                   className="attachment-action"
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     console.log('💾 Downloading file:', file.url, file.filename)
                     try {
                       // للـ data URLs، استخدم blob
                       if (file.url.startsWith('data:')) {
-                        const response = fetch(file.url)
-                        response.then(res => res.blob()).then(blob => {
-                          const url = window.URL.createObjectURL(blob)
-                          const link = document.createElement('a')
-                          link.href = url
-                          link.download = file.filename || 'attachment'
-                          document.body.appendChild(link)
-                          link.click()
-                          document.body.removeChild(link)
-                          window.URL.revokeObjectURL(url)
-                        }).catch(err => {
-                          console.error('Error downloading data URL:', err)
-                          // Fallback: افتح الملف مباشرة
-                          window.open(file.url, '_blank')
-                        })
-                      } else {
-                        // للروابط العادية
+                        const response = await fetch(file.url)
+                        const blob = await response.blob()
+                        const url = window.URL.createObjectURL(blob)
                         const link = document.createElement('a')
-                        link.href = file.url
+                        link.href = url
                         link.download = file.filename || 'attachment'
-                        link.target = '_blank'
                         document.body.appendChild(link)
                         link.click()
                         document.body.removeChild(link)
+                        window.URL.revokeObjectURL(url)
+                      } else {
+                        // للروابط العادية، استخدم fetch للتحقق من وجود الملف
+                        try {
+                          const response = await fetch(file.url, { method: 'HEAD' })
+                          if (response.ok) {
+                            // الملف موجود، قم بالتحميل
+                            const link = document.createElement('a')
+                            link.href = file.url
+                            link.download = file.filename || 'attachment'
+                            link.target = '_blank'
+                            document.body.appendChild(link)
+                            link.click()
+                            document.body.removeChild(link)
+                          } else {
+                            // الملف غير موجود، عرض رسالة خطأ
+                            console.error('❌ File not found:', file.url, response.status)
+                            showError(`الملف غير موجود (${response.status}). قد يكون الملف محذوفاً أو الرابط غير صحيح.`)
+                          }
+                        } catch (fetchError) {
+                          // إذا فشل HEAD request (مثلاً بسبب CORS)، جرب التحميل مباشرة
+                          console.warn('⚠️ HEAD request failed, trying direct download:', fetchError)
+                          const link = document.createElement('a')
+                          link.href = file.url
+                          link.download = file.filename || 'attachment'
+                          link.target = '_blank'
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                        }
                       }
                     } catch (error) {
-                      console.error('Error downloading file:', error)
-                      // Fallback: افتح الملف مباشرة
-                      window.open(file.url, '_blank')
+                      console.error('❌ Error downloading file:', error)
+                      showError('فشل تحميل الملف. يرجى المحاولة مرة أخرى.')
                     }
                   }}
                   title="تحميل الملف"

@@ -2555,15 +2555,21 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         )
       )
 
-      const ensureSerializedEntry = (
+      const ensureSerializedEntry = async (
         entry: any,
         index: number
-      ): (SerializedDesignFile & Record<string, any>) | SerializedDesignFile | null => {
+      ): Promise<(SerializedDesignFile & Record<string, any>) | SerializedDesignFile | null> => {
         if (!entry) return null
 
         if (isFileObject(entry)) {
           const signature = getFileSignature(entry)
-          const base = serializedFilesByKey.get(signature)
+          let base = serializedFilesByKey.get(signature)
+          // إذا لم يتم تسجيل الملف بعد، قم بتسجيله الآن
+          if (!base) {
+            base = await serializeFile(entry)
+            serializedFilesByKey.set(signature, base)
+            serializedFilesByName.set(base.filename, base)
+          }
           if (base) {
             return { ...base }
           }
@@ -2615,16 +2621,43 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             merged.download_url ||
             merged.raw_path ||
             merged.location_url ||
-            merged.data_url
+            merged.data_url ||
+            merged.file ||
+            merged.path ||
+            merged.href
 
           if (effectiveUrl) {
-            merged.url = effectiveUrl
-            merged.download_url = merged.download_url || effectiveUrl
-            merged.raw_path = merged.raw_path || effectiveUrl
-            merged.data_url = merged.data_url || effectiveUrl
-            merged.file_key =
-              merged.file_key || base?.file_key || `${merged.filename || 'file'}-${index}`
-            return merged
+            // تأكد من أن URL صحيح
+            const urlString = String(effectiveUrl).trim()
+            if (urlString) {
+              merged.url = urlString
+              merged.download_url = merged.download_url || urlString
+              merged.raw_path = merged.raw_path || urlString
+              if (!merged.data_url && (urlString.startsWith('data:') || urlString.startsWith('http'))) {
+                merged.data_url = urlString
+              }
+              merged.file_key =
+                merged.file_key || base?.file_key || `${merged.filename || 'file'}-${index}`
+              return merged
+            }
+          }
+
+          // إذا لم نجد URL، لكن لدينا filename، جرب إنشاء URL
+          if (merged.filename && !effectiveUrl) {
+            const filename = String(merged.filename).trim()
+            if (filename) {
+              if (filename.includes('/')) {
+                merged.url = filename
+                merged.download_url = filename
+                merged.raw_path = filename
+              } else {
+                merged.url = `/uploads/${filename}`
+                merged.download_url = `/uploads/${filename}`
+                merged.raw_path = `/uploads/${filename}`
+              }
+              merged.file_key = merged.file_key || base?.file_key || `${filename}-${index}`
+              return merged
+            }
           }
 
           if (base) {
@@ -2784,37 +2817,62 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
 
       if (Array.isArray(orderData?.items)) {
-        orderData.items = orderData.items.map((item: any) => {
-          const processedDesignFiles = Array.isArray(item.design_files)
-            ? item.design_files
-                .map((entry: any, idx: number) => ensureSerializedEntry(entry, idx))
-                .filter(Boolean)
-            : []
+        // معالجة جميع الملفات بشكل async
+        const processedItems = await Promise.all(
+          orderData.items.map(async (item: any) => {
+            // معالجة design_files
+            let processedDesignFiles: any[] = []
+            if (Array.isArray(item.design_files)) {
+              const processed = await Promise.all(
+                item.design_files.map(async (entry: any, idx: number) => {
+                  try {
+                    return await ensureSerializedEntry(entry, idx)
+                  } catch (error) {
+                    console.error(`Error serializing design_file[${idx}]:`, error)
+                    return null
+                  }
+                })
+              )
+              processedDesignFiles = processed.filter(Boolean) as any[]
+            }
 
-          const specifications = item.specifications ? { ...item.specifications } : undefined
-          const attachmentKeys = ['design_files', 'files', 'attachments', 'uploaded_files', 'documents', 'images']
+            // معالجة specifications
+            const specifications = item.specifications ? { ...item.specifications } : undefined
+            const attachmentKeys = ['design_files', 'files', 'attachments', 'uploaded_files', 'documents', 'images']
 
-          if (specifications) {
-            attachmentKeys.forEach((key) => {
-              if (Array.isArray(specifications[key])) {
-                const processed = specifications[key]
-                  .map((entry: any, idx: number) => ensureSerializedEntry(entry, idx))
-                  .filter(Boolean)
-                if (processed.length > 0) {
-                  specifications[key] = processed
-                } else {
-                  delete specifications[key]
-                }
-              }
-            })
-          }
+            if (specifications) {
+              await Promise.all(
+                attachmentKeys.map(async (key) => {
+                  if (Array.isArray(specifications[key])) {
+                    const processed = await Promise.all(
+                      specifications[key].map(async (entry: any, idx: number) => {
+                        try {
+                          return await ensureSerializedEntry(entry, idx)
+                        } catch (error) {
+                          console.error(`Error serializing ${key}[${idx}]:`, error)
+                          return null
+                        }
+                      })
+                    )
+                    const filtered = processed.filter(Boolean)
+                    if (filtered.length > 0) {
+                      specifications[key] = filtered
+                    } else {
+                      delete specifications[key]
+                    }
+                  }
+                })
+              )
+            }
 
-          return {
-            ...item,
-            design_files: processedDesignFiles,
-            specifications,
-          }
-        })
+            return {
+              ...item,
+              design_files: processedDesignFiles,
+              specifications,
+            }
+          })
+        )
+        orderData.items = processedItems
       }
 
       if (orderData && typeof orderData === 'object' && 'uploadedFiles' in orderData) {

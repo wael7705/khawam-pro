@@ -1295,6 +1295,7 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             'staff_notes': 'staff_notes',
             'delivery_latitude': 'delivery_latitude',
             'delivery_longitude': 'delivery_longitude',
+            'delivery_address_details': 'delivery_address_details',
             'rating': 'rating',
             'rating_comment': 'rating_comment'
         }

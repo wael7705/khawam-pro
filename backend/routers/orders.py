@@ -44,6 +44,7 @@ class OrderCreate(BaseModel):
     delivery_address: Optional[str] = None
     delivery_latitude: Optional[Decimal] = None
     delivery_longitude: Optional[Decimal] = None
+    delivery_address_details: Optional[str] = None  # بيانات إضافية للعنوان (الطابق، رقم الشقة، ملاحظات)
     notes: Optional[str] = None
     service_name: Optional[str] = None
 

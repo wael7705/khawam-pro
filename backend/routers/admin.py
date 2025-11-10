@@ -1037,7 +1037,11 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 })
             total_time = time.time() - start_time
             print(f"⏱️ Admin Orders API - Total time: {total_time:.2f}s (returning {len(orders_list)} orders)")
-            return orders_list
+            return {
+                "success": True,
+                "orders": orders_list,
+                "count": len(orders_list)
+            }
         except Exception as sql_err:
             print(f"Raw SQL failed, trying ORM: {sql_err}")
             # Fallback to ORM
@@ -1195,14 +1199,23 @@ async def get_all_orders(db: Session = Depends(get_db)):
             })
         total_time = time.time() - start_time
         print(f"⏱️ Admin Orders API - Total time: {total_time:.2f}s (returning {len(orders_list)} orders via ORM)")
-        return orders_list
+        return {
+            "success": True,
+            "orders": orders_list,
+            "count": len(orders_list)
+        }
     except Exception as e:
         total_time = time.time() - start_time
         print(f"❌ Admin Orders API - Error after {total_time:.2f}s: {e}")
         import traceback
         traceback.print_exc()
         # Return empty list on error instead of crashing
-        return []
+        return {
+            "success": False,
+            "orders": [],
+            "count": 0,
+            "error": str(e)
+        }
 
 def _safe_get_specifications(item):
     """Safely get specifications from order item"""

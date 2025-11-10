@@ -113,10 +113,18 @@ export default function OrdersManagement() {
       }
       
       setOrders(data)
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error loading orders:', e)
-      showError('حدث خطأ في جلب الطلبات')
-      setOrders([])
+      // لا نفرغ الطلبات إذا كانت موجودة بالفعل (للطلبات التلقائية)
+      // فقط نعرض رسالة خطأ إذا كان هذا هو التحميل الأولي
+      if (showLoading) {
+        showError('حدث خطأ في جلب الطلبات')
+        setOrders([])
+      } else {
+        // للطلبات التلقائية، لا نعرض رسالة خطأ ولا نفرغ البيانات
+        // فقط نسجل الخطأ في console
+        console.warn('⚠️ Failed to refresh orders in background, keeping existing data')
+      }
     } finally {
       if (showLoading) {
         setLoading(false)
@@ -127,9 +135,37 @@ export default function OrdersManagement() {
   useEffect(() => {
     loadOrders(true) // Show loading only on initial load
     loadArchivedOrders()
-    // Refresh every 30 seconds in background
-    const interval = setInterval(() => loadOrders(false), 30000)
-    return () => clearInterval(interval)
+    // Refresh every 30 seconds in background - فقط إذا كانت الصفحة مرئية
+    let interval: NodeJS.Timeout | null = null
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // إذا كانت الصفحة مخفية، أوقف التحديث التلقائي
+        if (interval) {
+          clearInterval(interval)
+          interval = null
+        }
+      } else {
+        // إذا كانت الصفحة مرئية، استأنف التحديث التلقائي
+        if (!interval) {
+          interval = setInterval(() => loadOrders(false), 30000)
+        }
+      }
+    }
+    
+    // بدء التحديث التلقائي فقط إذا كانت الصفحة مرئية
+    if (!document.hidden) {
+      interval = setInterval(() => loadOrders(false), 30000)
+    }
+    
+    // الاستماع لتغييرات رؤية الصفحة
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   const loadArchivedOrders = () => {

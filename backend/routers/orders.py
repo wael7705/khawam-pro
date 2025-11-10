@@ -509,18 +509,18 @@ def _persist_design_files(
                     filename = _secure_filename(f"attachment-{idx + 1}{extension}")
                     file_path = os.path.join(base_dir, filename)
                     try:
-                        with open(file_path, "wb") as file_obj:
-                            file_obj.write(file_bytes)
+                    with open(file_path, "wb") as file_obj:
+                        file_obj.write(file_bytes)
                         # Verify file was written
                         if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
-                            persisted_entry = {
-                                "filename": filename,
-                                "url": f"{web_base}/{filename}",
-                                "download_url": f"{web_base}/{filename}",
-                                "raw_path": f"{web_base}/{filename}",
-                                "size_in_bytes": len(file_bytes)
-                            }
-                            persisted_entries.append(persisted_entry)
+                    persisted_entry = {
+                        "filename": filename,
+                        "url": f"{web_base}/{filename}",
+                        "download_url": f"{web_base}/{filename}",
+                        "raw_path": f"{web_base}/{filename}",
+                        "size_in_bytes": len(file_bytes)
+                    }
+                    persisted_entries.append(persisted_entry)
                             print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes) -> {file_path}")
                             print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
                         else:
@@ -559,21 +559,21 @@ def _persist_design_files(
                         filename = _secure_filename(saved_entry.get("filename") or f"attachment-{idx + 1}{extension}")
                         file_path = os.path.join(base_dir, filename)
                         try:
-                            with open(file_path, "wb") as file_obj:
-                                file_obj.write(file_bytes)
+                        with open(file_path, "wb") as file_obj:
+                            file_obj.write(file_bytes)
                             # Verify file was written
                             if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
-                                # تحديث جميع URLs في saved_entry
-                                file_url = f"{web_base}/{filename}"
-                                saved_entry["url"] = file_url
-                                saved_entry["download_url"] = file_url
-                                saved_entry["raw_path"] = file_url
-                                saved_entry["size_in_bytes"] = len(file_bytes)
-                                # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
-                                # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
-                                saved_entry.pop("file_key", None)
-                                
-                                print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
+                        # تحديث جميع URLs في saved_entry
+                        file_url = f"{web_base}/{filename}"
+                        saved_entry["url"] = file_url
+                        saved_entry["download_url"] = file_url
+                        saved_entry["raw_path"] = file_url
+                        saved_entry["size_in_bytes"] = len(file_bytes)
+                        # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
+                        # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
+                        saved_entry.pop("file_key", None)
+                        
+                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
                                 print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
                             else:
                                 print(f"    ❌ File verification failed: {file_path}")
@@ -1112,10 +1112,10 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db), re
             if normalized:
                 # Only include attachments that have valid URLs
                 if normalized.get("url") or normalized.get("download_url"):
-                    if normalized.get("file_key"):
-                        attachments_by_key[str(normalized["file_key"])] = normalized
-                    normalized["order_item_service_name"] = getattr(item, "product_name", None)
-                    attachments.append(normalized)
+                if normalized.get("file_key"):
+                    attachments_by_key[str(normalized["file_key"])] = normalized
+                normalized["order_item_service_name"] = getattr(item, "product_name", None)
+                attachments.append(normalized)
 
     return {
         "success": True,
@@ -1208,7 +1208,7 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
 
     # For external URLs or files that don't exist locally, redirect
     if file_url.startswith("http://") or file_url.startswith("https://"):
-        return RedirectResponse(file_url, status_code=302)
+    return RedirectResponse(file_url, status_code=302)
     
     # For relative paths, try to serve them if they exist
     if raw_path and raw_path.startswith("/uploads/"):

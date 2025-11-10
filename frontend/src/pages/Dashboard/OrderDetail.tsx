@@ -616,6 +616,7 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
 
   console.log('🔍 collectAttachmentsFromSpecs - specs keys:', Object.keys(specs))
 
+  // أولاً: ابحث في المفاتيح المعروفة للمرفقات
   ATTACHMENT_SPEC_KEYS.forEach((key) => {
     const value = specs[key]
     if (!value) return
@@ -629,23 +630,69 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
     }
   })
   
-  // أيضاً ابحث في جميع المفاتيح التي قد تحتوي على ملفات
+  // ثانياً: ابحث في جميع المفاتيح التي قد تحتوي على ملفات
   Object.keys(specs).forEach((key) => {
+    // تخطي المفاتيح التي تم فحصها بالفعل
+    if (ATTACHMENT_SPEC_KEYS.includes(key)) return
+    
     const value = specs[key]
     if (!value) return
     
-    // إذا كان المفتاح يحتوي على "file" أو "image" أو "design" أو "upload"
     const keyLower = key.toLowerCase()
-    if ((keyLower.includes('file') || keyLower.includes('image') || keyLower.includes('design') || keyLower.includes('upload') || keyLower.includes('attachment')) 
-        && !ATTACHMENT_SPEC_KEYS.includes(key)) {
-      console.log(`  🔍 Found potential attachment key "${key}":`, value)
+    const isPotentialFileKey = keyLower.includes('file') || 
+                               keyLower.includes('image') || 
+                               keyLower.includes('design') || 
+                               keyLower.includes('upload') || 
+                               keyLower.includes('attachment') ||
+                               keyLower.includes('pdf') ||
+                               keyLower.includes('document')
+    
+    if (isPotentialFileKey) {
+      console.log(`  🔍 Found potential attachment key "${key}":`, value, typeof value)
       if (Array.isArray(value)) {
-        value.forEach(item => {
+        value.forEach((item, idx) => {
           if (item && (typeof item === 'string' || typeof item === 'object')) {
             entries.push(item)
+            console.log(`    ✅ Added item[${idx}] from "${key}"`)
           }
         })
-      } else if (typeof value === 'string' || typeof value === 'object') {
+      } else if (typeof value === 'string') {
+        // إذا كانت سلسلة نصية، تحقق إذا كانت ملف
+        if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
+          entries.push(value)
+          console.log(`    ✅ Added string file from "${key}":`, value.substring(0, 50))
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        entries.push(value)
+        console.log(`    ✅ Added object from "${key}"`)
+      }
+    } else {
+      // ثالثاً: حتى لو لم يكن المفتاح يحتوي على كلمات مفتاحية، تحقق من القيمة
+      // قد تكون الملفات مخزنة في مفاتيح غير متوقعة
+      if (Array.isArray(value) && value.length > 0) {
+        // تحقق من أن العناصر قد تكون ملفات
+        const firstItem = value[0]
+        if (firstItem && (
+          (typeof firstItem === 'string' && (firstItem.startsWith('data:') || firstItem.startsWith('http') || firstItem.startsWith('/uploads/'))) ||
+          (typeof firstItem === 'object' && firstItem !== null && (
+            firstItem.url || firstItem.file_url || firstItem.download_url || firstItem.raw_path || firstItem.data_url || firstItem.file || firstItem.path
+          ))
+        )) {
+          console.log(`  🔍 Found file-like array in key "${key}":`, value.length, 'items')
+          value.forEach((item: any) => {
+            if (item && (typeof item === 'string' || typeof item === 'object')) {
+              entries.push(item)
+            }
+          })
+        }
+      } else if (typeof value === 'string' && value.trim() && 
+                 (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/'))) {
+        console.log(`  🔍 Found file-like string in key "${key}":`, value.substring(0, 50))
+        entries.push(value)
+      } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && (
+        value.url || value.file_url || value.download_url || value.raw_path || value.data_url || value.file || value.path
+      )) {
+        console.log(`  🔍 Found file-like object in key "${key}":`, Object.keys(value))
         entries.push(value)
       }
     }

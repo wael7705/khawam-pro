@@ -362,28 +362,68 @@ const renderSpecValue = (value: any): ReactNode => {
 
 const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
   if (!files || files.length === 0) return null
+  
+  console.log('🎨 renderAttachmentsGrid - Rendering', files.length, 'files')
+  files.forEach((file, idx) => {
+    console.log(`  File[${idx}]:`, {
+      filename: file.filename,
+      url: file.url.substring(0, 50),
+      isImage: file.isImage,
+      location: file.location
+    })
+  })
+  
   return (
     <div className="attachments-grid">
-      {files.map((file) => {
+      {files.map((file, idx) => {
         const locationLabel = file.location || file.originLabel
+        const fileExtension = file.filename.split('.').pop()?.toLowerCase() || ''
+        const isPDF = fileExtension === 'pdf' || file.url.includes('.pdf') || file.url.startsWith('data:application/pdf')
+        const isDocument = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'].includes(fileExtension)
+        
         return (
-          <div key={`${file.url}-${file.filename}`} className="attachment-card">
-            <div className={`attachment-preview ${file.isImage ? 'image' : 'document'}`}>
+          <div key={`${file.url}-${file.filename}-${idx}`} className="attachment-card">
+            <div className={`attachment-preview ${file.isImage ? 'image' : isPDF ? 'pdf' : isDocument ? 'document' : 'file'}`}>
               {file.isImage ? (
-                <img src={file.url} alt={file.filename} loading="lazy" />
+                <img src={file.url} alt={file.filename} loading="lazy" onError={(e) => {
+                  console.error('❌ Error loading image:', file.url)
+                  // إذا فشل تحميل الصورة، استبدلها بأيقونة
+                  e.currentTarget.style.display = 'none'
+                  const parent = e.currentTarget.parentElement
+                  if (parent) {
+                    parent.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"><FileText size={26} /></div>'
+                  }
+                }} />
+              ) : isPDF ? (
+                <div className="file-icon pdf-icon">
+                  <FileText size={32} />
+                  <span className="file-extension">PDF</span>
+                </div>
               ) : (
-                <FileText size={26} />
+                <div className="file-icon">
+                  <FileText size={26} />
+                  {fileExtension && <span className="file-extension">{fileExtension.toUpperCase()}</span>}
+                </div>
               )}
             </div>
             <div className="attachment-meta">
               {locationLabel && <span className="attachment-location">{locationLabel}</span>}
-              <span className="attachment-name">{file.filename}</span>
+              <span className="attachment-name" title={file.filename}>{file.filename}</span>
               {file.sizeLabel && <span className="attachment-size">{file.sizeLabel}</span>}
               <div className="attachment-actions">
                 <button
                   className="attachment-action"
                   type="button"
-                  onClick={() => window.open(file.url, '_blank', 'noopener,noreferrer')}
+                  onClick={() => {
+                    console.log('🔗 Opening file:', file.url, file.filename)
+                    // للـ PDF والملفات، افتحها في نافذة جديدة
+                    if (isPDF || isDocument) {
+                      window.open(file.url, '_blank', 'noopener,noreferrer')
+                    } else {
+                      window.open(file.url, '_blank', 'noopener,noreferrer')
+                    }
+                  }}
+                  title="عرض الملف"
                 >
                   <ExternalLink size={16} />
                   عرض
@@ -392,13 +432,42 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                   className="attachment-action"
                   type="button"
                   onClick={() => {
-                    const link = document.createElement('a')
-                    link.href = file.url
-                    link.download = file.filename || 'attachment'
-                    document.body.appendChild(link)
-                    link.click()
-                    document.body.removeChild(link)
+                    console.log('💾 Downloading file:', file.url, file.filename)
+                    try {
+                      // للـ data URLs، استخدم blob
+                      if (file.url.startsWith('data:')) {
+                        const response = fetch(file.url)
+                        response.then(res => res.blob()).then(blob => {
+                          const url = window.URL.createObjectURL(blob)
+                          const link = document.createElement('a')
+                          link.href = url
+                          link.download = file.filename || 'attachment'
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                          window.URL.revokeObjectURL(url)
+                        }).catch(err => {
+                          console.error('Error downloading data URL:', err)
+                          // Fallback: افتح الملف مباشرة
+                          window.open(file.url, '_blank')
+                        })
+                      } else {
+                        // للروابط العادية
+                        const link = document.createElement('a')
+                        link.href = file.url
+                        link.download = file.filename || 'attachment'
+                        link.target = '_blank'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                      }
+                    } catch (error) {
+                      console.error('Error downloading file:', error)
+                      // Fallback: افتح الملف مباشرة
+                      window.open(file.url, '_blank')
+                    }
                   }}
+                  title="تحميل الملف"
                 >
                   <Download size={16} />
                   تحميل
@@ -915,9 +984,9 @@ export default function OrderDetail() {
       const finalAttachments = allAttachments.length > 0 ? allAttachments : attachments
 
       const unmatchedFallbacks =
-        attachments.length > 0
+        finalAttachments.length > 0
           ? fallbackNames.filter(
-              (name) => !attachments.some((attachment) => attachment.filename === name)
+              (name) => !finalAttachments.some((attachment) => attachment.filename === name)
             )
           : fallbackNames
 

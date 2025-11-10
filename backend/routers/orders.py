@@ -246,36 +246,84 @@ def normalize_attachment_entry(
         return None
 
     # Check if it's a data URL (base64 encoded)
+    # Important: If we have a file path in the entry, prefer it over data URL (especially for large files)
+    file_path_preferred = None
+    if isinstance(entry, dict):
+        file_path_preferred = entry.get("raw_path") or entry.get("path") or entry.get("file")
+        # Only use if it's not a data URL and looks like a file path
+        if file_path_preferred and not str(file_path_preferred).startswith("data:") and (
+            str(file_path_preferred).startswith("/uploads/") or 
+            str(file_path_preferred).startswith("http://") or 
+            str(file_path_preferred).startswith("https://")
+        ):
+            print(f"✅ Found file path in entry, preferring it over data URL: {file_path_preferred}")
+            raw_path = str(file_path_preferred)
+    
     if raw_path.startswith("data:"):
-        file_url = raw_path
-        file_exists = True
-        # Try to extract filename from data URL if not already set
-        if not filename:
-            # Try to get it from the data URL header
-            try:
-                header = raw_path.split(",")[0]
-                if "filename=" in header:
-                    filename_match = re.search(r'filename=([^;]+)', header)
-                    if filename_match:
-                        filename = filename_match.group(1)
-            except:
-                pass
+        # Check data URL size - large data URLs can cause HTTP/2 protocol errors
+        data_url_size = len(raw_path)
+        if data_url_size > 100000:  # More than ~100KB
+            print(f"⚠️ Large data URL detected ({data_url_size} bytes)")
+            # If we have a file path alternative, use it instead
+            if file_path_preferred and not str(file_path_preferred).startswith("data:"):
+                print(f"✅ Using file path instead of large data URL")
+                raw_path = str(file_path_preferred)
+                # Process as file path below
+            else:
+                print(f"⚠️ No file path alternative, using large data URL (may cause performance issues)")
+                file_url = raw_path
+                file_exists = True
+                # Try to extract filename from data URL if not already set
+                if not filename:
+                    try:
+                        header = raw_path.split(",")[0]
+                        if "filename=" in header:
+                            filename_match = re.search(r'filename=([^;]+)', header)
+                            if filename_match:
+                                filename = filename_match.group(1)
+                    except:
+                        pass
+                    if not filename:
+                        filename = "ملف"
+                # Try to get file size from data URL
+                if not size_in_bytes:
+                    try:
+                        encoded = raw_path.split(",", 1)[1]
+                        size_in_bytes = len(base64.b64decode(encoded))
+                    except:
+                        pass
+        else:
+            # Small data URL, use it directly
+            file_url = raw_path
+            file_exists = True
+            # Try to extract filename from data URL if not already set
             if not filename:
-                filename = "ملف"
-        # Try to get file size from data URL
-        if not size_in_bytes and raw_path.startswith("data:"):
-            try:
-                encoded = raw_path.split(",", 1)[1]
-                size_in_bytes = len(base64.b64decode(encoded))
-            except:
-                pass
-    elif raw_path.startswith("http://") or raw_path.startswith("https://"):
-        # External URL, assume it exists
-        file_url = raw_path
-        file_exists = True
-    else:
-        # Local file path - check if it exists
-        if raw_path.startswith("/uploads/"):
+                try:
+                    header = raw_path.split(",")[0]
+                    if "filename=" in header:
+                        filename_match = re.search(r'filename=([^;]+)', header)
+                        if filename_match:
+                            filename = filename_match.group(1)
+                except:
+                    pass
+                if not filename:
+                    filename = "ملف"
+            # Try to get file size from data URL
+            if not size_in_bytes:
+                try:
+                    encoded = raw_path.split(",", 1)[1]
+                    size_in_bytes = len(base64.b64decode(encoded))
+                except:
+                    pass
+    
+    # If we're still processing (not a data URL or we switched to file path), handle file paths
+    if not file_url or (raw_path and not raw_path.startswith("data:")):
+        if raw_path.startswith("http://") or raw_path.startswith("https://"):
+            # External URL, assume it exists
+            file_url = raw_path
+            file_exists = True
+        elif raw_path.startswith("/uploads/"):
+            # Local file path - check if it exists
             local_path = raw_path.lstrip("/")
             local_path = local_path.replace("/", os.sep)
             file_exists = os.path.exists(local_path) and os.path.isfile(local_path)
@@ -286,11 +334,11 @@ def normalize_attachment_entry(
                     pass
             if file_exists and not mime_type:
                 mime_type, _ = mimetypes.guess_type(local_path)
+            file_url = build_file_url(raw_path, request)
         else:
             # Relative path, assume it might exist
             file_exists = False
-        
-        file_url = build_file_url(raw_path, request)
+            file_url = build_file_url(raw_path, request)
 
     if not file_url:
         return None
@@ -765,9 +813,25 @@ async def create_order(
             design_files_json = json.dumps(persisted_design_files or [])
             
             # Also add design_files to specifications as backup (if not already there)
+            # Important: Always add design_files to specifications so they can be found even if design_files column is empty
             if persisted_design_files:
-                specs['design_files'] = persisted_design_files
-                print(f"📎 Added {len(persisted_design_files)} design_files to specifications")
+                # إذا كان design_files موجوداً بالفعل في specifications، ادمجه
+                if 'design_files' in specs and isinstance(specs.get('design_files'), list):
+                    # دمج القوائم مع تجنب التكرار
+                    existing_files = specs['design_files']
+                    for file in persisted_design_files:
+                        if file not in existing_files:
+                            existing_files.append(file)
+                    specs['design_files'] = existing_files
+                    print(f"📎 Merged {len(persisted_design_files)} design_files with existing {len(existing_files) - len(persisted_design_files)} files in specifications")
+                else:
+                    specs['design_files'] = persisted_design_files
+                    print(f"📎 Added {len(persisted_design_files)} design_files to specifications")
+            else:
+                # حتى لو لم يكن هناك ملفات محفوظة، تأكد من أن design_files موجود في specifications (حتى لو كان فارغاً)
+                if 'design_files' not in specs:
+                    specs['design_files'] = []
+                    print(f"📎 Initialized empty design_files array in specifications")
             
             specs_json = json.dumps(specs) if specs else None
             

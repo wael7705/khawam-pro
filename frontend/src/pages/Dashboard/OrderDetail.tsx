@@ -173,10 +173,25 @@ const normalizeAttachmentEntry = (
     
     let url = ''
     
-    // إذا كانت data URL، استخدمها مباشرة
+    // إذا كانت data URL، استخدمها مباشرة (لكن تحقق من الحجم)
     if (rawUrlString && isDataUrl(rawUrlString)) {
-      console.log('✅ Found data URL in object:', rawUrlString.substring(0, 50) + '...')
-      url = rawUrlString
+      const dataUrlSize = rawUrlString.length
+      if (dataUrlSize > 100000) { // أكثر من ~100KB
+        console.warn(`⚠️ Large data URL detected (${dataUrlSize} bytes), trying to use file path instead`)
+        // حاول استخدام raw_path أو path إذا كان موجوداً
+        const filePath = entry.raw_path || entry.path || entry.file
+        if (filePath && !isDataUrl(String(filePath)) && (String(filePath).startsWith('/uploads/') || String(filePath).startsWith('http'))) {
+          console.log('✅ Using file path instead of large data URL:', filePath)
+          url = resolveToAbsoluteUrl(String(filePath))
+        } else {
+          // إذا لم يكن هناك مسار ملف، استخدم data URL (لكن قد يسبب مشاكل)
+          console.warn('⚠️ No file path found, using large data URL (may cause performance issues)')
+          url = rawUrlString
+        }
+      } else {
+        console.log('✅ Found data URL in object:', rawUrlString.substring(0, 50) + '...')
+        url = rawUrlString
+      }
     } else if (rawUrlString) {
       // للروابط النسبية أو المطلقة
       if (rawUrlString.startsWith('http://') || rawUrlString.startsWith('https://')) {
@@ -681,49 +696,144 @@ interface Order {
 }
 
 const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
-  if (!specs || typeof specs !== 'object') return []
+  if (!specs || typeof specs !== 'object') {
+    console.log('🔍 collectAttachmentsFromSpecs - specs is null/undefined or not an object')
+    return []
+  }
   const entries: any[] = []
 
   console.log('🔍 collectAttachmentsFromSpecs - specs keys:', Object.keys(specs))
+  console.log('🔍 collectAttachmentsFromSpecs - full specs:', JSON.stringify(specs, null, 2).substring(0, 500))
 
   // أولاً: ابحث في المفاتيح المعروفة للمرفقات
   ATTACHMENT_SPEC_KEYS.forEach((key) => {
     const value = specs[key]
-    if (!value) return
-    console.log(`  Checking key "${key}":`, value, Array.isArray(value))
+    if (!value) {
+      console.log(`  ⏭️ Key "${key}" is empty or null`)
+      return
+    }
+    console.log(`  🔍 Checking key "${key}":`, {
+      value_type: typeof value,
+      is_array: Array.isArray(value),
+      is_string: typeof value === 'string',
+      is_object: typeof value === 'object',
+      value_preview: typeof value === 'string' ? value.substring(0, 100) : (Array.isArray(value) ? `Array[${value.length}]` : JSON.stringify(value).substring(0, 100))
+    })
+    
     if (Array.isArray(value)) {
-      entries.push(...value)
-      console.log(`  ✅ Added ${value.length} entries from ${key}`)
-    } else {
+      const validEntries = value.filter(v => v !== null && v !== undefined && v !== '')
+      if (validEntries.length > 0) {
+        entries.push(...validEntries)
+        console.log(`  ✅ Added ${validEntries.length} entries from ${key}`)
+      } else {
+        console.log(`  ⚠️ Array in "${key}" is empty or contains only null/undefined values`)
+      }
+    } else if (typeof value === 'string') {
+      // إذا كانت سلسلة، حاول تحليلها كـ JSON
+      if (value.trim().startsWith('[') || value.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(value)
+          if (Array.isArray(parsed)) {
+            const validEntries = parsed.filter(v => v !== null && v !== undefined && v !== '')
+            if (validEntries.length > 0) {
+              entries.push(...validEntries)
+              console.log(`  ✅ Parsed and added ${validEntries.length} entries from ${key} (JSON string)`)
+            }
+          } else if (parsed !== null && parsed !== undefined) {
+            entries.push(parsed)
+            console.log(`  ✅ Parsed and added 1 entry from ${key} (JSON string)`)
+          }
+        } catch (e) {
+          // إذا فشل التحليل، تحقق إذا كانت data URL أو رابط
+          if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
+            entries.push(value)
+            console.log(`  ✅ Added string URL from ${key}`)
+          } else {
+            console.log(`  ⚠️ Failed to parse JSON string in "${key}":`, e)
+          }
+        }
+      } else if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
+        entries.push(value)
+        console.log(`  ✅ Added string URL from ${key}`)
+      } else {
+        console.log(`  ⏭️ String in "${key}" doesn't look like a file URL`)
+      }
+    } else if (typeof value === 'object' && value !== null) {
       entries.push(value)
-      console.log(`  ✅ Added 1 entry from ${key}`)
+      console.log(`  ✅ Added object from ${key}`)
+    } else {
+      console.log(`  ⏭️ Value in "${key}" is not a recognized type:`, typeof value)
     }
   })
   
-  // ثانياً: ابحث في جميع المفاتيح التي قد تحتوي على ملفات
+  // ثانياً: ابحث في جميع المفاتيح التي قد تحتوي على ملفات (بما في ذلك المفاتيح المعروفة مرة أخرى للتأكد)
   Object.keys(specs).forEach((key) => {
-    // تخطي المفاتيح التي تم فحصها بالفعل
-    if (ATTACHMENT_SPEC_KEYS.includes(key)) return
-    
     const value = specs[key]
-    if (!value) return
+    if (value === null || value === undefined || value === '') {
+      return
+    }
     
     const keyLower = key.toLowerCase()
+    const wasAlreadyChecked = ATTACHMENT_SPEC_KEYS.includes(key)
     const isPotentialFileKey = keyLower.includes('file') || 
                                keyLower.includes('image') || 
                                keyLower.includes('design') || 
                                keyLower.includes('upload') || 
                                keyLower.includes('attachment') ||
                                keyLower.includes('pdf') ||
-                               keyLower.includes('document')
+                               keyLower.includes('document') ||
+                               keyLower.includes('url') ||
+                               keyLower.includes('path')
     
-    if (isPotentialFileKey) {
-      console.log(`  🔍 Found potential attachment key "${key}":`, value, typeof value)
+    // إذا كان المفتاح يحتوي على كلمات مفتاحية للملفات أو كان من المفاتيح المعروفة
+    if (isPotentialFileKey || wasAlreadyChecked) {
+      // إذا تم فحصه بالفعل، تخطاه (لكن قد نحتاج إعادة فحصه إذا كانت القيمة مختلفة)
+      if (wasAlreadyChecked && !isPotentialFileKey) {
+        return
+      }
+      
+      console.log(`  🔍 Examining key "${key}" (potential file key):`, {
+        value_type: typeof value,
+        is_array: Array.isArray(value),
+        is_string: typeof value === 'string',
+        is_object: typeof value === 'object',
+        value_length: typeof value === 'string' ? value.length : (Array.isArray(value) ? value.length : 'N/A'),
+        value_preview: typeof value === 'string' 
+          ? (value.length > 200 ? value.substring(0, 200) + '...' : value)
+          : (Array.isArray(value) 
+              ? `Array[${value.length}]: ${JSON.stringify(value.slice(0, 2)).substring(0, 100)}`
+              : JSON.stringify(value).substring(0, 200))
+      })
+      
       if (Array.isArray(value)) {
         value.forEach((item, idx) => {
-          if (item && (typeof item === 'string' || typeof item === 'object')) {
-            entries.push(item)
-            console.log(`    ✅ Added item[${idx}] from "${key}"`)
+          if (item && item !== null && item !== undefined && item !== '') {
+            if (typeof item === 'string' || typeof item === 'object') {
+              // إذا كانت سلسلة، تحقق إذا كانت data URL أو رابط
+              if (typeof item === 'string') {
+                if (item.startsWith('data:') || item.startsWith('http') || item.startsWith('/uploads/')) {
+                  entries.push(item)
+                  console.log(`    ✅ Added item[${idx}] from "${key}" (string URL)`)
+                } else if (item.trim().startsWith('[') || item.trim().startsWith('{')) {
+                  // محاولة تحليل JSON
+                  try {
+                    const parsed = JSON.parse(item)
+                    if (Array.isArray(parsed)) {
+                      entries.push(...parsed.filter(v => v !== null && v !== undefined))
+                      console.log(`    ✅ Parsed and added ${parsed.length} items from "${key}"[${idx}] (JSON array)`)
+                    } else {
+                      entries.push(parsed)
+                      console.log(`    ✅ Parsed and added item from "${key}"[${idx}] (JSON object)`)
+                    }
+                  } catch (e) {
+                    console.log(`    ⚠️ Failed to parse JSON in "${key}"[${idx}]:`, e)
+                  }
+                }
+              } else {
+                entries.push(item)
+                console.log(`    ✅ Added item[${idx}] from "${key}" (object)`)
+              }
+            }
           }
         })
       } else if (typeof value === 'string') {
@@ -731,10 +841,42 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
         if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
           entries.push(value)
           console.log(`    ✅ Added string file from "${key}":`, value.substring(0, 50))
+        } else if (value.trim().startsWith('[') || value.trim().startsWith('{')) {
+          // محاولة تحليل JSON
+          try {
+            const parsed = JSON.parse(value)
+            if (Array.isArray(parsed)) {
+              const validEntries = parsed.filter(v => v !== null && v !== undefined && v !== '')
+              if (validEntries.length > 0) {
+                entries.push(...validEntries)
+                console.log(`    ✅ Parsed and added ${validEntries.length} entries from "${key}" (JSON array string)`)
+              }
+            } else if (parsed !== null && parsed !== undefined) {
+              entries.push(parsed)
+              console.log(`    ✅ Parsed and added 1 entry from "${key}" (JSON object string)`)
+            }
+          } catch (e) {
+            console.log(`    ⚠️ Failed to parse JSON string in "${key}":`, e)
+          }
         }
       } else if (typeof value === 'object' && value !== null) {
-        entries.push(value)
-        console.log(`    ✅ Added object from "${key}"`)
+        // تحقق إذا كان الكائن يحتوي على معلومات ملف
+        if (value.url || value.file_url || value.download_url || value.raw_path || value.data_url || value.file || value.path || value.filename) {
+          entries.push(value)
+          console.log(`    ✅ Added object from "${key}" (has file properties)`)
+        } else if (Array.isArray(Object.values(value))) {
+          // إذا كانت القيم مصفوفات، افحصها
+          Object.values(value).forEach((subValue: any, subIdx: number) => {
+            if (Array.isArray(subValue)) {
+              subValue.forEach((item: any) => {
+                if (item && (typeof item === 'string' || typeof item === 'object')) {
+                  entries.push(item)
+                  console.log(`    ✅ Added nested item from "${key}"[${subIdx}]`)
+                }
+              })
+            }
+          })
+        }
       }
     } else {
       // ثالثاً: حتى لو لم يكن المفتاح يحتوي على كلمات مفتاحية، تحقق من القيمة
@@ -748,7 +890,7 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
             firstItem.url || firstItem.file_url || firstItem.download_url || firstItem.raw_path || firstItem.data_url || firstItem.file || firstItem.path
           ))
         )) {
-          console.log(`  🔍 Found file-like array in key "${key}":`, value.length, 'items')
+          console.log(`  🔍 Found file-like array in unexpected key "${key}":`, value.length, 'items')
           value.forEach((item: any) => {
             if (item && (typeof item === 'string' || typeof item === 'object')) {
               entries.push(item)
@@ -757,18 +899,28 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
         }
       } else if (typeof value === 'string' && value.trim() && 
                  (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/'))) {
-        console.log(`  🔍 Found file-like string in key "${key}":`, value.substring(0, 50))
+        console.log(`  🔍 Found file-like string in unexpected key "${key}":`, value.substring(0, 50))
         entries.push(value)
       } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && (
         value.url || value.file_url || value.download_url || value.raw_path || value.data_url || value.file || value.path
       )) {
-        console.log(`  🔍 Found file-like object in key "${key}":`, Object.keys(value))
+        console.log(`  🔍 Found file-like object in unexpected key "${key}":`, Object.keys(value))
         entries.push(value)
       }
     }
   })
 
   console.log(`✅ Total entries collected from specs: ${entries.length}`)
+  if (entries.length > 0) {
+    console.log(`✅ Entries preview:`, entries.slice(0, 3).map((e, i) => ({
+      index: i,
+      type: typeof e,
+      is_string: typeof e === 'string',
+      is_object: typeof e === 'object',
+      string_preview: typeof e === 'string' ? e.substring(0, 100) : undefined,
+      object_keys: typeof e === 'object' && e !== null ? Object.keys(e) : undefined
+    })))
+  }
   return entries
 }
 

@@ -657,6 +657,17 @@ export default function OrderDetail() {
         console.log('📋 Order data:', orderData)
         console.log('📋 Order items:', orderData.items)
         
+        // Log delivery information
+        console.log('📍 Delivery information:', {
+          delivery_type: orderData.delivery_type,
+          delivery_address: orderData.delivery_address,
+          delivery_latitude: orderData.delivery_latitude,
+          delivery_longitude: orderData.delivery_longitude,
+          has_address: !!orderData.delivery_address,
+          has_coordinates: !!(orderData.delivery_latitude && orderData.delivery_longitude),
+          should_show_card: !!(orderData.delivery_address || (orderData.delivery_latitude && orderData.delivery_longitude))
+        })
+        
         // Log design_files for each item
         if (orderData.items && Array.isArray(orderData.items)) {
           orderData.items.forEach((item: any, idx: number) => {
@@ -975,44 +986,12 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Status Card - دائماً نعرضه */}
-        <div className="detail-card status-card">
-          <h2>حالة الطلب</h2>
-          <div className="status-controls">
-            <div className="current-status">
-              <span
-                className="status-badge"
-                style={{ backgroundColor: getStatusColor(order.status || 'pending') }}
-              >
-                {getStatusLabel(order.status || 'pending')}
-              </span>
-            </div>
-            <div className="status-buttons">
-              {STATUS_OPTIONS.map((option) => {
-                const style = { '--status-color': option.color } as CSSProperties
-                const isCurrent = option.id === (order.status || 'pending')
-                return (
-                  <button
-                    key={option.id}
-                    className={`status-btn ${isCurrent ? 'active' : ''}`}
-                    style={style}
-                    onClick={() => handleStatusChange(option.id)}
-                    disabled={isUpdatingStatus || isCurrent}
-                  >
-                    {option.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Delivery Address Card - عند اختيار التوصيل */}
-        {order.delivery_type === 'delivery' && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
+        {/* Delivery Address Card - عرض بطاقة العنوان إذا كانت البيانات موجودة */}
+        {(order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
           <div className="detail-card delivery-address-card">
             <h2>
               <MapPin size={20} />
-              عنوان التوصيل
+              {order.delivery_type === 'delivery' ? 'عنوان التوصيل' : 'عنوان العميل'}
             </h2>
             <div className="delivery-address-content">
               {order.delivery_address && (

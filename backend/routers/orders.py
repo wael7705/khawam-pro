@@ -601,6 +601,9 @@ async def get_orders(
     If user is a customer, only returns their orders.
     If user is admin or employee, returns all orders."""
     try:
+        import time
+        start_time = time.time()
+        
         # تحديد نوع المستخدم - إذا كان "عميل" نفلتر الطلبات
         # ملاحظة: ensure_order_columns و ensure_order_items_columns يتم استدعاؤهما فقط عند الحاجة
         # (مثلاً في create_order) لتجنب إبطاء get_orders
@@ -617,6 +620,8 @@ async def get_orders(
             
             if user_type_row:
                 user_role = user_type_row[0]
+            
+            print(f"⏱️ Orders API - User role lookup: {time.time() - start_time:.2f}s")
             
             # بناء قائمة بأشكال رقم الهاتف الممكنة للبحث
             if current_user.phone:
@@ -659,7 +664,9 @@ async def get_orders(
                 ).order_by(Order.created_at.desc()).limit(100).all()
         elif user_role in ("مدير", "موظف"):
             # للمديرين والموظفين: جلب جميع الطلبات
+            orders_query_start = time.time()
             orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+            print(f"⏱️ Orders API - Orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
         else:
             # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
             if customer_phone_variants:
@@ -675,7 +682,9 @@ async def get_orders(
 
         items_map: Dict[int, List[OrderItem]] = defaultdict(list)
         if order_ids:
+            items_query_start = time.time()
             items = db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).all()
+            print(f"⏱️ Orders API - Items query: {time.time() - items_query_start:.2f}s (found {len(items)} items)")
             for item in items:
                 items_map[item.order_id].append(item)
 
@@ -748,12 +757,17 @@ async def get_orders(
                 "items": order_items_payload
             })
 
+        total_time = time.time() - start_time
+        print(f"⏱️ Orders API - Total time: {total_time:.2f}s (returning {len(orders_payload)} orders)")
+        
         return {
             "success": True,
             "orders": orders_payload
         }
     except Exception as e:
-        print(f"Error fetching orders: {e}")
+        import traceback
+        print(f"❌ Error fetching orders: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في جلب الطلبات: {str(e)}")
 
 @router.get("/{order_id}/attachments")

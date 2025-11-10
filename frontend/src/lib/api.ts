@@ -5,7 +5,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds timeout
+  timeout: 60000, // 60 seconds timeout - زيادة الوقت لتجنب timeout
 })
 
 // Add request interceptor to include auth token
@@ -45,11 +45,13 @@ api.interceptors.response.use(
       }
     }
 
-    // Handle 401 errors (unauthorized)
+    // Handle 401 errors (unauthorized) - لكن لا نحذف token تلقائياً
+    // لأن هذا قد يسبب مشاكل عندما يكون المستخدم مسجل دخول بالفعل
+    // دع component يتعامل مع 401 errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('user_data')
-      // Don't redirect on API errors, let the component handle it
+      // لا نحذف token تلقائياً - قد يكون المستخدم مسجل دخول
+      // فقط نترك component يتعامل مع الخطأ
+      console.warn('401 Unauthorized - Token may be invalid or expired')
     }
 
     return Promise.reject(error)

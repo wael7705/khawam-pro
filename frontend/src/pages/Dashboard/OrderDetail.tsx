@@ -190,10 +190,26 @@ const normalizeAttachmentEntry = (
     let isImage = false
     if (isDataUrl(url)) {
       isImage = url.startsWith('data:image/')
-      console.log('✅ Detected image from data URL MIME type')
+      console.log('✅ Detected image from data URL MIME type:', isImage, url.substring(0, 30))
     } else {
-      isImage = mimeType.includes('image') || looksLikeImage(url) || looksLikeImage(filename)
-      console.log('✅ Detected image from:', { mimeType, url, filename, isImage })
+      // التحقق من MIME type أولاً
+      if (mimeType) {
+        isImage = mimeType.toLowerCase().includes('image')
+        console.log('✅ Detected from MIME type:', { mimeType, isImage })
+      }
+      // إذا لم يكن MIME type موجوداً، تحقق من الامتداد
+      if (!isImage) {
+        isImage = looksLikeImage(url) || looksLikeImage(filename)
+        console.log('✅ Detected from file extension:', { url, filename, isImage })
+      }
+      // إذا كان ملف PDF أو مستند، لا تعتبره صورة
+      if (filename.toLowerCase().endsWith('.pdf') || 
+          url.toLowerCase().includes('.pdf') || 
+          mimeType.toLowerCase().includes('pdf') ||
+          url.startsWith('data:application/pdf')) {
+        isImage = false
+        console.log('✅ Detected PDF file, not an image')
+      }
     }
 
     const result = {
@@ -510,32 +526,62 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
     specifications: item.specifications
   })
   
-  if (Array.isArray(item.design_files)) {
-    console.log(`✅ Found ${item.design_files.length} design_files in array`)
-    item.design_files.forEach((entry, idx) => {
-      console.log(`  Processing design_file[${idx}]:`, entry, typeof entry)
+  // معالجة design_files - تحسين التعامل مع جميع الحالات
+  if (item.design_files) {
+    let filesToProcess: any[] = []
+    
+    if (Array.isArray(item.design_files)) {
+      console.log(`✅ Found ${item.design_files.length} design_files in array`)
+      filesToProcess = item.design_files.filter(f => f !== null && f !== undefined)
+    } else if (typeof item.design_files === 'string') {
+      // إذا كانت سلسلة نصية، حاول تحليلها كـ JSON
+      try {
+        const parsed = JSON.parse(item.design_files)
+        if (Array.isArray(parsed)) {
+          filesToProcess = parsed.filter(f => f !== null && f !== undefined)
+        } else if (parsed !== null && parsed !== undefined) {
+          filesToProcess = [parsed]
+        } else {
+          // إذا فشل التحليل، اعتبرها ملف واحد
+          filesToProcess = [item.design_files]
+        }
+      } catch (e) {
+        // إذا فشل التحليل، اعتبرها ملف واحد
+        filesToProcess = [item.design_files]
+      }
+    } else if (typeof item.design_files === 'object') {
+      // إذا كان كائناً، أضفه مباشرة
+      filesToProcess = [item.design_files]
+    }
+    
+    console.log(`📎 Processing ${filesToProcess.length} files from design_files`)
+    filesToProcess.forEach((entry, idx) => {
+      console.log(`  Processing design_file[${idx}]:`, {
+        entry,
+        entry_type: typeof entry,
+        is_string: typeof entry === 'string',
+        is_object: typeof entry === 'object',
+        is_data_url: typeof entry === 'string' && isDataUrl(entry),
+        object_keys: typeof entry === 'object' && entry !== null ? Object.keys(entry) : []
+      })
+      
       const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
       if (normalized) {
         console.log(`  ✅ Normalized attachment:`, normalized)
         entries.push(normalized)
       } else {
         console.warn(`  ⚠️ Failed to normalize entry:`, entry)
+        // إذا فشل التطبيع، حاول إضافة الملف كسلسلة إذا كان يحتوي على رابط
+        if (typeof entry === 'string' && entry.trim() && 
+            (entry.startsWith('data:') || entry.startsWith('http') || entry.startsWith('/uploads/'))) {
+          console.log(`  🔄 Trying to add as string URL:`, entry.substring(0, 50))
+          const fallbackNormalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
+          if (fallbackNormalized) {
+            entries.push(fallbackNormalized)
+          }
+        }
       }
     })
-  } else if (item.design_files) {
-    console.log('⚠️ design_files is not an array:', item.design_files, typeof item.design_files)
-    // محاولة تحويل إلى array
-    try {
-      const filesArray = Array.isArray(item.design_files) ? item.design_files : [item.design_files]
-      filesArray.forEach((entry, idx) => {
-        const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
-        if (normalized) {
-          entries.push(normalized)
-        }
-      })
-    } catch (e) {
-      console.error('Error processing design_files:', e)
-    }
   } else {
     console.log('⚠️ No design_files found in item')
   }
@@ -669,16 +715,40 @@ export default function OrderDetail() {
           should_show_card: !!(orderData.delivery_address || (orderData.delivery_latitude && orderData.delivery_longitude))
         })
         
-        // Log design_files for each item
+        // Log design_files and specifications for each item - تحسين التسجيل
         if (orderData.items && Array.isArray(orderData.items)) {
           orderData.items.forEach((item: any, idx: number) => {
-            console.log(`📎 Item[${idx}] design_files:`, {
+            console.log(`📎 Item[${idx}] - Full item data:`, {
               item_id: item.id,
+              product_name: item.product_name,
+              service_name: item.service_name,
               design_files: item.design_files,
               design_files_type: typeof item.design_files,
               design_files_is_array: Array.isArray(item.design_files),
-              design_files_length: Array.isArray(item.design_files) ? item.design_files.length : 'N/A'
+              design_files_length: Array.isArray(item.design_files) ? item.design_files.length : 'N/A',
+              specifications: item.specifications,
+              specifications_type: typeof item.specifications,
+              specifications_keys: item.specifications && typeof item.specifications === 'object' ? Object.keys(item.specifications) : []
             })
+            
+            // تحقق من وجود ملفات في specifications
+            if (item.specifications && typeof item.specifications === 'object') {
+              const specKeys = Object.keys(item.specifications)
+              console.log(`📎 Item[${idx}] - Checking specifications for files:`, specKeys)
+              specKeys.forEach(key => {
+                const value = item.specifications[key]
+                if (Array.isArray(value) && value.length > 0) {
+                  console.log(`  ✅ Found array in "${key}":`, value.length, 'items')
+                  value.forEach((v: any, i: number) => {
+                    console.log(`    [${i}]:`, typeof v, v && typeof v === 'object' ? Object.keys(v) : v)
+                  })
+                } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                  console.log(`  ✅ Found object in "${key}":`, Object.keys(value))
+                } else if (value && typeof value === 'string' && (value.startsWith('data:') || value.startsWith('/uploads/') || value.startsWith('http'))) {
+                  console.log(`  ✅ Found file URL in "${key}":`, value.substring(0, 50))
+                }
+              })
+            }
           })
         }
         
@@ -809,26 +879,40 @@ export default function OrderDetail() {
 
     const sections: ReactNode[] = []
 
-    order.items.forEach((item) => {
+      order.items.forEach((item) => {
       const attachments = attachmentsByItem[item.id] || []
       const fallbackNames = fallbackNamesByItem[item.id] || []
       
+      // جمع المرفقات من design_files و specifications مرة أخرى للتأكد
+      const collectedAttachments = collectItemAttachments(item)
+      const allAttachments = dedupeAttachments([...attachments, ...collectedAttachments])
+      
       console.log(`📋 Processing item ${item.id} for attachments display:`, {
         attachments_count: attachments.length,
+        collected_attachments_count: collectedAttachments.length,
+        all_attachments_count: allAttachments.length,
         fallbackNames_count: fallbackNames.length,
         has_design_files: !!item.design_files,
         design_files_length: Array.isArray(item.design_files) ? item.design_files.length : 'N/A',
+        design_files_preview: Array.isArray(item.design_files) && item.design_files.length > 0 ? item.design_files[0] : null,
         has_specifications: !!item.specifications,
-        specifications_keys: item.specifications ? Object.keys(item.specifications) : []
+        specifications_keys: item.specifications ? Object.keys(item.specifications) : [],
+        specifications_preview: item.specifications ? JSON.stringify(item.specifications).substring(0, 200) : null
       })
       
       // عرض المرفقات حتى لو كانت فارغة، لإظهار البطاقة
       // لكن نتحقق من وجود بيانات فعلية قبل إضافة section
-      const hasAnyData = attachments.length > 0 || fallbackNames.length > 0
+      const hasAnyData = allAttachments.length > 0 || fallbackNames.length > 0 || 
+                        (item.design_files && Array.isArray(item.design_files) && item.design_files.length > 0) ||
+                        (item.specifications && typeof item.specifications === 'object' && Object.keys(item.specifications).length > 0)
+      
       if (!hasAnyData) {
         console.log(`  ⚠️ No attachments found for item ${item.id}, skipping section`)
         return
       }
+      
+      // استخدام allAttachments بدلاً من attachments
+      const finalAttachments = allAttachments.length > 0 ? allAttachments : attachments
 
       const unmatchedFallbacks =
         attachments.length > 0
@@ -844,12 +928,27 @@ export default function OrderDetail() {
             <span className="attachments-item-quantity">الكمية: {item.quantity}</span>
           </div>
 
-          {attachments.length > 0 ? (
-            renderAttachmentsGrid(attachments)
+          {finalAttachments.length > 0 ? (
+            renderAttachmentsGrid(finalAttachments)
           ) : (
-            <p className="attachments-missing">
-              لم يتم العثور على روابط مباشرة لتحميل الملفات لهذا العنصر حتى الآن.
-            </p>
+            <div className="attachments-missing">
+              <p>لم يتم العثور على روابط مباشرة لتحميل الملفات لهذا العنصر حتى الآن.</p>
+              {/* عرض معلومات debug */}
+              {(item.design_files || item.specifications) && (
+                <div className="attachments-debug-info" style={{ marginTop: '12px', padding: '12px', background: '#f8f9fa', borderRadius: '8px', fontSize: '12px' }}>
+                  <strong>معلومات Debug:</strong>
+                  <pre style={{ marginTop: '8px', overflow: 'auto', maxHeight: '200px' }}>
+                    {JSON.stringify({
+                      design_files: item.design_files,
+                      specifications_keys: item.specifications ? Object.keys(item.specifications) : [],
+                      specifications_sample: item.specifications ? Object.fromEntries(
+                        Object.entries(item.specifications).slice(0, 3)
+                      ) : {}
+                    }, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
           )}
 
           {unmatchedFallbacks.length > 0 && (

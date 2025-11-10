@@ -96,10 +96,37 @@ const normalizeAttachmentEntry = (
     // إذا كانت data URL، استخدمها مباشرة بدون resolve
     if (isDataUrl(trimmed)) {
       console.log('✅ Found data URL:', trimmed.substring(0, 50) + '...')
+      
+      // استخراج MIME type من data URL
+      const mimeMatch = trimmed.match(/^data:([^;]+);/)
+      const mimeType = mimeMatch ? mimeMatch[1] : ''
+      const isImageFromMime = mimeType.startsWith('image/')
+      const isPDFFromMime = mimeType.includes('pdf') || trimmed.startsWith('data:application/pdf')
+      
+      // استخراج اسم الملف من data URL إذا كان موجوداً
+      let filename = 'ملف'
+      const filenameMatch = trimmed.match(/filename=([^;]+)/)
+      if (filenameMatch) {
+        filename = decodeURIComponent(filenameMatch[1])
+      } else {
+        // محاولة استخراج من MIME type
+        if (isPDFFromMime) {
+          filename = 'ملف.pdf'
+        } else if (isImageFromMime) {
+          const ext = mimeType.split('/')[1]?.split(';')[0] || 'png'
+          filename = `صورة.${ext}`
+        } else if (mimeType) {
+          const ext = mimeType.split('/')[1]?.split(';')[0] || 'bin'
+          filename = `ملف.${ext}`
+        } else {
+          filename = extractFileName(trimmed) || 'ملف'
+        }
+      }
+      
       const result = {
         url: trimmed, // استخدم data URL مباشرة
-        filename: extractFileName(trimmed) || 'ملف',
-        isImage: looksLikeImage(trimmed) || trimmed.startsWith('data:image/'),
+        filename: filename,
+        isImage: isImageFromMime && !isPDFFromMime,
         orderItemId,
         originLabel,
       }

@@ -2652,12 +2652,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           if (Array.isArray(selectedProduct.colors) && selectedProduct.colors.length > 0) {
             const matchingColor = selectedProduct.colors.find((color: string) => color === clothingColor)
             clothingColorLabel = matchingColor || clothingColor
-          }
+        }
           if (Array.isArray(selectedProduct.sizes) && selectedProduct.sizes.length > 0) {
             const matchingSize = selectedProduct.sizes.find((size: string) => size === clothingSize)
             clothingSizeLabel = matchingSize || selectedProduct.sizes[0]
           }
-        }
+      }
       }
       if (!clothingColorLabel) {
         clothingColorLabel = clothingColor

@@ -9,8 +9,8 @@ const api = axios.create({
 })
 
   // Add request interceptor to include auth token - مع دعم Token مخصص
-  api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('auth_token')
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token')
     
     // تنظيف token غير صالح (فقط إذا كانت القيمة حرفياً 'null' أو 'undefined' كسلسلة)
     if (token === 'null' || token === 'undefined') {
@@ -22,12 +22,12 @@ const api = axios.create({
     
     // إضافة token إذا كان موجوداً (حتى لو كان قصيراً - قد يكون token مخصص مثل admin_token_1)
     if (token && token.trim() !== '') {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  }, (error) => {
-    return Promise.reject(error)
-  })
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+}, (error) => {
+  return Promise.reject(error)
+})
 
 // Add response interceptor for error handling and retry logic
 api.interceptors.response.use(

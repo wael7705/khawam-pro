@@ -1376,7 +1376,29 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 return []
             if isinstance(value, list):
                 print(f"✅ design_files is list with {len(value)} items")
-                result = [f for f in value if f is not None]
+                result = []
+                for f in value:
+                    if f is not None:
+                        # إذا كان الملف كائناً يحتوي على raw_path أو url، تأكد من أن URL صحيح
+                        if isinstance(f, dict):
+                            # تحقق من وجود raw_path أو url وإذا كان نسبياً، أضف base URL
+                            if 'raw_path' in f and f['raw_path']:
+                                if not f['raw_path'].startswith('http') and not f['raw_path'].startswith('data:'):
+                                    # إذا كان raw_path نسبياً، تأكد من أن url موجود
+                                    if 'url' not in f or not f['url']:
+                                        f['url'] = f['raw_path']
+                                    if 'download_url' not in f or not f['download_url']:
+                                        f['download_url'] = f['raw_path']
+                            elif 'url' in f and f['url']:
+                                if not f['url'].startswith('http') and not f['url'].startswith('data:'):
+                                    # إذا كان url نسبياً، أضفه إلى raw_path أيضاً
+                                    if 'raw_path' not in f:
+                                        f['raw_path'] = f['url']
+                                    if 'download_url' not in f:
+                                        f['download_url'] = f['url']
+                            result.append(f)
+                        else:
+                            result.append(f)
                 print(f"✅ After filtering None: {len(result)} items")
                 return result
             if isinstance(value, str):
@@ -1386,11 +1408,44 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                     parsed = json.loads(value)
                     print(f"✅ Parsed JSON: type={type(parsed)}, is_list={isinstance(parsed, list)}")
                     if isinstance(parsed, list):
-                        result = [f for f in parsed if f is not None]
+                        result = []
+                        for f in parsed:
+                            if f is not None:
+                                # نفس التحقق كما في حالة list
+                                if isinstance(f, dict):
+                                    if 'raw_path' in f and f['raw_path']:
+                                        if not f['raw_path'].startswith('http') and not f['raw_path'].startswith('data:'):
+                                            if 'url' not in f or not f['url']:
+                                                f['url'] = f['raw_path']
+                                            if 'download_url' not in f or not f['download_url']:
+                                                f['download_url'] = f['raw_path']
+                                    elif 'url' in f and f['url']:
+                                        if not f['url'].startswith('http') and not f['url'].startswith('data:'):
+                                            if 'raw_path' not in f:
+                                                f['raw_path'] = f['url']
+                                            if 'download_url' not in f:
+                                                f['download_url'] = f['url']
+                                result.append(f)
                         print(f"✅ After filtering: {len(result)} items")
                         return result
                     elif isinstance(parsed, dict):
-                        result = [f for f in parsed.values() if f is not None]
+                        result = []
+                        for f in parsed.values():
+                            if f is not None:
+                                if isinstance(f, dict):
+                                    if 'raw_path' in f and f['raw_path']:
+                                        if not f['raw_path'].startswith('http') and not f['raw_path'].startswith('data:'):
+                                            if 'url' not in f or not f['url']:
+                                                f['url'] = f['raw_path']
+                                            if 'download_url' not in f or not f['download_url']:
+                                                f['download_url'] = f['raw_path']
+                                    elif 'url' in f and f['url']:
+                                        if not f['url'].startswith('http') and not f['url'].startswith('data:'):
+                                            if 'raw_path' not in f:
+                                                f['raw_path'] = f['url']
+                                            if 'download_url' not in f:
+                                                f['download_url'] = f['url']
+                                result.append(f)
                         print(f"✅ Dict values: {len(result)} items")
                         return result
                     else:
@@ -1402,7 +1457,23 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                     return [value] if value.strip() else []
             if isinstance(value, dict):
                 print(f"⚠️ design_files is dict with {len(value)} keys")
-                result = [f for f in value.values() if f is not None]
+                result = []
+                for f in value.values():
+                    if f is not None:
+                        if isinstance(f, dict):
+                            if 'raw_path' in f and f['raw_path']:
+                                if not f['raw_path'].startswith('http') and not f['raw_path'].startswith('data:'):
+                                    if 'url' not in f or not f['url']:
+                                        f['url'] = f['raw_path']
+                                    if 'download_url' not in f or not f['download_url']:
+                                        f['download_url'] = f['raw_path']
+                            elif 'url' in f and f['url']:
+                                if not f['url'].startswith('http') and not f['url'].startswith('data:'):
+                                    if 'raw_path' not in f:
+                                        f['raw_path'] = f['url']
+                                    if 'download_url' not in f:
+                                        f['download_url'] = f['url']
+                        result.append(f)
                 return result
             try:
                 result = list(value) if value else []
@@ -1450,16 +1521,52 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             if delivery_address_data:
                 specs['delivery_address_data'] = delivery_address_data
             
-            # Parse design_files with logging
+            # Parse design_files with logging - تحسين الاستخراج
             print(f"📎 Processing item {item_id} - design_files_raw type: {type(design_files_raw)}")
             parsed_design_files = safe_parse_array(design_files_raw)
-            print(f"📎 Item {item_id}: Parsed {len(parsed_design_files)} design_files")
+            print(f"📎 Item {item_id}: Parsed {len(parsed_design_files)} design_files from column")
+            
+            # أيضاً استخرج design_files من specifications إذا كانت موجودة (backup)
+            if specs and 'design_files' in specs:
+                spec_design_files = safe_parse_array(specs.get('design_files'))
+                print(f"📎 Item {item_id}: Found {len(spec_design_files)} design_files in specifications")
+                # دمج الملفات من design_files column و specifications
+                all_design_files = parsed_design_files.copy()
+                for spec_file in spec_design_files:
+                    # تجنب التكرار - تحقق من أن الملف غير موجود بالفعل
+                    if spec_file not in all_design_files:
+                        all_design_files.append(spec_file)
+                        print(f"  ✅ Added design_file from specifications: {str(spec_file)[:50]}")
+                parsed_design_files = all_design_files
+                print(f"📎 Item {item_id}: Total {len(parsed_design_files)} design_files after merging")
+            
+            # أيضاً ابحث في جميع مفاتيح specifications عن ملفات
+            if specs:
+                for key, value in specs.items():
+                    if key != 'design_files' and value:
+                        # إذا كان المفتاح يحتوي على "file" أو "upload" أو "attachment"
+                        key_lower = key.lower()
+                        if any(term in key_lower for term in ['file', 'upload', 'attachment', 'image', 'document', 'pdf']):
+                            print(f"📎 Item {item_id}: Found potential file key '{key}' in specifications")
+                            file_entries = safe_parse_array(value)
+                            if file_entries:
+                                print(f"  ✅ Found {len(file_entries)} files in '{key}'")
+                                for file_entry in file_entries:
+                                    if file_entry not in parsed_design_files:
+                                        parsed_design_files.append(file_entry)
+                                        print(f"  ✅ Added file from '{key}': {str(file_entry)[:50]}")
+            
+            print(f"📎 Item {item_id}: Final count: {len(parsed_design_files)} design_files")
             if parsed_design_files:
                 for idx, df in enumerate(parsed_design_files):
                     df_preview = str(df)[:100] if df else 'None'
-                    print(f"  design_file[{idx}]: {df_preview}... (type: {type(df)})")
+                    df_type = type(df).__name__
+                    print(f"  design_file[{idx}]: type={df_type}, preview={df_preview}...")
+                    # إذا كان كائناً، اطبع المفاتيح
+                    if isinstance(df, dict):
+                        print(f"    keys: {list(df.keys())}")
             else:
-                print(f"⚠️ Item {item_id}: No design_files found or all are None")
+                print(f"⚠️ Item {item_id}: No design_files found - checking specifications keys: {list(specs.keys()) if specs else 'N/A'}")
             
             items_list.append({
                 "id": item_id,
@@ -1471,7 +1578,7 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
                 "unit_price": unit_price,
                 "total_price": total_price,
                 "specifications": specs,
-                "design_files": parsed_design_files,  # استخدام القيمة المحفوظة
+                "design_files": parsed_design_files,  # استخدام القيمة المحفوظة مع الملفات المدمجة
                 "status": status
             })
         
@@ -1507,7 +1614,7 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
             "has_coordinates": bool(order['delivery_latitude'] and order['delivery_longitude']),
             "has_details": bool(order.get('delivery_address_details')),
             "has_address_data": bool(delivery_address_data)
-        })
+            })
         
         return {
             "success": True,

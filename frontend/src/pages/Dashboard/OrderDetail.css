@@ -765,6 +765,7 @@
 .attachment-preview {
   width: 72px;
   height: 72px;
+  min-width: 72px;
   border-radius: 8px;
   background: #f3f4f6;
   display: flex;
@@ -772,12 +773,66 @@
   justify-content: center;
   overflow: hidden;
   border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.attachment-preview.image {
+  background: #000;
 }
 
 .attachment-preview.image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.attachment-preview.image img:hover {
+  transform: scale(1.05);
+}
+
+.attachment-preview.document,
+.attachment-preview.pdf,
+.attachment-preview.file {
+  background: #e3f2fd;
+  color: #1976d2;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attachment-preview.pdf {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.file-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+}
+
+.file-icon svg {
+  flex-shrink: 0;
+}
+
+.file-extension {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 3px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.pdf-icon .file-extension {
+  background: #c62828;
+  color: white;
 }
 
 .attachment-preview.document svg {

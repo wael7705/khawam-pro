@@ -78,6 +78,19 @@ const normalizeAttachmentEntry = (
   if (typeof entry === 'string') {
     const trimmed = entry.trim()
     if (!trimmed || trimmed.startsWith(':')) return null
+    
+    // إذا كانت data URL، استخدمها مباشرة بدون resolve
+    if (isDataUrl(trimmed)) {
+      return {
+        url: trimmed, // استخدم data URL مباشرة
+        filename: extractFileName(trimmed) || 'ملف',
+        isImage: looksLikeImage(trimmed) || trimmed.startsWith('data:image/'),
+        orderItemId,
+        originLabel,
+      }
+    }
+    
+    // للروابط الأخرى، استخدم resolveToAbsoluteUrl
     const url = resolveToAbsoluteUrl(trimmed)
     if (!url) return null
     return {
@@ -99,15 +112,25 @@ const normalizeAttachmentEntry = (
       entry.location_url ||
       entry.download_url ||
       entry.raw_path ||
+      entry.data_url || // إضافة دعم data_url
       ''
     const rawUrlString = String(rawUrl).trim()
     let url = ''
-    if (rawUrlString && !rawUrlString.startsWith(':')) {
+    
+    // إذا كانت data URL، استخدمها مباشرة
+    if (rawUrlString && isDataUrl(rawUrlString)) {
+      url = rawUrlString
+    } else if (rawUrlString && !rawUrlString.startsWith(':')) {
       url = resolveToAbsoluteUrl(rawUrlString)
     }
 
     if (!url && entry.location) {
-      url = resolveToAbsoluteUrl(entry.location)
+      const locationUrl = String(entry.location).trim()
+      if (isDataUrl(locationUrl)) {
+        url = locationUrl
+      } else {
+        url = resolveToAbsoluteUrl(locationUrl)
+      }
     }
 
     if (!url) {
@@ -123,7 +146,14 @@ const normalizeAttachmentEntry = (
 
     const mimeType = entry.mime_type || entry.mimetype || entry.content_type || ''
     const sizeLabel = entry.size_label || prettyFileSize(entry.size || entry.file_size || entry.size_in_bytes)
-    const isImage = mimeType.includes('image') || looksLikeImage(url) || looksLikeImage(filename)
+    
+    // تحديد إذا كانت صورة - للdata URLs، تحقق من MIME type
+    let isImage = false
+    if (isDataUrl(url)) {
+      isImage = url.startsWith('data:image/')
+    } else {
+      isImage = mimeType.includes('image') || looksLikeImage(url) || looksLikeImage(filename)
+    }
 
     return {
       url,
@@ -803,36 +833,91 @@ export default function OrderDetail() {
           </div>
         </div>
 
-          <div className="detail-card status-card">
-            <h2>حالة الطلب</h2>
-            <div className="status-controls">
-              <div className="current-status">
-                <span
-                  className="status-badge"
-                  style={{ backgroundColor: getStatusColor(order.status || 'pending') }}
-                >
-                  {getStatusLabel(order.status || 'pending')}
-                </span>
-              </div>
-              <div className="status-buttons">
-                {STATUS_OPTIONS.map((option) => {
-                  const style = { '--status-color': option.color } as CSSProperties
-                  const isCurrent = option.id === (order.status || 'pending')
-                  return (
-                    <button
-                      key={option.id}
-                      className={`status-btn ${isCurrent ? 'active' : ''}`}
-                      style={style}
-                      onClick={() => handleStatusChange(option.id)}
-                      disabled={isUpdatingStatus || isCurrent}
-                    >
-                      {option.label}
-                    </button>
-                  )
-                })}
+          {/* Delivery Address Card - عند اختيار التوصيل */}
+          {order.delivery_type === 'delivery' && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) ? (
+            <div className="detail-card delivery-address-card">
+              <h2>
+                <MapPin size={20} />
+                عنوان التوصيل
+              </h2>
+              <div className="delivery-address-content">
+                {order.delivery_address && (
+                  <div className="delivery-address-text">
+                    <label>العنوان:</label>
+                    <p>{order.delivery_address}</p>
+                  </div>
+                )}
+                {order.delivery_latitude && order.delivery_longitude && (
+                  <>
+                    <div className="delivery-coordinates">
+                      <label>الإحداثيات:</label>
+                      <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
+                    </div>
+                    <div className="delivery-map-actions">
+                      <button
+                        className="map-action-btn"
+                        onClick={() => setShowLocationMap(!showLocationMap)}
+                      >
+                        <MapPin size={16} />
+                        {showLocationMap ? 'إخفاء الخريطة' : 'عرض على الخريطة'}
+                      </button>
+                      <a
+                        href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="map-action-btn external"
+                      >
+                        <ExternalLink size={16} />
+                        فتح في Google Maps
+                      </a>
+                    </div>
+                    {showLocationMap && (
+                      <div className="delivery-map-container">
+                        <SimpleMap
+                          address={order.delivery_address}
+                          latitude={order.delivery_latitude}
+                          longitude={order.delivery_longitude}
+                          defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                          defaultZoom={17}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="detail-card status-card">
+              <h2>حالة الطلب</h2>
+              <div className="status-controls">
+                <div className="current-status">
+                  <span
+                    className="status-badge"
+                    style={{ backgroundColor: getStatusColor(order.status || 'pending') }}
+                  >
+                    {getStatusLabel(order.status || 'pending')}
+                  </span>
+                </div>
+                <div className="status-buttons">
+                  {STATUS_OPTIONS.map((option) => {
+                    const style = { '--status-color': option.color } as CSSProperties
+                    const isCurrent = option.id === (order.status || 'pending')
+                    return (
+                      <button
+                        key={option.id}
+                        className={`status-btn ${isCurrent ? 'active' : ''}`}
+                        style={style}
+                        onClick={() => handleStatusChange(option.id)}
+                        disabled={isUpdatingStatus || isCurrent}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {attachmentsOverview}
 

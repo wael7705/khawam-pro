@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Search, User, Phone, ShoppingCart, DollarSign, MessageSquare, Eye, Calendar, TrendingUp } from 'lucide-react'
+import { Search, User, Phone, ShoppingCart, DollarSign, MessageSquare, Eye, Calendar, TrendingUp, MapPin, ExternalLink } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
+import SimpleMap from '../../components/SimpleMap'
 import './CustomersManagement.css'
 
 interface Customer {
@@ -20,6 +21,10 @@ interface OrderSummary {
   status: string
   final_amount: number
   created_at: string
+  delivery_type?: string
+  delivery_address?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
   items: Array<{
     product_name: string
     quantity: number
@@ -46,6 +51,7 @@ export default function CustomersManagement() {
   const [searchQuery, setSearchQuery] = useState('')
   const [staffNotes, setStaffNotes] = useState('')
   const [isSavingNotes, setIsSavingNotes] = useState(false)
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null)
 
   useEffect(() => {
     loadCustomers()
@@ -242,44 +248,101 @@ export default function CustomersManagement() {
           <div className="orders-history-card">
             <h3>تاريخ الطلبات ({selectedCustomer.orders.length})</h3>
             <div className="orders-list">
-              {selectedCustomer.orders.map((order) => (
-                <div key={order.id} className="order-history-item">
-                  <div className="order-header">
-                    <div>
-                      <span className="order-number">#{order.order_number}</span>
-                      {order.shop_name && (
-                        <span className="order-service">{order.shop_name}</span>
+              {selectedCustomer.orders.map((order) => {
+                const hasDeliveryLocation = order.delivery_type === 'delivery' && order.delivery_latitude && order.delivery_longitude
+                const isExpanded = expandedOrderId === order.id
+                
+                return (
+                  <div key={order.id} className="order-history-item">
+                    <div className="order-header">
+                      <div>
+                        <span className="order-number">#{order.order_number}</span>
+                        {order.shop_name && (
+                          <span className="order-service">{order.shop_name}</span>
+                        )}
+                      </div>
+                      <div className="order-meta">
+                        <span 
+                          className="status-badge"
+                          style={{ backgroundColor: getStatusColor(order.status) + '20', color: getStatusColor(order.status) }}
+                        >
+                          {getStatusLabel(order.status)}
+                        </span>
+                        <span className="order-date">{formatDate(order.created_at)}</span>
+                      </div>
+                    </div>
+                    <div className="order-items-preview">
+                      {order.items.map((item, idx) => (
+                        <span key={idx} className="item-tag">
+                          {item.product_name} × {item.quantity}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="order-delivery-info">
+                      <span className="delivery-type">
+                        {order.delivery_type === 'delivery' ? '📦 توصيل' : '🏪 استلام ذاتي'}
+                      </span>
+                      {hasDeliveryLocation && (
+                        <button
+                          className="toggle-location-btn"
+                          onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                        >
+                          <MapPin size={14} />
+                          {isExpanded ? 'إخفاء الموقع' : 'عرض الموقع'}
+                        </button>
                       )}
                     </div>
-                    <div className="order-meta">
-                      <span 
-                        className="status-badge"
-                        style={{ backgroundColor: getStatusColor(order.status) + '20', color: getStatusColor(order.status) }}
+                    {isExpanded && hasDeliveryLocation && (
+                      <div className="order-location-details">
+                        {order.delivery_address && (
+                          <div className="location-address">
+                            <label>العنوان:</label>
+                            <p>{order.delivery_address}</p>
+                          </div>
+                        )}
+                        {order.delivery_latitude && order.delivery_longitude && (
+                          <>
+                            <div className="location-coordinates">
+                              <label>الإحداثيات:</label>
+                              <span>{order.delivery_latitude.toFixed(6)}, {order.delivery_longitude.toFixed(6)}</span>
+                            </div>
+                            <div className="location-map-actions">
+                              <a
+                                href={`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="map-link-btn"
+                              >
+                                <ExternalLink size={14} />
+                                فتح في Google Maps
+                              </a>
+                            </div>
+                            <div className="location-map-container">
+                              <SimpleMap
+                                address={order.delivery_address}
+                                latitude={order.delivery_latitude}
+                                longitude={order.delivery_longitude}
+                                defaultCenter={[order.delivery_latitude, order.delivery_longitude]}
+                                defaultZoom={17}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <div className="order-footer">
+                      <span className="order-amount">{order.final_amount.toLocaleString()} ل.س</span>
+                      <button 
+                        className="view-order-btn"
+                        onClick={() => navigate(`/dashboard/orders/${order.id}`)}
                       >
-                        {getStatusLabel(order.status)}
-                      </span>
-                      <span className="order-date">{formatDate(order.created_at)}</span>
+                        <Eye size={16} />
+                        عرض التفاصيل
+                      </button>
                     </div>
                   </div>
-                  <div className="order-items-preview">
-                    {order.items.map((item, idx) => (
-                      <span key={idx} className="item-tag">
-                        {item.product_name} × {item.quantity}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="order-footer">
-                    <span className="order-amount">{order.final_amount.toLocaleString()} ل.س</span>
-                    <button 
-                      className="view-order-btn"
-                      onClick={() => navigate(`/dashboard/orders/${order.id}`)}
-                    >
-                      <Eye size={16} />
-                      عرض التفاصيل
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
               {selectedCustomer.orders.length === 0 && (
                 <div className="empty-state">
                   <p>لا توجد طلبات سابقة</p>

@@ -485,6 +485,132 @@
   color: #6b7280;
 }
 
+.order-delivery-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.delivery-type {
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.toggle-location-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.toggle-location-btn:hover {
+  background: #5568d3;
+  transform: translateY(-2px);
+}
+
+.order-location-details {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.location-address {
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+}
+
+.location-address label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.location-address p {
+  margin: 0;
+  font-size: 14px;
+  color: #1a1a1a;
+  line-height: 1.6;
+}
+
+.location-coordinates {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+}
+
+.location-coordinates label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.location-coordinates span {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.location-map-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.map-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.map-link-btn:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+.location-map-container {
+  margin-top: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 300px;
+}
+
 @media (max-width: 768px) {
   .customers-grid {
     grid-template-columns: 1fr;

@@ -2613,6 +2613,10 @@ async def get_customer_details(phone: str, db: Session = Depends(get_db)):
                 "status": getattr(order, 'status', 'pending'),
                 "final_amount": float(order.final_amount) if order.final_amount else 0,
                 "created_at": order.created_at.isoformat() if order.created_at else None,
+                "delivery_type": getattr(order, 'delivery_type', 'self'),
+                "delivery_address": getattr(order, 'delivery_address', None),
+                "delivery_latitude": float(order.delivery_latitude) if hasattr(order, 'delivery_latitude') and order.delivery_latitude is not None else None,
+                "delivery_longitude": float(order.delivery_longitude) if hasattr(order, 'delivery_longitude') and order.delivery_longitude is not None else None,
                 "items": [
                     {
                         "product_name": item.product_name,

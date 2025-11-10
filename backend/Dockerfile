@@ -12,14 +12,19 @@ RUN npm install -g pnpm@latest
 # Copy frontend source files (needed for pnpm to resolve dependencies correctly)
 COPY frontend/ .
 
-# Install dependencies with pnpm (without frozen-lockfile if lockfile doesn't exist)
-# Use --no-frozen-lockfile to allow pnpm to create/update lockfile
-# Fallback to npm with --legacy-peer-deps to handle React 19 peer dependency issues
+# Install dependencies with pnpm
+# Use --no-frozen-lockfile to allow pnpm to create/update lockfile if it doesn't exist
+# Use --shamefully-hoist to handle peer dependency conflicts (similar to --legacy-peer-deps in npm)
+# Fallback to npm with --legacy-peer-deps if pnpm fails
 RUN if [ -f pnpm-lock.yaml ]; then \
-        pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile; \
+        echo "📦 Lockfile found, using frozen lockfile with shamefully-hoist"; \
+        pnpm install --frozen-lockfile --shamefully-hoist || \
+        pnpm install --no-frozen-lockfile --shamefully-hoist; \
     else \
-        pnpm install --no-frozen-lockfile || \
-        (npm install --legacy-peer-deps && echo "⚠️ Used npm with --legacy-peer-deps"); \
+        echo "📦 No lockfile found, installing dependencies with shamefully-hoist"; \
+        pnpm install --no-frozen-lockfile --shamefully-hoist || \
+        (echo "⚠️ pnpm failed, trying npm with --legacy-peer-deps" && \
+         npm install --legacy-peer-deps); \
     fi
 
 # Build frontend

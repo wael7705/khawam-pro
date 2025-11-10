@@ -103,7 +103,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             try:
                 # استخدام bcrypt مباشرة - هذا الأفضل والأسرع للتحقق من bcrypt hashes
                 # تحويل password إلى bytes
-            password_bytes = plain_password.encode('utf-8')
+                password_bytes = plain_password.encode('utf-8')
                 
                 # تحويل hash إلى bytes (bcrypt يحتاج bytes)
                 if isinstance(hashed_password, str):
@@ -116,10 +116,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
                 result = bcrypt.checkpw(password_bytes, hashed_password_bytes)
                 if result:
                     print(f"✅ bcrypt.checkpw verification succeeded")
-                return True
+                    return True
                 else:
                     print(f"⚠️ bcrypt.checkpw verification failed (password mismatch)")
-        except Exception as bcrypt_error:
+                    return False
+            except Exception as bcrypt_error:
                 print(f"⚠️ Direct bcrypt.checkpw error: {bcrypt_error}")
                 import traceback
                 traceback.print_exc()
@@ -614,11 +615,11 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             access_token = custom_token
         else:
             # إنشاء JWT token عادي
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user_id},
-            expires_delta=access_token_expires
-        )
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"sub": user_id},
+                expires_delta=access_token_expires
+            )
         
         return {
             "access_token": access_token,

@@ -8,8 +8,8 @@ from models import User, UserType
 from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
 from passlib.hash import bcrypt_sha256 as legacy_bcrypt_sha256
-from passlib.hash import bcrypt as legacy_bcrypt
 from passlib.exc import UnknownHashError
+# لا نستخدم legacy_bcrypt من passlib لأن bcrypt مباشرة أفضل ويتجنب مشاكل 72 بايت
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -24,6 +24,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-use-e
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
+# استخدام pbkdf2_sha256 فقط للتشفير الجديد (يدعم أي طول لكلمة المرور)
+# لا نستخدم bcrypt في pwd_context لأن bcrypt له حد 72 بايت
 pwd_context = CryptContext(
     schemes=["pbkdf2_sha256"],
     default="pbkdf2_sha256",
@@ -73,31 +75,63 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         if not hashed_password or not plain_password:
             return False
         
+        # إزالة المسافات الزائدة من كلمة المرور
+        plain_password = plain_password.strip()
+        
+        # تحديد نوع hash والتحقق بالطريقة المناسبة
+        # أولاً: إذا كان bcrypt hash ($2a$, $2b$, $2y$)، استخدم bcrypt مباشرة
+        if hashed_password.startswith('$2'):
+            try:
+                # استخدام bcrypt مباشرة - هذا الأفضل والأسرع للتحقق من bcrypt hashes
+                # تحويل password إلى bytes
+                password_bytes = plain_password.encode('utf-8')
+                
+                # تحويل hash إلى bytes (bcrypt يحتاج bytes)
+                if isinstance(hashed_password, str):
+                    hashed_password_bytes = hashed_password.encode('utf-8')
+                else:
+                    hashed_password_bytes = hashed_password
+                
+                # التحقق من كلمة المرور باستخدام bcrypt مباشرة
+                # هذا يتجاوز مشاكل passlib مع bcrypt
+                result = bcrypt.checkpw(password_bytes, hashed_password_bytes)
+                if result:
+                    print(f"✅ bcrypt.checkpw verification succeeded")
+                    return True
+                else:
+                    print(f"⚠️ bcrypt.checkpw verification failed (password mismatch)")
+            except Exception as bcrypt_error:
+                print(f"⚠️ Direct bcrypt.checkpw error: {bcrypt_error}")
+                import traceback
+                traceback.print_exc()
+        
+        # ثانياً: إذا كان bcrypt-sha256 hash (legacy)
+        if hashed_password.startswith("$bcrypt-sha256$"):
+            try:
+                # استخدام bcrypt-sha256 من passlib لكن مع معالجة الأخطاء
+                # هذا نادر الاستخدام لكن نبقيه للتوافق مع البيانات القديمة
+                if legacy_bcrypt_sha256.verify(plain_password, hashed_password):
+                    return True
+            except Exception as legacy_sha_error:
+                # إذا فشل، لا نطبع الخطأ لأن هذا قد يسبب مشاكل
+                pass
+        
+        # ثالثاً: محاولة استخدام pbkdf2_sha256 (للكلمات المرور الجديدة)
+        # هذا يدعم أي طول لكلمة المرور بدون مشاكل
         try:
             if pwd_context.verify(plain_password, hashed_password):
                 return True
         except UnknownHashError:
             pass
         except Exception as context_error:
-            print(f"⚠️ pwd_context verify failed: {context_error}")
-
-        if hashed_password.startswith("$bcrypt-sha256$"):
-            try:
-                if legacy_bcrypt_sha256.verify(plain_password, hashed_password):
-                    return True
-            except Exception as legacy_sha_error:
-                print(f"⚠️ Legacy bcrypt_sha256 verify failed: {legacy_sha_error}")
-
-        if hashed_password.startswith('$2'):
-            try:
-                if legacy_bcrypt.verify(plain_password, hashed_password):
-                    return True
-            except Exception as bcrypt_error:
-                print(f"⚠️ Legacy bcrypt verify failed: {bcrypt_error}")
+            # لا نطبع الخطأ هنا لأن هذا قد يسبب مشاكل
+            pass
         
         return False
     except Exception as e:
         print(f"⚠️ Error verifying password: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def get_password_hash(password: str) -> str:

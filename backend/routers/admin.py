@@ -848,6 +848,42 @@ async def get_all_orders(db: Session = Depends(get_db)):
             
             print(f"⏱️ Admin Orders API - Items query: {time.time() - items_query_start:.2f}s (found items for {len(all_items)} orders)")
             
+            # جلب design_files لجميع items دفعة واحدة
+            design_files_start = time.time()
+            design_files_map = {}
+            if order_ids:
+                design_files_query = db.execute(text("""
+                    SELECT order_id, design_files
+                    FROM order_items
+                    WHERE order_id = ANY(:order_ids)
+                    ORDER BY order_id, id ASC
+                """), {"order_ids": order_ids}).fetchall()
+                
+                for item_row in design_files_query:
+                    order_id = item_row[0]
+                    design_files = item_row[1]
+                    if order_id not in design_files_map and design_files:
+                        # محاولة استخراج أول design_file
+                        try:
+                            import json
+                            if isinstance(design_files, str):
+                                design_files_parsed = json.loads(design_files)
+                            elif isinstance(design_files, list):
+                                design_files_parsed = design_files
+                            elif isinstance(design_files, dict):
+                                design_files_parsed = list(design_files.values()) if design_files else []
+                            else:
+                                design_files_parsed = []
+                            
+                            if design_files_parsed:
+                                for u in design_files_parsed:
+                                    if u and str(u).strip():
+                                        design_files_map[order_id] = str(u).strip()
+                                        break
+                        except:
+                            pass
+            print(f"⏱️ Admin Orders API - Design files query: {time.time() - design_files_start:.2f}s")
+            
             # Get order items for each order to determine order type and quantity
             orders_with_items = []
             for row in rows:
@@ -901,16 +937,8 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 order_id = row[0]
                 order_info = order_info_map.get(order_id, {'order_type': 'product', 'total_quantity': 0, 'service_name': None})
                 
-                # Get image from first order item - استخدام البيانات المحفوظة
-                raw_image = None
-                if order_id in all_items and all_items[order_id]:
-                    # محاولة جلب design_files من first item
-                    first_item_db = db.query(OrderItem).filter(OrderItem.order_id == order_id).order_by(OrderItem.id.asc()).first()
-                    if first_item_db and first_item_db.design_files:
-                        for u in first_item_db.design_files:
-                            if u and str(u).strip():
-                                raw_image = str(u).strip()
-                                break
+                # Get image from pre-fetched design_files
+                raw_image = design_files_map.get(order_id)
                 
                 # حساب مؤشرات الأعمدة الجديدة للتقسيط (يجب تعريفها أولاً)
                 paid_amount = float(row[9]) if len(row) > 9 and row[9] is not None else 0.0

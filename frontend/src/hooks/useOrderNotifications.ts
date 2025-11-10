@@ -233,11 +233,28 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
         const currentToken = getToken()
         if (!currentToken || currentToken === 'null' || currentToken === 'undefined' || currentToken.trim() === '') {
           console.warn('WebSocket: Connection skipped - no valid token available')
+          // إيقاف أي محاولات إعادة اتصال
+          reconnectAttemptsRef.current = 999
+          return
+        }
+        
+        // تحقق إضافي: التأكد من أن token ليس null أو undefined كقيمة
+        if (currentToken === null || currentToken === undefined) {
+          console.warn('WebSocket: Connection skipped - token is null/undefined')
+          reconnectAttemptsRef.current = 999
           return
         }
         
         const wsUrl = buildWebSocketUrl(`/ws/orders?token=${encodeURIComponent(currentToken)}`)
-        console.log('WebSocket: Attempting to connect...')
+        
+        // تحقق نهائي: التأكد من أن URL لا يحتوي على token=null
+        if (wsUrl.includes('token=null') || wsUrl.includes('token=undefined')) {
+          console.error('WebSocket: URL contains null token, aborting connection')
+          reconnectAttemptsRef.current = 999
+          return
+        }
+        
+        console.log('WebSocket: Attempting to connect with valid token')
         const socket = new WebSocket(wsUrl)
         wsRef.current = socket
 

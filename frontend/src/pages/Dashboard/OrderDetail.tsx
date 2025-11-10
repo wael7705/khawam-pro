@@ -458,16 +458,44 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
   if (!specs || typeof specs !== 'object') return []
   const entries: any[] = []
 
+  console.log('🔍 collectAttachmentsFromSpecs - specs keys:', Object.keys(specs))
+
   ATTACHMENT_SPEC_KEYS.forEach((key) => {
     const value = specs[key]
     if (!value) return
+    console.log(`  Checking key "${key}":`, value, Array.isArray(value))
     if (Array.isArray(value)) {
       entries.push(...value)
+      console.log(`  ✅ Added ${value.length} entries from ${key}`)
     } else {
       entries.push(value)
+      console.log(`  ✅ Added 1 entry from ${key}`)
+    }
+  })
+  
+  // أيضاً ابحث في جميع المفاتيح التي قد تحتوي على ملفات
+  Object.keys(specs).forEach((key) => {
+    const value = specs[key]
+    if (!value) return
+    
+    // إذا كان المفتاح يحتوي على "file" أو "image" أو "design" أو "upload"
+    const keyLower = key.toLowerCase()
+    if ((keyLower.includes('file') || keyLower.includes('image') || keyLower.includes('design') || keyLower.includes('upload') || keyLower.includes('attachment')) 
+        && !ATTACHMENT_SPEC_KEYS.includes(key)) {
+      console.log(`  🔍 Found potential attachment key "${key}":`, value)
+      if (Array.isArray(value)) {
+        value.forEach(item => {
+          if (item && (typeof item === 'string' || typeof item === 'object')) {
+            entries.push(item)
+          }
+        })
+      } else if (typeof value === 'string' || typeof value === 'object') {
+        entries.push(value)
+      }
     }
   })
 
+  console.log(`✅ Total entries collected from specs: ${entries.length}`)
   return entries
 }
 

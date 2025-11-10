@@ -58,19 +58,27 @@ export const isAuthenticated = (): boolean => {
 export const getToken = (): string | null => {
   const token = localStorage.getItem('auth_token')
   
+  // تنظيف: إذا كان token هو 'null' أو 'undefined' كسلسلة، احذفه
+  if (token === 'null' || token === 'undefined') {
+    console.warn('⚠️ Found invalid token string in localStorage, removing it...', { token })
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_data')
+    return null
+  }
+  
   // التحقق من أن token ليس "null" أو "undefined" كسلسلة نصية
-  if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
-    console.warn('⚠️ No valid token found in localStorage', { token, length: token?.length })
+  if (!token || token.trim() === '') {
     return null
   }
   
   // التحقق من أن token ليس قصيراً جداً (JWT tokens عادة تكون أطول من 20 حرف)
   if (token.length < 20) {
-    console.warn('⚠️ Token seems invalid (too short):', token.substring(0, 10) + '...')
+    console.warn('⚠️ Token seems invalid (too short), removing it:', token.substring(0, 10) + '...')
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_data')
     return null
   }
   
-  console.log('✅ Valid token found:', token.substring(0, 20) + '...')
   return token
 }
 

@@ -41,14 +41,32 @@ export default function Login() {
         return
       }
       
+      // تنظيف أي tokens غير صالحة أولاً
+      const oldToken = localStorage.getItem('auth_token')
+      if (oldToken === 'null' || oldToken === 'undefined' || (oldToken && oldToken.length < 20)) {
+        console.warn('⚠️ Removing invalid old token:', oldToken)
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_data')
+      }
+      
+      // حفظ Token وبيانات المستخدم
+      if (!loginData.access_token || loginData.access_token === 'null' || loginData.access_token === 'undefined') {
+        console.error('⚠️ Invalid token received from server:', loginData.access_token)
+        showError('خطأ في token المستلم من الخادم')
+        setLoading(false)
+        return
+      }
+      
       localStorage.setItem('auth_token', loginData.access_token)
       localStorage.setItem('user_data', JSON.stringify(loginData.user))
       
       // التحقق من أن token تم حفظه بشكل صحيح
       const savedToken = localStorage.getItem('auth_token')
-      if (!savedToken || savedToken !== loginData.access_token) {
-        console.error('⚠️ Token was not saved correctly!')
-        showError('حدث خطأ في حفظ بيانات تسجيل الدخول')
+      if (!savedToken || savedToken !== loginData.access_token || savedToken === 'null' || savedToken === 'undefined') {
+        console.error('⚠️ Token was not saved correctly!', { savedToken, received: loginData.access_token })
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_data')
+        showError('حدث خطأ في حفظ بيانات تسجيل الدخول. يرجى المحاولة مرة أخرى.')
         setLoading(false)
         return
       }

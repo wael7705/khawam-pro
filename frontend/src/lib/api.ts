@@ -10,7 +10,15 @@ const api = axios.create({
 
 // Add request interceptor to include auth token
 api.interceptors.request.use((config) => {
+  // تنظيف token غير صالح
   const token = localStorage.getItem('auth_token')
+  if (token === 'null' || token === 'undefined' || (token && token.length < 20)) {
+    console.warn('⚠️ Invalid token found in interceptor, removing it')
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_data')
+    return config
+  }
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

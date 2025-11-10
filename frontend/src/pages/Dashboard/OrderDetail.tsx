@@ -189,8 +189,8 @@ const normalizeAttachmentEntry = (
           url = rawUrlString
         }
       } else {
-        console.log('✅ Found data URL in object:', rawUrlString.substring(0, 50) + '...')
-        url = rawUrlString
+      console.log('✅ Found data URL in object:', rawUrlString.substring(0, 50) + '...')
+      url = rawUrlString
       }
     } else if (rawUrlString) {
       // للروابط النسبية أو المطلقة
@@ -477,11 +477,11 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                   loading="lazy" 
                   onError={(e) => {
                     console.error('❌ Error loading image:', file.url, file.filename)
-                    // إذا فشل تحميل الصورة، استبدلها بأيقونة
+                  // إذا فشل تحميل الصورة، استبدلها بأيقونة
                     const target = e.currentTarget as HTMLImageElement
                     target.style.display = 'none'
                     const parent = target.parentElement
-                    if (parent) {
+                  if (parent) {
                       // إنشاء عنصر div مع أيقونة
                       const iconDiv = document.createElement('div')
                       iconDiv.style.display = 'flex'
@@ -502,7 +502,7 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                         <span style="font-size: 10px; color: #666;">خطأ في التحميل</span>
                       `
                       parent.appendChild(iconDiv)
-                    }
+                  }
                   }}
                   onLoad={() => {
                     console.log('✅ Image loaded successfully:', file.url)
@@ -534,8 +534,8 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                       // التحقق من أن الملف موجود قبل فتحه
                       if (file.url.startsWith('data:')) {
                         // Data URL - يمكن فتحه مباشرة
-                        window.open(file.url, '_blank', 'noopener,noreferrer')
-                      } else {
+                      window.open(file.url, '_blank', 'noopener,noreferrer')
+                    } else {
                         // للروابط العادية، جرب فتحها مع معالجة الأخطاء
                         const newWindow = window.open(file.url, '_blank', 'noopener,noreferrer')
                         if (!newWindow) {
@@ -580,27 +580,27 @@ const renderAttachmentsGrid = (files: NormalizedAttachment[]) => {
                       if (file.url.startsWith('data:')) {
                         const response = await fetch(file.url)
                         const blob = await response.blob()
-                        const url = window.URL.createObjectURL(blob)
-                        const link = document.createElement('a')
-                        link.href = url
-                        link.download = file.filename || 'attachment'
-                        document.body.appendChild(link)
-                        link.click()
-                        document.body.removeChild(link)
-                        window.URL.revokeObjectURL(url)
+                          const url = window.URL.createObjectURL(blob)
+                          const link = document.createElement('a')
+                          link.href = url
+                          link.download = file.filename || 'attachment'
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                          window.URL.revokeObjectURL(url)
                       } else {
                         // للروابط العادية، استخدم fetch للتحقق من وجود الملف
                         try {
                           const response = await fetch(file.url, { method: 'HEAD' })
                           if (response.ok) {
                             // الملف موجود، قم بالتحميل
-                            const link = document.createElement('a')
-                            link.href = file.url
-                            link.download = file.filename || 'attachment'
-                            link.target = '_blank'
-                            document.body.appendChild(link)
-                            link.click()
-                            document.body.removeChild(link)
+                        const link = document.createElement('a')
+                        link.href = file.url
+                        link.download = file.filename || 'attachment'
+                        link.target = '_blank'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
                           } else {
                             // الملف غير موجود، عرض رسالة خطأ
                             console.error('❌ File not found:', file.url, response.status)
@@ -695,7 +695,7 @@ interface Order {
   total_quantity?: number
 }
 
-const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
+const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttachments: NormalizedAttachment[] = []) => {
   if (!specs || typeof specs !== 'object') {
     console.log('🔍 collectAttachmentsFromSpecs - specs is null/undefined or not an object')
     return []
@@ -704,9 +704,19 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
 
   console.log('🔍 collectAttachmentsFromSpecs - specs keys:', Object.keys(specs))
   console.log('🔍 collectAttachmentsFromSpecs - full specs:', JSON.stringify(specs, null, 2).substring(0, 500))
+  console.log('🔍 collectAttachmentsFromSpecs - existing attachments count:', existingAttachments.length)
 
-  // أولاً: ابحث في المفاتيح المعروفة للمرفقات
+  // إنشاء Set من URLs الموجودة لتجنب التكرار
+  const existingUrls = new Set(existingAttachments.map(a => a.url).filter(Boolean))
+  const existingFilenames = new Set(existingAttachments.map(a => a.filename).filter(Boolean))
+
+  // أولاً: ابحث في المفاتيح المعروفة للمرفقات (لكن نتجاهل design_files إذا كانت موجودة في design_files column)
   ATTACHMENT_SPEC_KEYS.forEach((key) => {
+    // إذا كان المفتاح design_files وكانت هناك ملفات في design_files column، نتجاهله لتجنب التكرار
+    if (key === 'design_files' && existingAttachments.length > 0) {
+      console.log(`  ⏭️ Skipping design_files from specs (already in design_files column)`)
+      return
+    }
     const value = specs[key]
     if (!value) {
       console.log(`  ⏭️ Key "${key}" is empty or null`)
@@ -721,12 +731,36 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
     })
     
     if (Array.isArray(value)) {
-      const validEntries = value.filter(v => v !== null && v !== undefined && v !== '')
+      const validEntries = value.filter(v => {
+        if (v === null || v === undefined || v === '') return false
+        // التحقق من التكرار
+        if (typeof v === 'string') {
+          return !existingUrls.has(v)
+        }
+        if (typeof v === 'object') {
+          const vUrl = v.url || v.download_url || v.raw_path || v.data_url
+          const vFilename = v.filename || v.name
+          if (vUrl && existingUrls.has(vUrl)) return false
+          if (vFilename && existingFilenames.has(vFilename)) return false
+        }
+        return true
+      })
       if (validEntries.length > 0) {
         entries.push(...validEntries)
-        console.log(`  ✅ Added ${validEntries.length} entries from ${key}`)
+        // تحديث existingUrls و existingFilenames
+        validEntries.forEach(ve => {
+          if (typeof ve === 'string' && (ve.startsWith('data:') || ve.startsWith('http') || ve.startsWith('/uploads/'))) {
+            existingUrls.add(ve)
+          } else if (typeof ve === 'object' && ve !== null) {
+            const veUrl = ve.url || ve.download_url || ve.raw_path || ve.data_url
+            const veFilename = ve.filename || ve.name
+            if (veUrl) existingUrls.add(veUrl)
+            if (veFilename) existingFilenames.add(veFilename)
+          }
+        })
+        console.log(`  ✅ Added ${validEntries.length} entries from ${key} (${value.length - validEntries.length} duplicates skipped)`)
       } else {
-        console.log(`  ⚠️ Array in "${key}" is empty or contains only null/undefined values`)
+        console.log(`  ⏭️ Skipped all entries from ${key} (all duplicates or empty)`)
       }
     } else if (typeof value === 'string') {
       // إذا كانت سلسلة، حاول تحليلها كـ JSON
@@ -734,33 +768,87 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
         try {
           const parsed = JSON.parse(value)
           if (Array.isArray(parsed)) {
-            const validEntries = parsed.filter(v => v !== null && v !== undefined && v !== '')
+            const validEntries = parsed.filter(v => {
+              if (v === null || v === undefined || v === '') return false
+              // التحقق من التكرار
+              if (typeof v === 'string') {
+                return !existingUrls.has(v)
+              }
+              if (typeof v === 'object') {
+                const vUrl = v.url || v.download_url || v.raw_path || v.data_url
+                const vFilename = v.filename || v.name
+                if (vUrl && existingUrls.has(vUrl)) return false
+                if (vFilename && existingFilenames.has(vFilename)) return false
+              }
+              return true
+            })
             if (validEntries.length > 0) {
               entries.push(...validEntries)
-              console.log(`  ✅ Parsed and added ${validEntries.length} entries from ${key} (JSON string)`)
+              // تحديث existingUrls و existingFilenames
+              validEntries.forEach(ve => {
+                if (typeof ve === 'string' && (ve.startsWith('data:') || ve.startsWith('http') || ve.startsWith('/uploads/'))) {
+                  existingUrls.add(ve)
+                } else if (typeof ve === 'object' && ve !== null) {
+                  const veUrl = ve.url || ve.download_url || ve.raw_path || ve.data_url
+                  const veFilename = ve.filename || ve.name
+                  if (veUrl) existingUrls.add(veUrl)
+                  if (veFilename) existingFilenames.add(veFilename)
+                }
+              })
+              console.log(`  ✅ Parsed and added ${validEntries.length} entries from ${key} (JSON string, ${parsed.length - validEntries.length} duplicates skipped)`)
+            } else {
+              console.log(`  ⏭️ Skipped all parsed entries from ${key} (all duplicates)`)
             }
           } else if (parsed !== null && parsed !== undefined) {
-            entries.push(parsed)
-            console.log(`  ✅ Parsed and added 1 entry from ${key} (JSON string)`)
+            // التحقق من التكرار للكائن المفرد
+            const parsedUrl = parsed?.url || parsed?.download_url || parsed?.raw_path || parsed?.data_url
+            const parsedFilename = parsed?.filename || parsed?.name
+            if ((!parsedUrl || !existingUrls.has(parsedUrl)) && (!parsedFilename || !existingFilenames.has(parsedFilename))) {
+              entries.push(parsed)
+              if (parsedUrl) existingUrls.add(parsedUrl)
+              if (parsedFilename) existingFilenames.add(parsedFilename)
+              console.log(`  ✅ Parsed and added 1 entry from ${key} (JSON string)`)
+            } else {
+              console.log(`  ⏭️ Skipped duplicate parsed entry from ${key}`)
+            }
           }
         } catch (e) {
           // إذا فشل التحليل، تحقق إذا كانت data URL أو رابط
           if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
-            entries.push(value)
-            console.log(`  ✅ Added string URL from ${key}`)
+            if (!existingUrls.has(value)) {
+              entries.push(value)
+              existingUrls.add(value)
+              console.log(`  ✅ Added string URL from ${key}`)
+            } else {
+              console.log(`  ⏭️ Skipped duplicate string URL from ${key}`)
+            }
           } else {
             console.log(`  ⚠️ Failed to parse JSON string in "${key}":`, e)
           }
         }
       } else if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
-        entries.push(value)
-        console.log(`  ✅ Added string URL from ${key}`)
+        if (!existingUrls.has(value)) {
+          entries.push(value)
+          existingUrls.add(value)
+          console.log(`  ✅ Added string URL from ${key}`)
+        } else {
+          console.log(`  ⏭️ Skipped duplicate string URL from ${key}`)
+        }
       } else {
         console.log(`  ⏭️ String in "${key}" doesn't look like a file URL`)
       }
     } else if (typeof value === 'object' && value !== null) {
-      entries.push(value)
-      console.log(`  ✅ Added object from ${key}`)
+      // التحقق من التكرار قبل الإضافة
+      const objUrl = value.url || value.download_url || value.raw_path || value.data_url
+      const objFilename = value.filename || value.name
+      if ((!objUrl || !existingUrls.has(objUrl)) && (!objFilename || !existingFilenames.has(objFilename))) {
+        entries.push(value)
+        if (objUrl) existingUrls.add(objUrl)
+        if (objFilename) existingFilenames.add(objFilename)
+        console.log(`  ✅ Added object from ${key}`)
+      } else {
+        console.log(`  ⏭️ Skipped duplicate object from ${key}`)
+      }
     } else {
       console.log(`  ⏭️ Value in "${key}" is not a recognized type:`, typeof value)
     }
@@ -812,26 +900,79 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
               // إذا كانت سلسلة، تحقق إذا كانت data URL أو رابط
               if (typeof item === 'string') {
                 if (item.startsWith('data:') || item.startsWith('http') || item.startsWith('/uploads/')) {
-                  entries.push(item)
-                  console.log(`    ✅ Added item[${idx}] from "${key}" (string URL)`)
+                  // التحقق من التكرار
+                  if (!existingUrls.has(item)) {
+                    entries.push(item)
+                    existingUrls.add(item)
+                    console.log(`    ✅ Added item[${idx}] from "${key}" (string URL)`)
+                  } else {
+                    console.log(`    ⏭️ Skipped duplicate item[${idx}] from "${key}"`)
+                  }
                 } else if (item.trim().startsWith('[') || item.trim().startsWith('{')) {
                   // محاولة تحليل JSON
                   try {
                     const parsed = JSON.parse(item)
                     if (Array.isArray(parsed)) {
-                      entries.push(...parsed.filter(v => v !== null && v !== undefined))
-                      console.log(`    ✅ Parsed and added ${parsed.length} items from "${key}"[${idx}] (JSON array)`)
+                      const newItems = parsed.filter(v => {
+                        if (v === null || v === undefined) return false
+                        // التحقق من التكرار
+                        if (typeof v === 'string') {
+                          return !existingUrls.has(v)
+                        }
+                        if (typeof v === 'object') {
+                          const vUrl = v.url || v.download_url || v.raw_path || v.data_url
+                          const vFilename = v.filename || v.name
+                          if (vUrl && existingUrls.has(vUrl)) return false
+                          if (vFilename && existingFilenames.has(vFilename)) return false
+                        }
+                        return true
+                      })
+                      if (newItems.length > 0) {
+                        entries.push(...newItems)
+                        // تحديث existingUrls و existingFilenames
+                        newItems.forEach(ni => {
+                          if (typeof ni === 'string' && (ni.startsWith('data:') || ni.startsWith('http') || ni.startsWith('/uploads/'))) {
+                            existingUrls.add(ni)
+                          } else if (typeof ni === 'object' && ni !== null) {
+                            const niUrl = ni.url || ni.download_url || ni.raw_path || ni.data_url
+                            const niFilename = ni.filename || ni.name
+                            if (niUrl) existingUrls.add(niUrl)
+                            if (niFilename) existingFilenames.add(niFilename)
+                          }
+                        })
+                        console.log(`    ✅ Parsed and added ${newItems.length} items from "${key}"[${idx}] (JSON array, ${parsed.length - newItems.length} duplicates skipped)`)
+                      } else {
+                        console.log(`    ⏭️ Skipped all parsed items from "${key}"[${idx}] (all duplicates)`)
+                      }
                     } else {
-                      entries.push(parsed)
-                      console.log(`    ✅ Parsed and added item from "${key}"[${idx}] (JSON object)`)
+                      // التحقق من التكرار للكائن المفرد
+                      const parsedUrl = parsed?.url || parsed?.download_url || parsed?.raw_path || parsed?.data_url
+                      const parsedFilename = parsed?.filename || parsed?.name
+                      if ((!parsedUrl || !existingUrls.has(parsedUrl)) && (!parsedFilename || !existingFilenames.has(parsedFilename))) {
+                        entries.push(parsed)
+                        if (parsedUrl) existingUrls.add(parsedUrl)
+                        if (parsedFilename) existingFilenames.add(parsedFilename)
+                        console.log(`    ✅ Parsed and added item from "${key}"[${idx}] (JSON object)`)
+                      } else {
+                        console.log(`    ⏭️ Skipped duplicate parsed item from "${key}"[${idx}]`)
+                      }
                     }
                   } catch (e) {
                     console.log(`    ⚠️ Failed to parse JSON in "${key}"[${idx}]:`, e)
                   }
                 }
               } else {
-                entries.push(item)
-                console.log(`    ✅ Added item[${idx}] from "${key}" (object)`)
+                // التحقق من التكرار للكائن
+                const itemUrl = (item as any)?.url || (item as any)?.download_url || (item as any)?.raw_path || (item as any)?.data_url
+                const itemFilename = (item as any)?.filename || (item as any)?.name
+                if ((!itemUrl || !existingUrls.has(itemUrl)) && (!itemFilename || !existingFilenames.has(itemFilename))) {
+                  entries.push(item)
+                  if (itemUrl) existingUrls.add(itemUrl)
+                  if (itemFilename) existingFilenames.add(itemFilename)
+                  console.log(`    ✅ Added item[${idx}] from "${key}" (object)`)
+                } else {
+                  console.log(`    ⏭️ Skipped duplicate item[${idx}] from "${key}"`)
+                }
               }
             }
           }
@@ -839,21 +980,62 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
       } else if (typeof value === 'string') {
         // إذا كانت سلسلة نصية، تحقق إذا كانت ملف
         if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/uploads/')) {
-          entries.push(value)
-          console.log(`    ✅ Added string file from "${key}":`, value.substring(0, 50))
+          // التحقق من التكرار
+          if (!existingUrls.has(value)) {
+            entries.push(value)
+            existingUrls.add(value)
+            console.log(`    ✅ Added string file from "${key}":`, value.substring(0, 50))
+          } else {
+            console.log(`    ⏭️ Skipped duplicate string file from "${key}"`)
+          }
         } else if (value.trim().startsWith('[') || value.trim().startsWith('{')) {
           // محاولة تحليل JSON
           try {
             const parsed = JSON.parse(value)
             if (Array.isArray(parsed)) {
-              const validEntries = parsed.filter(v => v !== null && v !== undefined && v !== '')
+              const validEntries = parsed.filter(v => {
+                if (v === null || v === undefined || v === '') return false
+                // التحقق من التكرار
+                if (typeof v === 'string') {
+                  return !existingUrls.has(v)
+                }
+                if (typeof v === 'object') {
+                  const vUrl = v.url || v.download_url || v.raw_path || v.data_url
+                  const vFilename = v.filename || v.name
+                  if (vUrl && existingUrls.has(vUrl)) return false
+                  if (vFilename && existingFilenames.has(vFilename)) return false
+                }
+                return true
+              })
               if (validEntries.length > 0) {
                 entries.push(...validEntries)
-                console.log(`    ✅ Parsed and added ${validEntries.length} entries from "${key}" (JSON array string)`)
+                // تحديث existingUrls و existingFilenames
+                validEntries.forEach(ve => {
+                  if (typeof ve === 'string' && (ve.startsWith('data:') || ve.startsWith('http') || ve.startsWith('/uploads/'))) {
+                    existingUrls.add(ve)
+                  } else if (typeof ve === 'object' && ve !== null) {
+                    const veUrl = ve.url || ve.download_url || ve.raw_path || ve.data_url
+                    const veFilename = ve.filename || ve.name
+                    if (veUrl) existingUrls.add(veUrl)
+                    if (veFilename) existingFilenames.add(veFilename)
+                  }
+                })
+                console.log(`    ✅ Parsed and added ${validEntries.length} entries from "${key}" (JSON array string, ${parsed.length - validEntries.length} duplicates skipped)`)
+              } else {
+                console.log(`    ⏭️ Skipped all parsed entries from "${key}" (all duplicates)`)
               }
             } else if (parsed !== null && parsed !== undefined) {
-              entries.push(parsed)
-              console.log(`    ✅ Parsed and added 1 entry from "${key}" (JSON object string)`)
+              // التحقق من التكرار للكائن المفرد
+              const parsedUrl = parsed?.url || parsed?.download_url || parsed?.raw_path || parsed?.data_url
+              const parsedFilename = parsed?.filename || parsed?.name
+              if ((!parsedUrl || !existingUrls.has(parsedUrl)) && (!parsedFilename || !existingFilenames.has(parsedFilename))) {
+                entries.push(parsed)
+                if (parsedUrl) existingUrls.add(parsedUrl)
+                if (parsedFilename) existingFilenames.add(parsedFilename)
+                console.log(`    ✅ Parsed and added 1 entry from "${key}" (JSON object string)`)
+              } else {
+                console.log(`    ⏭️ Skipped duplicate parsed entry from "${key}"`)
+              }
             }
           } catch (e) {
             console.log(`    ⚠️ Failed to parse JSON string in "${key}":`, e)
@@ -862,8 +1044,17 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>) => {
       } else if (typeof value === 'object' && value !== null) {
         // تحقق إذا كان الكائن يحتوي على معلومات ملف
         if (value.url || value.file_url || value.download_url || value.raw_path || value.data_url || value.file || value.path || value.filename) {
-          entries.push(value)
-          console.log(`    ✅ Added object from "${key}" (has file properties)`)
+          // التحقق من التكرار
+          const objUrl = value.url || value.file_url || value.download_url || value.raw_path || value.data_url
+          const objFilename = value.filename || value.name
+          if ((!objUrl || !existingUrls.has(objUrl)) && (!objFilename || !existingFilenames.has(objFilename))) {
+            entries.push(value)
+            if (objUrl) existingUrls.add(objUrl)
+            if (objFilename) existingFilenames.add(objFilename)
+            console.log(`    ✅ Added object from "${key}" (has file properties)`)
+          } else {
+            console.log(`    ⏭️ Skipped duplicate object from "${key}"`)
+          }
         } else if (Array.isArray(Object.values(value))) {
           // إذا كانت القيم مصفوفات، افحصها
           Object.values(value).forEach((subValue: any, subIdx: number) => {
@@ -936,6 +1127,7 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
   })
   
   // معالجة design_files - تحسين التعامل مع جميع الحالات
+  const designFilesEntries: NormalizedAttachment[] = []
   if (item.design_files) {
     let filesToProcess: any[] = []
     
@@ -977,7 +1169,7 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
       const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
       if (normalized) {
         console.log(`  ✅ Normalized attachment:`, normalized)
-        entries.push(normalized)
+        designFilesEntries.push(normalized)
       } else {
         console.warn(`  ⚠️ Failed to normalize entry:`, entry)
         // إذا فشل التطبيع، حاول إضافة الملف كسلسلة إذا كان يحتوي على رابط
@@ -986,7 +1178,7 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
           console.log(`  🔄 Trying to add as string URL:`, entry.substring(0, 50))
           const fallbackNormalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
           if (fallbackNormalized) {
-            entries.push(fallbackNormalized)
+            designFilesEntries.push(fallbackNormalized)
           }
         }
       }
@@ -995,16 +1187,29 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
     console.log('⚠️ No design_files found in item')
   }
 
-  const specEntries = collectAttachmentsFromSpecs(item.specifications)
-  console.log(`📋 Found ${specEntries.length} attachments from specifications`)
+  // جمع الملفات من specifications (لكن نتجاهل design_files لتجنب التكرار)
+  const specEntries = collectAttachmentsFromSpecs(item.specifications, designFilesEntries)
+  console.log(`📋 Found ${specEntries.length} attachments from specifications (excluding duplicates from design_files)`)
   specEntries.forEach((entry, idx) => {
     console.log(`  Processing spec entry[${idx}]:`, entry)
     const normalized = normalizeAttachmentEntry(entry, item.id, item.service_name || item.product_name)
     if (normalized) {
-      console.log(`  ✅ Normalized spec attachment:`, normalized)
-      entries.push(normalized)
+      // التحقق من عدم التكرار مع design_files
+      const isDuplicate = designFilesEntries.some(existing => 
+        existing.url === normalized.url || 
+        (existing.filename === normalized.filename && existing.url && normalized.url)
+      )
+      if (!isDuplicate) {
+        console.log(`  ✅ Normalized spec attachment:`, normalized)
+        entries.push(normalized)
+      } else {
+        console.log(`  ⏭️ Skipped duplicate spec attachment (already in design_files):`, normalized.filename)
+      }
     }
   })
+
+  // إضافة design_files entries
+  entries.push(...designFilesEntries)
 
   console.log(`✅ Total attachments collected: ${entries.length}`)
   return dedupeAttachments(entries)

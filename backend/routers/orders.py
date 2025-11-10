@@ -509,18 +509,18 @@ def _persist_design_files(
                     filename = _secure_filename(f"attachment-{idx + 1}{extension}")
                     file_path = os.path.join(base_dir, filename)
                     try:
-                        with open(file_path, "wb") as file_obj:
-                            file_obj.write(file_bytes)
+                    with open(file_path, "wb") as file_obj:
+                        file_obj.write(file_bytes)
                         # Verify file was written
                         if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
-                            persisted_entry = {
-                                "filename": filename,
-                                "url": f"{web_base}/{filename}",
-                                "download_url": f"{web_base}/{filename}",
-                                "raw_path": f"{web_base}/{filename}",
-                                "size_in_bytes": len(file_bytes)
-                            }
-                            persisted_entries.append(persisted_entry)
+                    persisted_entry = {
+                        "filename": filename,
+                        "url": f"{web_base}/{filename}",
+                        "download_url": f"{web_base}/{filename}",
+                        "raw_path": f"{web_base}/{filename}",
+                        "size_in_bytes": len(file_bytes)
+                    }
+                    persisted_entries.append(persisted_entry)
                             print(f"    ✅ Persisted file: {filename} ({len(file_bytes)} bytes) -> {file_path}")
                             print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
                         else:
@@ -559,21 +559,21 @@ def _persist_design_files(
                         filename = _secure_filename(saved_entry.get("filename") or f"attachment-{idx + 1}{extension}")
                         file_path = os.path.join(base_dir, filename)
                         try:
-                            with open(file_path, "wb") as file_obj:
-                                file_obj.write(file_bytes)
+                        with open(file_path, "wb") as file_obj:
+                            file_obj.write(file_bytes)
                             # Verify file was written
                             if os.path.exists(file_path) and os.path.getsize(file_path) == len(file_bytes):
-                                # تحديث جميع URLs في saved_entry
-                                file_url = f"{web_base}/{filename}"
-                                saved_entry["url"] = file_url
-                                saved_entry["download_url"] = file_url
-                                saved_entry["raw_path"] = file_url
-                                saved_entry["size_in_bytes"] = len(file_bytes)
-                                # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
-                                # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
-                                saved_entry.pop("file_key", None)
-                                
-                                print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
+                        # تحديث جميع URLs في saved_entry
+                        file_url = f"{web_base}/{filename}"
+                        saved_entry["url"] = file_url
+                        saved_entry["download_url"] = file_url
+                        saved_entry["raw_path"] = file_url
+                        saved_entry["size_in_bytes"] = len(file_bytes)
+                        # احتفظ بـ data_url كنسخة احتياطية إذا لزم الأمر
+                        # saved_entry.pop("data_url", None)  # لا تحذف data_url - قد نحتاجه لاحقاً
+                        saved_entry.pop("file_key", None)
+                        
+                        print(f"    ✅ Persisted file from dict: {filename} ({len(file_bytes)} bytes) -> {file_url}")
                                 print(f"    ✅ File verified: exists={os.path.exists(file_path)}, size={os.path.getsize(file_path)}")
                             else:
                                 print(f"    ❌ File verification failed: {file_path}")
@@ -765,28 +765,19 @@ async def create_order(
             
             import json
             
-            # Collect design_files - من item_data.design_files أولاً
+            # Collect design_files - من item_data.design_files فقط
+            # لا نجمع من specifications.design_files لتجنب التكرار
             design_files_list = _safe_design_file_list(item_data.design_files)
             print(f"📎 Order {order_number}, Item {item_index}: Found {len(design_files_list)} design_files from item_data.design_files")
             
-            # أيضاً استخرج design_files من specifications إذا كانت موجودة
-            if specs and 'design_files' in specs:
-                spec_design_files = _safe_design_file_list(specs.get('design_files'))
-                print(f"📎 Order {order_number}, Item {item_index}: Found {len(spec_design_files)} design_files from specifications")
-                # دمج الملفات من item_data.design_files و specifications
-                all_design_files = design_files_list.copy()
-                for spec_file in spec_design_files:
-                    # تجنب التكرار
-                    if spec_file not in all_design_files:
-                        all_design_files.append(spec_file)
-                        print(f"  ✅ Added design_file from specifications: {str(spec_file)[:50]}")
-                design_files_list = all_design_files
-                print(f"📎 Order {order_number}, Item {item_index}: Total {len(design_files_list)} design_files after merging")
-            
-            # أيضاً ابحث في جميع مفاتيح specifications عن ملفات
+            # نبحث في مفاتيح specifications الأخرى (لكن نتجاهل design_files لتجنب التكرار)
+            # فقط المفاتيح الأخرى مثل files, attachments, etc.
             if specs:
                 for key, value in specs.items():
-                    if key != 'design_files' and value:
+                    # نتجاهل design_files لأنها موجودة في design_files column
+                    if key == 'design_files':
+                        continue
+                    if value:
                         # إذا كان المفتاح يحتوي على "file" أو "upload" أو "attachment"
                         key_lower = key.lower()
                         if any(term in key_lower for term in ['file', 'upload', 'attachment', 'image', 'document', 'pdf']):
@@ -795,9 +786,12 @@ async def create_order(
                             if file_entries:
                                 print(f"  ✅ Found {len(file_entries)} files in '{key}'")
                                 for file_entry in file_entries:
+                                    # تجنب التكرار - تحقق من أن الملف غير موجود بالفعل
                                     if file_entry not in design_files_list:
                                         design_files_list.append(file_entry)
                                         print(f"  ✅ Added file from '{key}': {str(file_entry)[:50]}")
+                                    else:
+                                        print(f"  ⏭️ Skipped duplicate file from '{key}'")
             
             print(f"📎 Order {order_number}, Item {item_index}: Final design_files count: {len(design_files_list)}")
             
@@ -809,29 +803,21 @@ async def create_order(
             )
             print(f"📎 Order {order_number}, Item {item_index}: Persisted {len(persisted_design_files)} design_files")
             
-            # Save design_files in both design_files column AND specifications (as backup)
+            # Save design_files in design_files column ONLY
+            # لا نضيف design_files إلى specifications لتجنب التكرار
+            # الملفات موجودة في design_files column وهذا كافٍ
             design_files_json = json.dumps(persisted_design_files or [])
             
-            # Also add design_files to specifications as backup (if not already there)
-            # Important: Always add design_files to specifications so they can be found even if design_files column is empty
-            if persisted_design_files:
-                # إذا كان design_files موجوداً بالفعل في specifications، ادمجه
-                if 'design_files' in specs and isinstance(specs.get('design_files'), list):
-                    # دمج القوائم مع تجنب التكرار
-                    existing_files = specs['design_files']
-                    for file in persisted_design_files:
-                        if file not in existing_files:
-                            existing_files.append(file)
-                    specs['design_files'] = existing_files
-                    print(f"📎 Merged {len(persisted_design_files)} design_files with existing {len(existing_files) - len(persisted_design_files)} files in specifications")
-                else:
-                    specs['design_files'] = persisted_design_files
-                    print(f"📎 Added {len(persisted_design_files)} design_files to specifications")
-            else:
-                # حتى لو لم يكن هناك ملفات محفوظة، تأكد من أن design_files موجود في specifications (حتى لو كان فارغاً)
-                if 'design_files' not in specs:
-                    specs['design_files'] = []
-                    print(f"📎 Initialized empty design_files array in specifications")
+            # إزالة design_files من specifications إذا كانت موجودة لتجنب التكرار
+            if 'design_files' in specs:
+                # نحتفظ فقط بالملفات الموجودة في specifications إذا لم تكن موجودة في design_files column
+                # لكن لتجنب التكرار، نزيل design_files من specifications تماماً
+                # لأن الملفات موجودة في design_files column
+                removed_from_specs = specs.pop('design_files', None)
+                if removed_from_specs:
+                    print(f"📎 Removed design_files from specifications to avoid duplication (files are in design_files column)")
+            
+            # لا نضيف design_files إلى specifications بعد الآن لتجنب التكرار
             
             specs_json = json.dumps(specs) if specs else None
             
@@ -1126,10 +1112,10 @@ async def get_order_attachments(order_id: int, db: Session = Depends(get_db), re
             if normalized:
                 # Only include attachments that have valid URLs
                 if normalized.get("url") or normalized.get("download_url"):
-                    if normalized.get("file_key"):
-                        attachments_by_key[str(normalized["file_key"])] = normalized
-                    normalized["order_item_service_name"] = getattr(item, "product_name", None)
-                    attachments.append(normalized)
+                if normalized.get("file_key"):
+                    attachments_by_key[str(normalized["file_key"])] = normalized
+                normalized["order_item_service_name"] = getattr(item, "product_name", None)
+                attachments.append(normalized)
 
     return {
         "success": True,
@@ -1222,7 +1208,7 @@ async def download_order_attachment(order_id: int, file_key: str, db: Session = 
 
     # For external URLs or files that don't exist locally, redirect
     if file_url.startswith("http://") or file_url.startswith("https://"):
-        return RedirectResponse(file_url, status_code=302)
+    return RedirectResponse(file_url, status_code=302)
     
     # For relative paths, try to serve them if they exist
     if raw_path and raw_path.startswith("/uploads/"):

@@ -605,6 +605,10 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
         
         new_work = result.fetchone()
         
+        # إبطال cache المحفظة بعد إنشاء العمل
+        from cache import invalidate_cache
+        invalidate_cache('portfolio')
+        
         return {
             "success": True,
             "work": {
@@ -694,6 +698,10 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
             db.execute(update_query, params)
         db.commit()
         
+        # إبطال cache المحفظة بعد تحديث العمل
+        from cache import invalidate_cache
+        invalidate_cache('portfolio')
+        
         # استرجاع العمل المحدث
         result = db.execute(text("""
             SELECT id, title_ar, title, image_url, is_featured
@@ -721,18 +729,32 @@ async def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_
 async def delete_work(work_id: int, db: Session = Depends(get_db)):
     """Delete a portfolio work"""
     try:
-        work = db.query(PortfolioWork).filter(PortfolioWork.id == work_id).first()
-        if not work:
+        from sqlalchemy import text
+        
+        # التحقق من وجود العمل أولاً باستخدام raw SQL
+        check_work = text("SELECT id FROM portfolio_works WHERE id = :id")
+        work_exists = db.execute(check_work, {"id": work_id}).fetchone()
+        if not work_exists:
             raise HTTPException(status_code=404, detail="Work not found")
         
-        db.delete(work)
+        # حذف العمل باستخدام raw SQL
+        delete_query = text("DELETE FROM portfolio_works WHERE id = :id")
+        db.execute(delete_query, {"id": work_id})
         db.commit()
+        
+        # إبطال cache المحفظة بعد حذف العمل
+        from cache import invalidate_cache
+        invalidate_cache('portfolio')
+        
         return {"success": True, "message": "Work deleted"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error deleting work: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف العمل: {str(e)}")
 
 @router.put("/works/{work_id}/images")
 async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Session = Depends(get_db)):
@@ -775,6 +797,11 @@ async def update_work_images(work_id: int, payload: WorkImagesUpdate, db: Sessio
 
         db.commit()
         db.refresh(work)
+        
+        # إبطال cache المحفظة بعد تحديث الصور
+        from cache import invalidate_cache
+        invalidate_cache('portfolio')
+        
         return {"success": True, "images": work.images or []}
     except HTTPException:
         raise

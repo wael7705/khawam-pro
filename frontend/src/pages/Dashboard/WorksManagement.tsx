@@ -38,21 +38,45 @@ export default function WorksManagement() {
   const [isAdding, setIsAdding] = useState(false)
   const [editingWork, setEditingWork] = useState<Work | null>(null)
 
-  const toggleVisibility = (id: number) => {
-    setWorks(works.map(w => 
-      w.id === id ? { ...w, is_visible: !w.is_visible } : w
-    ))
+  const toggleVisibility = async (id: number) => {
+    const work = works.find(w => w.id === id)
+    if (!work) return
+    
+    try {
+      await adminAPI.works.update(id, { is_visible: !work.is_visible })
+      // إعادة تحميل الأعمال من السيرفر بعد التحديث
+      await loadWorks()
+    } catch (error: any) {
+      console.error('Error updating work visibility:', error)
+      alert(error?.response?.data?.detail || 'فشل تحديث حالة العمل. يرجى المحاولة مرة أخرى.')
+    }
   }
 
-  const toggleFeatured = (id: number) => {
-    setWorks(works.map(w => 
-      w.id === id ? { ...w, is_featured: !w.is_featured } : w
-    ))
+  const toggleFeatured = async (id: number) => {
+    const work = works.find(w => w.id === id)
+    if (!work) return
+    
+    try {
+      await adminAPI.works.update(id, { is_featured: !work.is_featured })
+      // إعادة تحميل الأعمال من السيرفر بعد التحديث
+      await loadWorks()
+    } catch (error: any) {
+      console.error('Error updating work featured status:', error)
+      alert(error?.response?.data?.detail || 'فشل تحديث حالة التميز. يرجى المحاولة مرة أخرى.')
+    }
   }
 
-  const deleteWork = (id: number) => {
-    if (confirm('هل أنت متأكد من حذف هذا العمل؟')) {
-      setWorks(works.filter(w => w.id !== id))
+  const deleteWork = async (id: number) => {
+    if (confirm('هل أنت متأكد من حذف هذا العمل؟ سيتم حذفه نهائياً من قاعدة البيانات.')) {
+      try {
+        await adminAPI.works.delete(id)
+        // إعادة تحميل الأعمال من السيرفر بعد الحذف
+        await loadWorks()
+        alert('تم حذف العمل بنجاح')
+      } catch (error: any) {
+        console.error('Error deleting work:', error)
+        alert(error?.response?.data?.detail || 'فشل حذف العمل. يرجى المحاولة مرة أخرى.')
+      }
     }
   }
 

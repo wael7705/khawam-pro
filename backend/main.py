@@ -681,17 +681,8 @@ async def _setup_flier_printing_service():
                 "step_type": "customer_info",
                 "step_config": {
                     "required": True,
-                    "fields": ["whatsapp_optional", "load_from_account"]
-                }
-            },
-            {
-                "step_number": 4,
-                "step_name_ar": "الفاتورة والملخص",
-                "step_name_en": "Invoice and Summary",
-                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
-                "step_type": "invoice",
-                "step_config": {
-                    "required": True
+                    "fields": ["whatsapp_optional", "load_from_account"],
+                    "skip_invoice": True  # تخطي مرحلة الفاتورة
                 }
             }
         ]

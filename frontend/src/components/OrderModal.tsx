@@ -218,9 +218,20 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         } else if (stepConfig.paper_sizes && stepConfig.paper_sizes.length > 0 && !paperSize) {
           setPaperSize(stepConfig.paper_sizes[0])
         }
+        // تهيئة printQuality إذا كان force_color = true ولم يتم تحديد قيمة
+        if (stepConfig.force_color && stepConfig.quality_options && !printQuality) {
+          // نختار أول خيار متاح كقيمة افتراضية
+          if (stepConfig.quality_options.standard) {
+            setPrintQuality('standard')
+          } else if (stepConfig.quality_options.laser) {
+            setPrintQuality('laser')
+          } else if (stepConfig.quality_options.uv) {
+            setPrintQuality('uv')
+          }
+        }
       }
     }
-  }, [workflowSteps, printColor, paperSize])
+  }, [workflowSteps, printColor, paperSize, printQuality])
 
   useEffect(() => {
     if (!image) {
@@ -787,10 +798,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             </div>
             )}
             
-            {/* خيارات الجودة - للملون فقط أو إذا كان force_color = true */}
+            {/* خيارات الدقة - للملون فقط أو إذا كان force_color = true */}
             {(printColor === 'color' || stepConfig.force_color) && stepConfig.quality_options && (
               <div className="form-group">
-                <label>نوع الطباعة <span className="required">*</span></label>
+                <label>نوع الدقة <span className="required">*</span></label>
                 <div className="delivery-options">
                   {stepConfig.quality_options.standard && (
                   <label className="radio-option">
@@ -2502,6 +2513,30 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
     }
 
+    // التحقق من skip_invoice - إذا كان true وstep الحالي هو customer_info، أرسل الطلب مباشرة
+    if (workflowSteps.length > 0) {
+      const currentStep = workflowSteps.find((s) => s.step_number === step)
+      if (currentStep?.step_type === 'customer_info' && currentStep?.step_config?.skip_invoice) {
+        // التحقق من البيانات المطلوبة قبل الإرسال
+        if (!customerName.trim()) {
+          showError('يرجى إدخال اسم العميل')
+          return
+        }
+        if (!customerWhatsApp.trim()) {
+          showError('يرجى إدخال رقم واتساب')
+          return
+        }
+        // إذا كان نوع الاستلام هو delivery ولم يتم تحديد العنوان
+        if (deliveryType === 'delivery' && !addressConfirmed) {
+          showError('يرجى تحديد موقع التوصيل قبل المتابعة')
+          return
+        }
+        // إرسال الطلب مباشرة
+        handleSubmit()
+        return
+      }
+    }
+
     setStep(Math.min(step + 1, maxStep))
   }
 
@@ -3056,6 +3091,22 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           )}
           {(() => {
             const maxStep = workflowSteps.length > 0 ? workflowSteps.length : defaultSteps.length
+            const currentStep = workflowSteps.length > 0 ? workflowSteps.find((s) => s.step_number === step) : null
+            const shouldSkipInvoice = currentStep?.step_type === 'customer_info' && currentStep?.step_config?.skip_invoice
+            
+            // إذا كان skip_invoice = true، نعرض زر "تأكيد الطلب" في customer_info step
+            if (shouldSkipInvoice) {
+              return (
+                <button 
+                  className="btn btn-primary" 
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'جاري الإرسال...' : 'تأكيد الطلب'}
+                </button>
+              )
+            }
+            
             return step < maxStep ? (
               <button className="btn btn-primary" onClick={handleNext}>
                 التالي

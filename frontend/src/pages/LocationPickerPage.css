@@ -485,6 +485,10 @@
   to { transform: rotate(360deg); }
 }
 
+.search-spinner {
+  animation: spin 1s linear infinite;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .page-title {

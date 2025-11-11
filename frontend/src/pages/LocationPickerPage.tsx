@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { MapPin, ArrowLeft, ArrowRight, Image, XCircle, CheckCircle } from 'lucide-react'
+import { MapPin, ArrowLeft, ArrowRight, Image, XCircle, CheckCircle, Search, Loader2 } from 'lucide-react'
 import SimpleMap from '../components/SimpleMap'
 import './LocationPickerPage.css'
 
@@ -43,6 +43,10 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
   const [mapHeight, setMapHeight] = useState(400)
   const entranceInputRef = useRef<HTMLInputElement>(null)
   const houseInputRef = useRef<HTMLInputElement>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
 
   // حساب ارتفاع الخريطة ديناميكياً
   useEffect(() => {
@@ -89,6 +93,118 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
     setLatitude(lat)
     setLongitude(lng)
   }
+
+  // البحث عن موقع باستخدام Nominatim API
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault()
+    }
+    
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    setError(null)
+
+    try {
+      // البحث في سوريا أولاً، ثم البحث العام
+      const query = encodeURIComponent(searchQuery.trim())
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&countrycodes=sy&accept-language=ar`
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'KhawamPro/1.0'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('فشل البحث')
+      }
+
+      const data = await response.json()
+      
+      if (data && data.length > 0) {
+        setSearchResults(data)
+        setShowSearchResults(true)
+      } else {
+        // إذا لم نجد نتائج في سوريا، نجرب البحث العام
+        const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&accept-language=ar`
+        const globalResponse = await fetch(globalUrl, {
+          headers: {
+            'User-Agent': 'KhawamPro/1.0'
+          }
+        })
+        
+        if (globalResponse.ok) {
+          const globalData = await globalResponse.json()
+          if (globalData && globalData.length > 0) {
+            setSearchResults(globalData)
+            setShowSearchResults(true)
+          } else {
+            setSearchResults([])
+            setShowSearchResults(false)
+            setError('لم يتم العثور على نتائج للبحث')
+          }
+        } else {
+          setSearchResults([])
+          setShowSearchResults(false)
+          setError('فشل البحث. يرجى المحاولة مرة أخرى')
+        }
+      }
+    } catch (err) {
+      console.error('Search error:', err)
+      setError('حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى')
+      setSearchResults([])
+      setShowSearchResults(false)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // اختيار نتيجة من نتائج البحث
+  const handleSelectSearchResult = (result: { display_name: string; lat: string; lon: string }) => {
+    const lat = parseFloat(result.lat)
+    const lon = parseFloat(result.lon)
+    
+    setLatitude(lat)
+    setLongitude(lon)
+    setSearchQuery(result.display_name)
+    setSearchResults([])
+    setShowSearchResults(false)
+    setError(null)
+  }
+
+  // البحث عند تغيير النص (debounce) - معالجة محسّنة
+  // تم تعطيل البحث التلقائي - سيتم البحث فقط عند النقر على زر البحث
+  // يمكن تفعيله لاحقاً إذا لزم الأمر
+  // useEffect(() => {
+  //   if (!searchQuery.trim()) {
+  //     setSearchResults([])
+  //     setShowSearchResults(false)
+  //     return
+  //   }
+
+  //   if (searchQuery.trim().length < 3) {
+  //     setSearchResults([])
+  //     setShowSearchResults(false)
+  //     return
+  //   }
+
+  //   const timeoutId = setTimeout(async () => {
+  //     if (searchQuery.trim().length >= 3) {
+  //       try {
+  //         await handleSearch()
+  //       } catch (err) {
+  //         console.error('Search error in useEffect:', err)
+  //       }
+  //     }
+  //   }, 500)
+
+  //   return () => clearTimeout(timeoutId)
+  // }, [searchQuery])
 
   // رفع الصور
   const handleImageChange = (
@@ -209,19 +325,138 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
               تحديد موقعي تلقائياً
             </button>
           </div>
+          
+          {/* Search Box */}
+          <div style={{ margin: '0 24px 16px 24px', position: 'relative' }}>
+            <form onSubmit={handleSearch} style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Search className="w-5 h-5" style={{ 
+                    position: 'absolute', 
+                    right: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)',
+                    color: '#6b7280',
+                    pointerEvents: 'none'
+                  }} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      if (searchResults.length > 0) {
+                        setShowSearchResults(true)
+                      }
+                    }}
+                    placeholder="ابحث عن موقع (مثال: دمشق، البرامكة، شارع...)"
+                    className="form-input"
+                    style={{ 
+                      paddingRight: '40px',
+                      width: '100%'
+                    }}
+                    disabled={isLoading}
+                  />
+                  {isSearching && (
+                    <Loader2 className="w-4 h-4 search-spinner" style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: '#6b7280'
+                    }} />
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSearching || !searchQuery.trim()}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {isSearching ? 'جاري البحث...' : 'بحث'}
+                </button>
+              </div>
+            </form>
+            
+            {/* Search Results Dropdown */}
+            {showSearchResults && searchResults.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                marginTop: '4px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+              }}>
+                {searchResults.map((result, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleSelectSearchResult(result)}
+                    style={{
+                      padding: '12px 16px',
+                      cursor: 'pointer',
+                      borderBottom: index < searchResults.length - 1 ? '1px solid #e2e8f0' : 'none',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f3f4f6'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white'
+                    }}
+                  >
+                    <div style={{ fontWeight: 500, color: '#111827', marginBottom: '4px' }}>
+                      {result.display_name}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                      {parseFloat(result.lat).toFixed(4)}, {parseFloat(result.lon).toFixed(4)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
           {latitude && longitude && (
             <div className="location-info" style={{ margin: '0 24px 12px 24px' }}>
               <CheckCircle className="w-4 h-4" />
               الموقع المحدد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
             </div>
           )}
-          <div className="map-container-wrapper" style={{ height: `${mapHeight}px` }}>
+          <div className="map-container-wrapper" style={{ height: `${mapHeight}px`, position: 'relative' }}>
             <SimpleMap
               latitude={latitude}
               longitude={longitude}
               defaultCenter={latitude && longitude ? [latitude, longitude] : [33.5138, 36.2765]}
               defaultZoom={latitude && longitude ? 17 : 12}
+              onLocationSelect={(lat, lng) => {
+                setLatitude(lat)
+                setLongitude(lng)
+                setError(null)
+                // تحديث searchQuery عند النقر على الخريطة (اختياري)
+                // يمكن إزالة هذا إذا أردنا أن يبقى searchQuery فارغاً
+              }}
             />
+            <div style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              color: '#374151',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              zIndex: 1000,
+              pointerEvents: 'none'
+            }}>
+              💡 انقر على الخريطة لتحديد الموقع
+            </div>
           </div>
         </div>
       </div>

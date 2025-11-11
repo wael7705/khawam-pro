@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -23,6 +23,7 @@ interface SimpleMapProps {
     title: string
     description?: string
   }>
+  onLocationSelect?: (lat: number, lng: number) => void
 }
 
 // Component to update map view when props change
@@ -42,13 +43,30 @@ function MapViewUpdater({
   return null
 }
 
+// Component to handle map click events
+function MapClickHandler({ 
+  onLocationSelect 
+}: { 
+  onLocationSelect?: (lat: number, lng: number) => void 
+}) {
+  useMapEvents({
+    click: (e) => {
+      if (onLocationSelect) {
+        onLocationSelect(e.latlng.lat, e.latlng.lng)
+      }
+    },
+  })
+  return null
+}
+
 export default function SimpleMap({ 
   address, 
   latitude, 
   longitude,
   defaultCenter = [33.5138, 36.2765], // Damascus default
   defaultZoom = 12,
-  markers = []
+  markers = [],
+  onLocationSelect
 }: SimpleMapProps) {
   const [position, setPosition] = useState<[number, number]>(defaultCenter)
   const [zoom, setZoom] = useState(defaultZoom)
@@ -107,10 +125,12 @@ export default function SimpleMap({
   }
 
   // Determine which markers to show
+  // إذا كان هناك markers مخصصة، نستخدمها
+  // وإلا إذا كان هناك latitude وlongitude، نضيف marker للموقع المحدد
   const markersToShow = markers.length > 0 
     ? markers 
-    : (position && latitude && longitude 
-        ? [{ lat: latitude, lng: longitude, title: address || 'الموقع', description: '' }]
+    : (latitude && longitude 
+        ? [{ lat: latitude, lng: longitude, title: address || 'الموقع المحدد', description: `الإحداثيات: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}` }]
         : [])
 
   return (
@@ -137,6 +157,7 @@ export default function SimpleMap({
         style={{ height: '500px', width: '100%', borderRadius: '12px', zIndex: 1 }}
       >
         <MapViewUpdater center={position} zoom={zoom} />
+        {onLocationSelect && <MapClickHandler onLocationSelect={onLocationSelect} />}
         
         {/* Switch between street and satellite view */}
         {mapType === 'street' ? (

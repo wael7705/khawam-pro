@@ -208,8 +208,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       const printOptionsStep = workflowSteps.find((s: any) => s.step_type === 'print_options')
       if (printOptionsStep?.step_config) {
         const stepConfig = printOptionsStep.step_config
-        // تهيئة printColor
-        if (stepConfig.force_color && printColor !== 'color') {
+        // تهيئة printColor - التحقق من force_color بشكل أفضل
+        const isForceColor = stepConfig.force_color === true || stepConfig.force_color === 'true' || stepConfig.force_color === 1
+        if (isForceColor && printColor !== 'color') {
+          console.log('✅ Setting printColor to color because force_color = true')
           setPrintColor('color')
         }
         // تهيئة paperSize من stepConfig
@@ -218,20 +220,41 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         } else if (stepConfig.paper_sizes && stepConfig.paper_sizes.length > 0 && !paperSize) {
           setPaperSize(stepConfig.paper_sizes[0])
         }
-        // تهيئة printQuality إذا كان force_color = true ولم يتم تحديد قيمة
-        if (stepConfig.force_color && stepConfig.quality_options && !printQuality) {
-          // نختار أول خيار متاح كقيمة افتراضية
-          if (stepConfig.quality_options.standard) {
-            setPrintQuality('standard')
-          } else if (stepConfig.quality_options.laser) {
-            setPrintQuality('laser')
-          } else if (stepConfig.quality_options.uv) {
-            setPrintQuality('uv')
+        // تهيئة printQuality إذا كان force_color = true و quality_options موجودة
+        // نتحقق من أن quality_options لها خصائص وليس object فارغ
+        if (isForceColor && stepConfig.quality_options && typeof stepConfig.quality_options === 'object') {
+          const hasQualityOptions = Object.keys(stepConfig.quality_options).length > 0
+          if (hasQualityOptions) {
+            // نتحقق من أن printQuality الحالي ليس أحد الخيارات المتاحة
+            const availableQualities = Object.keys(stepConfig.quality_options)
+            const currentQualityValid = availableQualities.includes(printQuality)
+            
+            if (!currentQualityValid) {
+              console.log('✅ Setting printQuality because force_color = true and quality_options exist, current quality is not valid')
+              // نختار أول خيار متاح كقيمة افتراضية
+              if (stepConfig.quality_options.standard) {
+                setPrintQuality('standard')
+              } else if (stepConfig.quality_options.laser) {
+                setPrintQuality('laser')
+              } else if (stepConfig.quality_options.uv) {
+                setPrintQuality('uv')
+              } else if (availableQualities.length > 0) {
+                // إذا لم يكن أي من الخيارات المذكورة، نستخدم أول خيار متاح
+                setPrintQuality(availableQualities[0] as PrintQuality)
+              }
+            } else {
+              // إذا كانت القيمة الحالية صالحة، نتأكد من أنها معينة (للتأكد من العرض)
+              console.log('✅ printQuality is already valid:', printQuality)
+            }
+          } else {
+            console.log('⚠️ quality_options is empty object')
           }
+        } else if (isForceColor) {
+          console.log('⚠️ force_color is true but quality_options is missing or invalid:', stepConfig.quality_options)
         }
       }
     }
-  }, [workflowSteps, printColor, paperSize, printQuality])
+  }, [workflowSteps, printColor, paperSize])
 
   useEffect(() => {
     if (!image) {
@@ -725,6 +748,27 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         )
 
       case 'print_options':
+        // Debug: التحقق من stepConfig
+        console.log('🔍 Print Options Step - stepConfig:', JSON.stringify(stepConfig, null, 2))
+        console.log('🔍 Print Options Step - force_color:', stepConfig?.force_color, 'Type:', typeof stepConfig?.force_color)
+        console.log('🔍 Print Options Step - quality_options:', stepConfig?.quality_options)
+        console.log('🔍 Print Options Step - printColor:', printColor)
+        console.log('🔍 Print Options Step - printQuality:', printQuality)
+        
+        // التحقق من شروط عرض خيارات الدقة
+        // force_color قد يكون boolean true أو string "true" أو undefined
+        const isForceColor = stepConfig?.force_color === true || stepConfig?.force_color === 'true' || stepConfig?.force_color === 1
+        // التحقق من أن quality_options موجودة ولها خصائص (ليست object فارغ)
+        const hasQualityOptions = stepConfig?.quality_options && 
+                                  typeof stepConfig.quality_options === 'object' && 
+                                  Object.keys(stepConfig.quality_options).length > 0
+        // عرض خيارات الدقة إذا كان force_color = true أو printColor = 'color' و quality_options موجودة
+        const shouldShowQualityOptions = (isForceColor || printColor === 'color') && hasQualityOptions
+        
+        console.log('🔍 Print Options Step - isForceColor:', isForceColor)
+        console.log('🔍 Print Options Step - hasQualityOptions:', hasQualityOptions, 'Keys:', stepConfig?.quality_options ? Object.keys(stepConfig.quality_options) : [])
+        console.log('🔍 Print Options Step - shouldShowQualityOptions:', shouldShowQualityOptions)
+        
         return (
           <div className="modal-body">
             <h3>{workflowStep.step_name_ar}</h3>
@@ -766,6 +810,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             ) : null}
             
+            {/* نوع الورق - إذا كان show_paper_type = true */}
+            {stepConfig.show_paper_type && stepConfig.paper_types && stepConfig.paper_types.length > 0 && (
+              <div className="form-group">
+                <label>نوع الورق <span className="required">*</span></label>
+                <select
+                  value={paperType || ''}
+                  onChange={(e) => setPaperType(e.target.value)}
+                  className="form-input"
+                  required={stepConfig.required}
+                >
+                  <option value="">اختر نوع الورق</option>
+                  {stepConfig.paper_types.map((type: any) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
             {/* نوع الطباعة - إذا كان force_color = true، لا نعرض خيار أبيض/ملون */}
             {!stepConfig.force_color && (
             <div className="form-group">
@@ -799,22 +863,25 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             )}
             
             {/* خيارات الدقة - للملون فقط أو إذا كان force_color = true */}
-            {(printColor === 'color' || stepConfig.force_color) && stepConfig.quality_options && (
+            {/* تحسين الشرط: عرض خيارات الدقة إذا كان force_color = true أو printColor = 'color' */}
+            {shouldShowQualityOptions && (
               <div className="form-group">
                 <label>نوع الدقة <span className="required">*</span></label>
                 <div className="delivery-options">
+                  {/* عرض خيار standard إذا كان موجوداً */}
                   {stepConfig.quality_options.standard && (
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="printQuality"
-                      value="standard"
-                      checked={printQuality === 'standard'}
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printQuality"
+                        value="standard"
+                        checked={printQuality === 'standard'}
                         onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                    />
+                      />
                       <span>{stepConfig.quality_options.standard}</span>
-                  </label>
+                    </label>
                   )}
+                  {/* عرض خيار uv إذا كان موجوداً */}
                   {stepConfig.quality_options.uv && (
                     <label className="radio-option">
                       <input
@@ -827,18 +894,20 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       <span>{stepConfig.quality_options.uv}</span>
                     </label>
                   )}
+                  {/* عرض خيار laser إذا كان موجوداً */}
                   {stepConfig.quality_options.laser && (
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="printQuality"
-                      value="laser"
-                      checked={printQuality === 'laser'}
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printQuality"
+                        value="laser"
+                        checked={printQuality === 'laser'}
                         onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                    />
+                      />
                       <span>{stepConfig.quality_options.laser}</span>
-                  </label>
+                    </label>
                   )}
+                  {/* دعم structure متداخل (quality_options.color.standard, etc.) */}
                   {stepConfig.quality_options.color && typeof stepConfig.quality_options.color === 'object' && (
                     <>
                       {stepConfig.quality_options.color.standard && (
@@ -868,26 +937,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     </>
                   )}
                 </div>
-              </div>
-            )}
-            
-            {/* نوع الورق - إذا كان show_paper_type = true */}
-            {stepConfig.show_paper_type && stepConfig.paper_types && stepConfig.paper_types.length > 0 && (
-              <div className="form-group">
-                <label>نوع الورق <span className="required">*</span></label>
-                <select 
-                  value={paperType} 
-                  onChange={(e) => setPaperType(e.target.value)} 
-                  className="form-input"
-                  required={stepConfig.required}
-                >
-                  <option value="">اختر نوع الورق</option>
-                  {stepConfig.paper_types.map((type: any) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
               </div>
             )}
             

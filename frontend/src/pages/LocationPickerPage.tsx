@@ -327,93 +327,49 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
           </div>
           
           {/* Search Box */}
-          <div style={{ margin: '0 24px 16px 24px', position: 'relative' }}>
-            <form onSubmit={handleSearch} style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Search className="w-5 h-5" style={{ 
-                    position: 'absolute', 
-                    right: '12px', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)',
-                    color: '#6b7280',
-                    pointerEvents: 'none'
-                  }} />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => {
-                      if (searchResults.length > 0) {
-                        setShowSearchResults(true)
-                      }
-                    }}
-                    placeholder="ابحث عن موقع (مثال: دمشق، البرامكة، شارع...)"
-                    className="form-input"
-                    style={{ 
-                      paddingRight: '40px',
-                      width: '100%'
-                    }}
-                    disabled={isLoading}
-                  />
-                  {isSearching && (
-                    <Loader2 className="w-4 h-4 search-spinner" style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#6b7280'
-                    }} />
-                  )}
-                </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isSearching || !searchQuery.trim()}
-                  style={{ whiteSpace: 'nowrap' }}
-                >
-                  {isSearching ? 'جاري البحث...' : 'بحث'}
-                </button>
+          <div className="search-section">
+            <form onSubmit={handleSearch} className="search-form">
+              <div className="search-input-wrapper">
+                <Search className="search-icon" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => {
+                    if (searchResults.length > 0) {
+                      setShowSearchResults(true)
+                    }
+                  }}
+                  placeholder="ابحث عن موقع (مثال: دمشق، البرامكة، شارع...)"
+                  className="form-input search-input"
+                  disabled={isLoading}
+                />
+                {isSearching && (
+                  <Loader2 className="search-spinner" />
+                )}
               </div>
+              <button
+                type="submit"
+                className="btn btn-primary search-button"
+                disabled={isSearching || !searchQuery.trim()}
+              >
+                {isSearching ? 'جاري البحث...' : 'بحث'}
+              </button>
             </form>
             
             {/* Search Results Dropdown */}
             {showSearchResults && searchResults.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                backgroundColor: 'white',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                marginTop: '4px',
-                maxHeight: '300px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-              }}>
+              <div className="search-results-dropdown">
                 {searchResults.map((result, index) => (
                   <div
                     key={index}
+                    className="search-result-item"
                     onClick={() => handleSelectSearchResult(result)}
-                    style={{
-                      padding: '12px 16px',
-                      cursor: 'pointer',
-                      borderBottom: index < searchResults.length - 1 ? '1px solid #e2e8f0' : 'none',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f3f4f6'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white'
-                    }}
                   >
-                    <div style={{ fontWeight: 500, color: '#111827', marginBottom: '4px' }}>
+                    <div className="search-result-name">
                       {result.display_name}
                     </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    <div className="search-result-coords">
                       {parseFloat(result.lat).toFixed(4)}, {parseFloat(result.lon).toFixed(4)}
                     </div>
                   </div>
@@ -422,13 +378,18 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
             )}
           </div>
           
+          {/* Location Info */}
           {latitude && longitude && (
-            <div className="location-info" style={{ margin: '0 24px 12px 24px' }}>
-              <CheckCircle className="w-4 h-4" />
-              الموقع المحدد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+            <div className="location-info">
+              <CheckCircle className="location-check-icon" />
+              <span>
+                الموقع المحدد: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+              </span>
             </div>
           )}
-          <div className="map-container-wrapper" style={{ height: `${mapHeight}px`, position: 'relative' }}>
+          
+          {/* Map Container */}
+          <div className="map-container-wrapper" style={{ height: `${mapHeight}px` }}>
             <SimpleMap
               latitude={latitude}
               longitude={longitude}
@@ -438,23 +399,10 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
                 setLatitude(lat)
                 setLongitude(lng)
                 setError(null)
-                // تحديث searchQuery عند النقر على الخريطة (اختياري)
-                // يمكن إزالة هذا إذا أردنا أن يبقى searchQuery فارغاً
               }}
             />
-            <div style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              color: '#374151',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              zIndex: 1000,
-              pointerEvents: 'none'
-            }}>
+            {/* Hint */}
+            <div className="map-hint">
               💡 انقر على الخريطة لتحديد الموقع
             </div>
           </div>

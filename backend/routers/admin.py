@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, Query
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Product, Service, PortfolioWork, Order, OrderItem, ProductCategory
@@ -2067,7 +2067,10 @@ async def delete_order(order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"خطأ في حذف الطلب: {str(e)}")
 
 @router.delete("/orders/bulk/delete-by-status")
-async def delete_orders_by_status(status: str = "pending", db: Session = Depends(get_db)):
+async def delete_orders_by_status(
+    status: str = Query(default="pending", description="حالة الطلبات المراد حذفها"),
+    db: Session = Depends(get_db)
+):
     """حذف جميع الطلبات بحالة معينة (مثل pending)"""
     try:
         from sqlalchemy import text

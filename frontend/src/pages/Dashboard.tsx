@@ -23,7 +23,10 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [userType, setUserType] = useState<string | null>(null)
-  const { notifications, dismissNotification } = useOrderNotifications()
+  const { notifications, dismissNotification } = useOrderNotifications({
+    onNotificationClick: (orderId) => navigate(`/dashboard/orders/${orderId}`),
+    enableDesktopNotifications: true
+  })
 
   useEffect(() => {
     // Check authentication - لا نحذف Token تلقائياً، نترك المستخدم مسجل دخول

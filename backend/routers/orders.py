@@ -97,7 +97,7 @@ def ensure_order_columns(db: Session):
         except Exception as exc:
             print(f"⚠️ Unable to execute migration ({stmt}): {exc}")
             db.rollback()
-    
+
     # إضافة index على customer_phone لتسريع البحث - مهم جداً للأداء
     try:
         # التحقق من وجود index
@@ -815,6 +815,9 @@ async def create_order(
         
         ensure_order_items_columns(db)
         
+        # متغير لحفظ أول صورة للطلب (لإظهارها في الإشعار)
+        first_order_image_url = None
+        
         # Create order items using raw SQL
         for item_index, item_data in enumerate(order_data.items):
             # Prepare specifications JSON
@@ -858,6 +861,24 @@ async def create_order(
             
             print(f"📎 Order {order_number}, Item {item_index}: Final design_files count: {len(design_files_list)}")
             
+            # حفظ أول صورة من design_files_list للإشعار (فقط من أول عنصر)
+            if item_index == 0 and not first_order_image_url and design_files_list:
+                try:
+                    for file_entry in design_files_list:
+                        file_url = None
+                        if isinstance(file_entry, dict):
+                            file_url = file_entry.get('url') or file_entry.get('file_url') or file_entry.get('download_url') or file_entry.get('data_url')
+                        elif isinstance(file_entry, str):
+                            file_url = file_entry
+                        
+                        if file_url:
+                            # إذا كانت صورة (data URL أو رابط http)
+                            if file_url.startswith('data:image') or file_url.startswith('http'):
+                                first_order_image_url = file_url
+                                break
+                except Exception as img_error:
+                    print(f"⚠️ Failed to extract image URL from design_files: {img_error}")
+            
             # Persist design files to disk
             persisted_design_files = _persist_design_files(
                 order_number,
@@ -865,6 +886,26 @@ async def create_order(
                 design_files_list
             )
             print(f"📎 Order {order_number}, Item {item_index}: Persisted {len(persisted_design_files)} design_files")
+            
+            # إذا لم نجد صورة من data URL، نحاول الحصول على رابط من persisted files
+            if item_index == 0 and not first_order_image_url and persisted_design_files:
+                try:
+                    for file_entry in persisted_design_files:
+                        if isinstance(file_entry, dict) and file_entry.get('file_key'):
+                            file_key = file_entry.get('file_key')
+                            if file_key:
+                                # بناء رابط للصورة من الخادم
+                                public_base_url = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+                                if not public_base_url:
+                                    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+                                    if domain:
+                                        public_base_url = f"https://{domain}" if not domain.startswith("http") else domain
+                                    else:
+                                        public_base_url = "https://khawam-pro-production.up.railway.app"
+                                first_order_image_url = f"{public_base_url}/api/orders/{order_id}/attachments/{file_key}"
+                                break
+                except Exception as img_error:
+                    print(f"⚠️ Failed to build image URL from persisted files: {img_error}")
             
             # Save design_files in design_files column ONLY
             # لا نضيف design_files إلى specifications لتجنب التكرار
@@ -920,6 +961,7 @@ async def create_order(
         db.commit()
         
         first_item = order_data.items[0] if order_data.items else None
+        
         notification_payload: Dict[str, Any] = {
             "order_id": order_result[0],
             "order_number": order_number,
@@ -931,6 +973,7 @@ async def create_order(
             "service_name": order_data.service_name or (first_item.service_name if first_item else None),
             "items_count": len(order_data.items),
             "created_at": order_result[14].isoformat() if order_result[14] else datetime.utcnow().isoformat(),
+            "image_url": first_order_image_url,  # صورة الطلب للإشعار (تم استخراجها من design_files)
         }
 
         # Add background task for external notifications (email/SMS)
@@ -1273,7 +1316,7 @@ async def get_orders(
                                         print(f"⚠️ Error processing order row: {row_error}")
                                         continue
                                 
-                                print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
+                                    print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
                         
                         if orders:
                             print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for phone variants: {customer_phone_variants})")

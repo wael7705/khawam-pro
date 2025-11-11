@@ -14,11 +14,18 @@ export interface OrderNotification {
   finalAmount?: number
   itemsCount?: number
   createdAt: string
+  imageUrl?: string // صورة الطلب للإشعار
 }
 
 interface UseOrderNotificationsResult {
   notifications: OrderNotification[]
   dismissNotification: (id: string) => void
+  onNotificationClick?: (orderId: number) => void
+}
+
+interface UseOrderNotificationsOptions {
+  onNotificationClick?: (orderId: number) => void
+  enableDesktopNotifications?: boolean
 }
 
 const RECONNECT_BASE_DELAY = 3000
@@ -54,6 +61,7 @@ function buildWebSocketUrl(pathWithQuery: string): string {
   return `${base}${normalizedPath}`
 }
 
+// تحسين صوت الإشعار ليكون أكثر شبهاً بواتساب
 function playNotificationSound(audioContextRef: MutableRefObject<AudioContext | null>) {
   try {
     const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext
@@ -70,28 +78,107 @@ function playNotificationSound(audioContextRef: MutableRefObject<AudioContext | 
       ctx.resume().catch(() => {})
     }
 
-    const oscillator = ctx.createOscillator()
-    const gainNode = ctx.createGain()
+    // نغمة مزدوجة مثل واتساب (نغمة عالية ثم منخفضة)
+    const time = ctx.currentTime
+    
+    // النغمة الأولى (عالية)
+    const oscillator1 = ctx.createOscillator()
+    const gainNode1 = ctx.createGain()
+    oscillator1.type = 'sine'
+    oscillator1.frequency.setValueAtTime(784, time) // G5
+    gainNode1.gain.setValueAtTime(0, time)
+    gainNode1.gain.linearRampToValueAtTime(0.3, time + 0.05)
+    gainNode1.gain.linearRampToValueAtTime(0, time + 0.2)
+    oscillator1.connect(gainNode1)
+    gainNode1.connect(ctx.destination)
+    oscillator1.start(time)
+    oscillator1.stop(time + 0.2)
 
-    oscillator.type = 'sine'
-    oscillator.frequency.setValueAtTime(880, ctx.currentTime)
-    oscillator.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.35)
-
-    gainNode.gain.setValueAtTime(0.0001, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02)
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6)
-
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-
-    oscillator.start()
-    oscillator.stop(ctx.currentTime + 0.65)
+    // النغمة الثانية (منخفضة) بعد 0.15 ثانية
+    const oscillator2 = ctx.createOscillator()
+    const gainNode2 = ctx.createGain()
+    oscillator2.type = 'sine'
+    oscillator2.frequency.setValueAtTime(523, time + 0.15) // C5
+    gainNode2.gain.setValueAtTime(0, time + 0.15)
+    gainNode2.gain.linearRampToValueAtTime(0.3, time + 0.2)
+    gainNode2.gain.linearRampToValueAtTime(0, time + 0.4)
+    oscillator2.connect(gainNode2)
+    gainNode2.connect(ctx.destination)
+    oscillator2.start(time + 0.15)
+    oscillator2.stop(time + 0.4)
   } catch (error) {
     console.warn('Failed to play notification sound', error)
   }
 }
 
-export function useOrderNotifications(): UseOrderNotificationsResult {
+// طلب إذن الإشعارات وإظهار إشعار سطح المكتب
+async function showDesktopNotification(
+  notification: OrderNotification,
+  onNotificationClick?: (orderId: number) => void
+): Promise<void> {
+  // التحقق من دعم الإشعارات
+  if (!('Notification' in window)) {
+    console.warn('This browser does not support desktop notifications')
+    return
+  }
+
+  // طلب الإذن إذا لم يكن موجوداً
+  if (Notification.permission === 'default') {
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') {
+      console.warn('Notification permission denied')
+      return
+    }
+  }
+
+  if (Notification.permission !== 'granted') {
+    return
+  }
+
+  // إنشاء نص الإشعار
+  const title = '🔔 طلب جديد'
+  const body = `طلب ${notification.orderNumber} من ${notification.customerName}`
+  
+  // الحصول على صورة الطلب أو استخدام أيقونة افتراضية
+  const icon = notification.imageUrl || '/favicon.ico'
+  const badge = '/favicon.ico'
+
+  // إنشاء الإشعار
+  const desktopNotification = new Notification(title, {
+    body,
+    icon,
+    badge,
+    tag: `order-${notification.orderId}`, // لمنع تكرار الإشعارات
+    requireInteraction: false, // يختفي تلقائياً
+    silent: false, // إظهار الصوت
+    timestamp: new Date(notification.createdAt).getTime(),
+    data: {
+      orderId: notification.orderId,
+      orderNumber: notification.orderNumber,
+      url: `/dashboard/orders/${notification.orderId}`
+    }
+  })
+
+  // عند النقر على الإشعار، افتح الصفحة
+  desktopNotification.onclick = () => {
+    window.focus()
+    if (onNotificationClick) {
+      onNotificationClick(notification.orderId)
+    } else {
+      // التنقل الافتراضي
+      window.location.href = `/dashboard/orders/${notification.orderId}`
+    }
+    desktopNotification.close()
+  }
+
+  // إغلاق الإشعار تلقائياً بعد 8 ثوانٍ
+  setTimeout(() => {
+    desktopNotification.close()
+  }, 8000)
+}
+
+export function useOrderNotifications(options: UseOrderNotificationsOptions = {}): UseOrderNotificationsResult {
+  const { onNotificationClick, enableDesktopNotifications = true } = options
   const [notifications, setNotifications] = useState<OrderNotification[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
@@ -101,6 +188,21 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
   const dismissTimersRef = useRef<Record<string, number>>({})
   const audioContextRef = useRef<AudioContext | null>(null)
   const originalTitleRef = useRef<string | null>(null)
+  
+  // طلب إذن الإشعارات عند تحميل المكون
+  useEffect(() => {
+    if (enableDesktopNotifications && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          console.log('✅ Desktop notifications permission granted')
+        } else {
+          console.warn('⚠️ Desktop notifications permission denied')
+        }
+      }).catch(error => {
+        console.warn('⚠️ Failed to request notification permission:', error)
+      })
+    }
+  }, [enableDesktopNotifications])
 
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.filter((notification) => notification.id !== id))
@@ -195,6 +297,7 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
         const finalAmountRaw = (data as any).finalAmount ?? (data as any).final_amount
         const itemsCountRaw = (data as any).itemsCount ?? (data as any).items_count
 
+        const imageUrl = (data as any).image_url ?? (data as any).imageUrl ?? null
         const notification: OrderNotification = {
           id: orderNumber,
           orderId: (data as any).orderId ?? (data as any).order_id ?? 0,
@@ -207,6 +310,7 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
           finalAmount: typeof finalAmountRaw === 'number' ? finalAmountRaw : finalAmountRaw ? Number(finalAmountRaw) : undefined,
           itemsCount: typeof itemsCountRaw === 'number' ? itemsCountRaw : itemsCountRaw ? Number(itemsCountRaw) : undefined,
           createdAt: (data as any).createdAt ?? (data as any).created_at ?? new Date().toISOString(),
+          imageUrl: imageUrl ? (imageUrl.startsWith('http') ? imageUrl : `${window.location.origin}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`) : undefined,
         }
 
         setNotifications((prev) => {
@@ -217,9 +321,20 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
           return next.slice(0, 5) // حد أقصى 5 إشعارات معروضة
         })
 
+        // عرض Toast notification
         showInfo(`طلب جديد (${notification.orderNumber}) من ${notification.customerName}`)
+        
+        // تشغيل الصوت
         playNotificationSound(audioContextRef)
 
+        // إظهار إشعار سطح المكتب (مثل واتساب ويب)
+        if (enableDesktopNotifications) {
+          showDesktopNotification(notification, onNotificationClick).catch(error => {
+            console.warn('Failed to show desktop notification:', error)
+          })
+        }
+
+        // تحديث عنوان الصفحة إذا كانت مخفية
         if (document.hidden) {
           if (originalTitleRef.current === null) {
             originalTitleRef.current = document.title
@@ -333,11 +448,12 @@ export function useOrderNotifications(): UseOrderNotificationsResult {
       document.removeEventListener('visibilitychange', visibilityListener)
       restoreTitle()
     }
-  }, [])
+  }, [onNotificationClick, enableDesktopNotifications])
 
   return {
     notifications,
     dismissNotification,
+    onNotificationClick,
   }
 }
 

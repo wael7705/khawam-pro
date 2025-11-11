@@ -352,45 +352,45 @@ def _get_user_by_custom_token(token: str, db: Session) -> Optional[User]:
     # البحث عن username المرتبط بـ token (استخدام reverse lookup محسّن)
     username = None
     for uname, custom_token in CUSTOM_TOKENS.items():
-        if custom_token == token:
+            if custom_token == token:
             username = uname
             break
     
     if not username:
         return None
     
-    # البحث عن المستخدم في قاعدة البيانات
-    from sqlalchemy import text
-    user_row = None
-    
-    if is_valid_phone(username):
-        normalized = normalize_phone(username)
-        variants = [username, normalized, '+' + normalized]
-        if username.startswith('0'):
-            variants.extend(['963' + username[1:], '+963' + username[1:]])
-        
+                # البحث عن المستخدم في قاعدة البيانات
+                from sqlalchemy import text
+                user_row = None
+                
+                if is_valid_phone(username):
+                    normalized = normalize_phone(username)
+                    variants = [username, normalized, '+' + normalized]
+                    if username.startswith('0'):
+                        variants.extend(['963' + username[1:], '+963' + username[1:]])
+                    
         # استخدام OR clause مع parameterized query - أسرع وأكثر أماناً
         if variants:
             # إنشاء placeholders ديناميكية
             placeholders = ', '.join([f':phone_{i}' for i in range(len(variants))])
             params = {f'phone_{i}': variant for i, variant in enumerate(variants)}
             user_row = db.execute(text(f"""
-                SELECT id, name, email, phone, password_hash, user_type_id, is_active
-                FROM users
+                            SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                            FROM users
                 WHERE phone IN ({placeholders})
                 LIMIT 1
             """), params).fetchone()
-    elif is_valid_email(username):
-        user_row = db.execute(text("""
-            SELECT id, name, email, phone, password_hash, user_type_id, is_active
-            FROM users
-            WHERE email = :email
-        """), {"email": username.lower()}).fetchone()
-    
-    if user_row:
-        user = User()
-        user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
-        if user.is_active:
+                elif is_valid_email(username):
+                    user_row = db.execute(text("""
+                        SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                        FROM users
+                        WHERE email = :email
+                    """), {"email": username.lower()}).fetchone()
+                
+                if user_row:
+                    user = User()
+                    user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
+                    if user.is_active:
             # حفظ في cache
             _CUSTOM_TOKEN_USER_CACHE[token] = {
                 "user_id": user.id,
@@ -453,7 +453,7 @@ async def get_current_user(
     if token in CUSTOM_TOKENS.values():
         user = _get_user_by_custom_token(token, db)
         if user:
-            return user
+                        return user
     
     # التحقق من JWT token
     try:
@@ -505,7 +505,7 @@ async def get_current_user_optional(
     if token in CUSTOM_TOKENS.values():
         user = _get_user_by_custom_token(token, db)
         if user:
-            return user
+                        return user
     
     # التحقق من JWT token
     try:

@@ -58,6 +58,8 @@ export default function OrdersManagement() {
   const [archivedOrders, setArchivedOrders] = useState<Order[]>([])
   const [deleteModalOpen, setDeleteModalOpen] = useState<number | null>(null)
   const [deleteReason, setDeleteReason] = useState('')
+  const [deleteAllPendingModalOpen, setDeleteAllPendingModalOpen] = useState(false)
+  const [deletingAllPending, setDeletingAllPending] = useState(false)
 
   const loadOrders = async (showLoading = false) => {
     try {
@@ -549,6 +551,29 @@ export default function OrdersManagement() {
     }
   }
 
+  const handleDeleteAllPending = async () => {
+    try {
+      setDeletingAllPending(true)
+      const response = await adminAPI.orders.deleteByStatus('pending')
+      
+      // Remove all pending orders from local state
+      setOrders(prevOrders => prevOrders.filter(order => order.status !== 'pending'))
+      
+      const deletedCount = response.data?.deleted_orders_count || 0
+      showSuccess(`تم حذف ${deletedCount} طلب في الانتظار بنجاح`)
+      setDeleteAllPendingModalOpen(false)
+      
+      // Reload orders to refresh counts
+      await loadOrders(true)
+    } catch (e: any) {
+      console.error('Error deleting all pending orders:', e)
+      const errorMessage = e?.response?.data?.detail || e?.message || 'حدث خطأ في حذف الطلبات'
+      showError(errorMessage)
+    } finally {
+      setDeletingAllPending(false)
+    }
+  }
+
   const handleExportArchive = async () => {
     if (archivedOrders.length === 0) {
       showError('الأرشيف فارغ')
@@ -661,7 +686,7 @@ export default function OrdersManagement() {
         </div>
 
       {/* Status Tabs */}
-      <div className="status-tabs">
+      <div className="status-tabs" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         {statusTabs.map(tab => {
           const count = getOrdersCountByStatus(tab.id)
           return (
@@ -675,6 +700,42 @@ export default function OrdersManagement() {
         </button>
           )
         })}
+        {activeTab === 'pending' && getOrdersCountByStatus('pending') > 0 && (
+          <button
+            onClick={() => setDeleteAllPendingModalOpen(true)}
+            style={{
+              marginLeft: 'auto',
+              padding: '12px 24px',
+              background: '#EF4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: deletingAllPending ? 'not-allowed' : 'pointer',
+              fontSize: '15px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.3s',
+              opacity: deletingAllPending ? 0.6 : 1
+            }}
+            disabled={deletingAllPending}
+            onMouseOver={(e) => {
+              if (!deletingAllPending) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
+              }
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <Trash2 size={18} />
+            {deletingAllPending ? 'جاري الحذف...' : `حذف جميع الطلبات في الانتظار (${getOrdersCountByStatus('pending')})`}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -1198,6 +1259,50 @@ export default function OrdersManagement() {
                 disabled={updatingOrderId === deleteModalOpen}
               >
                 {updatingOrderId === deleteModalOpen ? 'جاري الحذف...' : 'تأكيد الحذف'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Pending Modal */}
+      {deleteAllPendingModalOpen && (
+        <div className="modal-overlay" onClick={() => setDeleteAllPendingModalOpen(false)}>
+          <div className="cancel-modal delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <Trash2 size={24} />
+              <h3>حذف جميع الطلبات في الانتظار</h3>
+              <button className="modal-close" onClick={() => setDeleteAllPendingModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '16px', fontWeight: 600, color: '#EF4444', marginBottom: '12px' }}>
+                تحذير: هذا الإجراء لا يمكن التراجع عنه!
+              </p>
+              <p>
+                هل أنت متأكد من حذف جميع الطلبات في حالة "في الانتظار"؟ 
+                ({getOrdersCountByStatus('pending')} طلب)
+              </p>
+              <p style={{ marginTop: '12px', color: '#6B7280', fontSize: '14px' }}>
+                سيتم حذف جميع الطلبات وعناصرها بشكل نهائي من قاعدة البيانات.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="cancel-btn-secondary"
+                onClick={() => setDeleteAllPendingModalOpen(false)}
+                disabled={deletingAllPending}
+              >
+                إلغاء
+              </button>
+              <button
+                className="delete-btn-primary"
+                onClick={handleDeleteAllPending}
+                disabled={deletingAllPending}
+                style={{ background: '#EF4444' }}
+              >
+                {deletingAllPending ? 'جاري الحذف...' : 'نعم، احذف جميع الطلبات'}
               </button>
             </div>
           </div>

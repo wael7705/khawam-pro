@@ -2066,6 +2066,58 @@ async def delete_order(order_id: int, db: Session = Depends(get_db)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في حذف الطلب: {str(e)}")
 
+@router.delete("/orders/bulk/delete-by-status")
+async def delete_orders_by_status(status: str = "pending", db: Session = Depends(get_db)):
+    """حذف جميع الطلبات بحالة معينة (مثل pending)"""
+    try:
+        from sqlalchemy import text
+        
+        # التحقق من أن الحالة صالحة
+        valid_statuses = ["pending", "preparing", "shipping", "awaiting_pickup", "completed", "cancelled", "rejected"]
+        if status not in valid_statuses:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"الحالة غير صالحة. الحالات المسموحة: {', '.join(valid_statuses)}"
+            )
+        
+        # جلب جميع الطلبات بالحالة المحددة
+        orders = db.query(Order).filter(Order.status == status).all()
+        order_ids = [order.id for order in orders]
+        order_count = len(order_ids)
+        
+        if order_count == 0:
+            return {
+                "success": True,
+                "message": f"لا توجد طلبات بحالة '{status}' للحذف",
+                "deleted_count": 0
+            }
+        
+        # حذف order_items أولاً (foreign key constraint)
+        deleted_items_count = db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).delete(synchronize_session=False)
+        
+        # حذف الطلبات
+        deleted_orders_count = db.query(Order).filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
+        
+        db.commit()
+        
+        print(f"✅ Deleted {deleted_orders_count} orders with status '{status}' and {deleted_items_count} order items")
+        
+        return {
+            "success": True,
+            "message": f"تم حذف {deleted_orders_count} طلب بحالة '{status}' و {deleted_items_count} عنصر طلب بنجاح",
+            "deleted_orders_count": deleted_orders_count,
+            "deleted_items_count": deleted_items_count,
+            "status": status
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting orders by status: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف الطلبات: {str(e)}")
+
 @router.put("/orders/{order_id}/staff-notes")
 async def update_staff_notes(order_id: int, notes_data: StaffNotesUpdate, db: Session = Depends(get_db)):
     """Update staff notes for an order"""

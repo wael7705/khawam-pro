@@ -167,6 +167,7 @@ export const adminAPI = {
       rating_comment: ratingComment 
     }),
     delete: (id: number) => api.delete(`/admin/orders/${id}`),
+    deleteByStatus: (status: string) => api.delete(`/admin/orders/bulk/delete-by-status?status=${status}`),
   },
   
   // Dashboard Statistics

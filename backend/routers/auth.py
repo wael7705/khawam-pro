@@ -43,6 +43,17 @@ CUSTOM_TOKENS = {
     # "رقم_الهاتف": "custom_token_here",
 }
 
+# Cache للمستخدمين المصرح لهم - لتسريع البحث
+# هيكل: {token: {user_id, user_name, user_type_id, phone, email}}
+_CUSTOM_TOKEN_USER_CACHE: dict[str, dict] = {}
+
+# Cache لـ user_type - لتسريع البحث
+# هيكل: {user_type_id: name_ar}
+_USER_TYPE_CACHE: dict[int, str] = {}
+_USER_TYPE_CACHE_TTL = 300  # 5 دقائق
+import time
+_USER_TYPE_CACHE_TIMESTAMP: dict[int, float] = {}
+
 # استخدام pbkdf2_sha256 فقط للتشفير الجديد (يدعم أي طول لكلمة المرور)
 # لا نستخدم bcrypt في pwd_context لأن bcrypt له حد 72 بايت
 pwd_context = CryptContext(
@@ -313,6 +324,120 @@ def get_or_create_customer_user_type(db: Session) -> tuple[int, str]:
 
     return new_role[0], new_role[1] or target_role_ar
 
+def _get_user_by_custom_token(token: str, db: Session) -> Optional[User]:
+    """الحصول على المستخدم من custom token مع استخدام cache"""
+    # التحقق من cache أولاً
+    if token in _CUSTOM_TOKEN_USER_CACHE:
+        cached_user = _CUSTOM_TOKEN_USER_CACHE[token]
+        # التحقق من أن المستخدم لا يزال نشطاً
+        try:
+            from sqlalchemy import text
+            user_row = db.execute(text("""
+                SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                FROM users
+                WHERE id = :id
+            """), {"id": cached_user["user_id"]}).fetchone()
+            
+            if user_row and user_row[6]:  # is_active
+                user = User()
+                user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
+                return user
+            else:
+                # المستخدم غير نشط أو غير موجود، احذف من cache
+                _CUSTOM_TOKEN_USER_CACHE.pop(token, None)
+        except Exception:
+            # في حالة خطأ، احذف من cache
+            _CUSTOM_TOKEN_USER_CACHE.pop(token, None)
+    
+    # البحث عن username المرتبط بـ token (استخدام reverse lookup محسّن)
+    username = None
+    for uname, custom_token in CUSTOM_TOKENS.items():
+        if custom_token == token:
+            username = uname
+            break
+    
+    if not username:
+        return None
+    
+    # البحث عن المستخدم في قاعدة البيانات
+    from sqlalchemy import text
+    user_row = None
+    
+    if is_valid_phone(username):
+        normalized = normalize_phone(username)
+        variants = [username, normalized, '+' + normalized]
+        if username.startswith('0'):
+            variants.extend(['963' + username[1:], '+963' + username[1:]])
+        
+        # استخدام OR clause مع parameterized query - أسرع وأكثر أماناً
+        if variants:
+            # إنشاء placeholders ديناميكية
+            placeholders = ', '.join([f':phone_{i}' for i in range(len(variants))])
+            params = {f'phone_{i}': variant for i, variant in enumerate(variants)}
+            user_row = db.execute(text(f"""
+                SELECT id, name, email, phone, password_hash, user_type_id, is_active
+                FROM users
+                WHERE phone IN ({placeholders})
+                LIMIT 1
+            """), params).fetchone()
+    elif is_valid_email(username):
+        user_row = db.execute(text("""
+            SELECT id, name, email, phone, password_hash, user_type_id, is_active
+            FROM users
+            WHERE email = :email
+        """), {"email": username.lower()}).fetchone()
+    
+    if user_row:
+        user = User()
+        user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
+        if user.is_active:
+            # حفظ في cache
+            _CUSTOM_TOKEN_USER_CACHE[token] = {
+                "user_id": user.id,
+                "user_name": user.name,
+                "user_type_id": user.user_type_id,
+                "phone": user.phone,
+                "email": user.email
+            }
+            print(f"✅ Custom token validated for user: {user.name} (cached)")
+            return user
+    
+    return None
+
+def _get_user_type_name(user_type_id: int, db: Session) -> Optional[str]:
+    """الحصول على اسم user_type مع استخدام cache"""
+    current_time = time.time()
+    
+    # التحقق من cache
+    if user_type_id in _USER_TYPE_CACHE:
+        cache_time = _USER_TYPE_CACHE_TIMESTAMP.get(user_type_id, 0)
+        if current_time - cache_time < _USER_TYPE_CACHE_TTL:
+            return _USER_TYPE_CACHE[user_type_id]
+        else:
+            # Cache منتهي الصلاحية، احذفه
+            _USER_TYPE_CACHE.pop(user_type_id, None)
+            _USER_TYPE_CACHE_TIMESTAMP.pop(user_type_id, None)
+    
+    # جلب من قاعدة البيانات
+    try:
+        from sqlalchemy import text
+        user_type_row = db.execute(text("""
+            SELECT name_ar 
+            FROM user_types 
+            WHERE id = :id
+        """), {"id": user_type_id}).fetchone()
+        
+        if user_type_row and user_type_row[0]:
+            name_ar = user_type_row[0]
+            # حفظ في cache
+            _USER_TYPE_CACHE[user_type_id] = name_ar
+            _USER_TYPE_CACHE_TIMESTAMP[user_type_id] = current_time
+            return name_ar
+    except Exception as e:
+        print(f"⚠️ Error fetching user_type: {e}")
+    
+    return None
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -324,42 +449,11 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    # التحقق من Token مخصص أولاً
+    # التحقق من Token مخصص أولاً (محسّن مع cache)
     if token in CUSTOM_TOKENS.values():
-        # Token مخصص - البحث عن المستخدم المرتبط بهذا Token
-        for username, custom_token in CUSTOM_TOKENS.items():
-            if custom_token == token:
-                # البحث عن المستخدم في قاعدة البيانات
-                from sqlalchemy import text
-                user_row = None
-                
-                if is_valid_phone(username):
-                    normalized = normalize_phone(username)
-                    variants = [username, normalized, '+' + normalized]
-                    if username.startswith('0'):
-                        variants.extend(['963' + username[1:], '+963' + username[1:]])
-                    
-                    for variant in variants:
-                        user_row = db.execute(text("""
-                            SELECT id, name, email, phone, password_hash, user_type_id, is_active
-                            FROM users
-                            WHERE phone = :phone
-                        """), {"phone": variant}).fetchone()
-                        if user_row:
-                            break
-                elif is_valid_email(username):
-                    user_row = db.execute(text("""
-                        SELECT id, name, email, phone, password_hash, user_type_id, is_active
-                        FROM users
-                        WHERE email = :email
-                    """), {"email": username.lower()}).fetchone()
-                
-                if user_row:
-                    user = User()
-                    user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
-                    if user.is_active:
-                        print(f"✅ Custom token validated for user: {user.name}")
-                        return user
+        user = _get_user_by_custom_token(token, db)
+        if user:
+            return user
     
     # التحقق من JWT token
     try:
@@ -399,7 +493,7 @@ async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(http_bearer_optional),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
-    """الحصول على المستخدم الحالي (اختياري) - لا يرمي خطأ إذا لم يكن هناك token - مع دعم Token مخصص"""
+    """الحصول على المستخدم الحالي (اختياري) - لا يرمي خطأ إذا لم يكن هناك token - مع دعم Token مخصص محسّن"""
     if not credentials:
         return None
     
@@ -407,39 +501,11 @@ async def get_current_user_optional(
     if not token:
         return None
     
-    # التحقق من Token مخصص أولاً
+    # التحقق من Token مخصص أولاً (محسّن مع cache)
     if token in CUSTOM_TOKENS.values():
-        for username, custom_token in CUSTOM_TOKENS.items():
-            if custom_token == token:
-                from sqlalchemy import text
-                user_row = None
-                
-                if is_valid_phone(username):
-                    normalized = normalize_phone(username)
-                    variants = [username, normalized, '+' + normalized]
-                    if username.startswith('0'):
-                        variants.extend(['963' + username[1:], '+963' + username[1:]])
-                    
-                    for variant in variants:
-                        user_row = db.execute(text("""
-                            SELECT id, name, email, phone, password_hash, user_type_id, is_active
-                            FROM users
-                            WHERE phone = :phone
-                        """), {"phone": variant}).fetchone()
-                        if user_row:
-                            break
-                elif is_valid_email(username):
-                    user_row = db.execute(text("""
-                        SELECT id, name, email, phone, password_hash, user_type_id, is_active
-                        FROM users
-                        WHERE email = :email
-                    """), {"email": username.lower()}).fetchone()
-                
-                if user_row:
-                    user = User()
-                    user.id, user.name, user.email, user.phone, user.password_hash, user.user_type_id, user.is_active = user_row
-                    if user.is_active:
-                        return user
+        user = _get_user_by_custom_token(token, db)
+        if user:
+            return user
     
     # التحقق من JWT token
     try:

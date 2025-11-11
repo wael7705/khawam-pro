@@ -97,6 +97,22 @@ def ensure_order_columns(db: Session):
         except Exception as exc:
             print(f"⚠️ Unable to execute migration ({stmt}): {exc}")
             db.rollback()
+    
+    # إضافة index على customer_phone لتسريع البحث - مهم جداً للأداء
+    try:
+        # التحقق من وجود index
+        indexes = inspector.get_indexes('orders')
+        index_names = [idx['name'] for idx in indexes]
+        
+        if 'idx_orders_customer_phone' not in index_names:
+            db.execute(text("CREATE INDEX IF NOT EXISTS idx_orders_customer_phone ON orders(customer_phone)"))
+            db.commit()
+            print("✅ Created index on orders.customer_phone for performance")
+        else:
+            print("✅ Index on orders.customer_phone already exists")
+    except Exception as index_error:
+        print(f"⚠️ Unable to create index on customer_phone: {index_error}")
+        db.rollback()
 
 def ensure_order_items_columns(db: Session):
     """Ensure order_items table has JSONB columns for specifications and design_files."""
@@ -953,25 +969,36 @@ async def get_orders(
         import time
         start_time = time.time()
         
+        # التأكد من وجود الفهرس على customer_phone (مرة واحدة فقط عند الحاجة)
+        # هذا مهم للأداء لكننا نريد أن يكون سريعاً
+        try:
+            from sqlalchemy import inspect as sql_inspect
+            inspector = sql_inspect(db.bind)
+            indexes = inspector.get_indexes('orders')
+            index_names = [idx['name'] for idx in indexes]
+            if 'idx_orders_customer_phone' not in index_names:
+                # إنشاء الفهرس إذا لم يكن موجوداً
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_orders_customer_phone ON orders(customer_phone)"))
+                db.commit()
+                print("✅ Created index on orders.customer_phone")
+        except Exception as index_check_error:
+            # لا نريد أن نوقف العملية إذا فشل إنشاء الفهرس
+            print(f"⚠️ Could not ensure index exists: {index_check_error}")
+        
         # تحديد نوع المستخدم - إذا كان "عميل" نفلتر الطلبات
-        # ملاحظة: ensure_order_columns و ensure_order_items_columns يتم استدعاؤهما فقط عند الحاجة
-        # (مثلاً في create_order) لتجنب إبطاء get_orders
         user_role = None
         customer_phone_variants = []
         
         if current_user:
-            # الحصول على نوع المستخدم من قاعدة البيانات
+            # الحصول على نوع المستخدم من قاعدة البيانات مع استخدام cache
             # مع معالجة الأخطاء للتعامل مع حالات user_type_id = None أو فشل الاستعلام
             try:
                 if current_user.user_type_id is not None:
-                    user_type_row = db.execute(text("""
-                        SELECT name_ar 
-                        FROM user_types 
-                        WHERE id = :id
-                    """), {"id": current_user.user_type_id}).fetchone()
+                    # استخدام cache function من auth module
+                    from routers.auth import _get_user_type_name
+                    user_role = _get_user_type_name(current_user.user_type_id, db)
                     
-                    if user_type_row and user_type_row[0]:
-                        user_role = user_type_row[0]
+                    if user_role:
                         print(f"✅ Orders API - User role found: {user_role} (user_type_id: {current_user.user_type_id})")
                     else:
                         print(f"⚠️ Orders API - User type not found for user_type_id: {current_user.user_type_id}")
@@ -1031,15 +1058,110 @@ async def get_orders(
                     print(f"⚠️ Orders API - Customer has no phone variants, returning empty orders")
                     orders = []
                 else:
-                    # تحسين الأداء: استخدام OR بدلاً من IN
-                    # نبحث عن جميع الأشكال الممكنة لرقم الهاتف
+                    # تحسين الأداء: استخدام raw SQL مع IN clause - أسرع من OR filters
                     try:
-                        # استخدام raw SQL للبحث المرن أكثر (يدعم LIKE أيضاً)
-                        # لكن أولاً نجرب البحث الدقيق
-                        phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
-                        orders = db.query(Order).filter(
-                            or_(*phone_filters)
-                        ).order_by(Order.created_at.desc()).limit(100).all()
+                        # استخدام raw SQL للبحث الدقيق أولاً - أسرع من ORM
+                        placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
+                        params = {f'phone_{i}': variant for i, variant in enumerate(customer_phone_variants)}
+                        params['limit'] = 100
+                        
+                        # استخدام raw SQL مباشرة - أسرع من ORM
+                        orders_result = db.execute(text(f"""
+                            SELECT id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                                shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                                delivery_address, delivery_latitude, delivery_longitude, delivery_address_details,
+                                notes, staff_notes, paid_amount, remaining_amount, rating, rating_comment,
+                                created_at, updated_at
+                            FROM orders
+                            WHERE customer_phone IN ({placeholders})
+                            ORDER BY created_at DESC
+                            LIMIT :limit
+                        """), params).fetchall()
+                        
+                        # تحويل النتائج إلى كائنات Order باستخدام setattr لتجنب أخطاء الأعمدة غير الموجودة
+                        orders = []
+                        for row in orders_result:
+                            order = Order()
+                            try:
+                                order.id = row[0]
+                                order.order_number = row[1]
+                                if row[2] is not None:
+                                    order.customer_id = row[2]
+                                if row[3]:
+                                    order.customer_name = row[3]
+                                if row[4]:
+                                    order.customer_phone = row[4]
+                                if row[5]:
+                                    order.customer_whatsapp = row[5]
+                                if row[6]:
+                                    order.shop_name = row[6]
+                                if row[7]:
+                                    order.status = row[7]
+                                if row[8] is not None:
+                                    order.total_amount = row[8]
+                                if row[9] is not None:
+                                    order.final_amount = row[9]
+                                if row[10]:
+                                    order.payment_status = row[10]
+                                if row[11]:
+                                    order.delivery_type = row[11]
+                                if row[12]:
+                                    order.delivery_address = row[12]
+                                if row[13] is not None:
+                                    try:
+                                        order.delivery_latitude = row[13]
+                                    except AttributeError:
+                                        pass  # العمود قد لا يكون موجوداً
+                                if row[14] is not None:
+                                    try:
+                                        order.delivery_longitude = row[14]
+                                    except AttributeError:
+                                        pass
+                                if row[15]:
+                                    try:
+                                        order.delivery_address_details = row[15]
+                                    except AttributeError:
+                                        pass
+                                if row[16]:
+                                    order.notes = row[16]
+                                if row[17]:
+                                    try:
+                                        order.staff_notes = row[17]
+                                    except AttributeError:
+                                        pass
+                                if row[18] is not None:
+                                    try:
+                                        order.paid_amount = row[18]
+                                    except AttributeError:
+                                        pass
+                                if row[19] is not None:
+                                    try:
+                                        order.remaining_amount = row[19]
+                                    except AttributeError:
+                                        pass
+                                if row[20] is not None:
+                                    try:
+                                        order.rating = row[20]
+                                    except AttributeError:
+                                        pass
+                                if row[21]:
+                                    try:
+                                        order.rating_comment = row[21]
+                                    except AttributeError:
+                                        pass
+                                if row[22]:
+                                    order.created_at = row[22]
+                                if len(row) > 23 and row[23]:
+                                    try:
+                                        order.updated_at = row[23]
+                                    except AttributeError:
+                                        pass
+                                orders.append(order)
+                            except Exception as row_error:
+                                print(f"⚠️ Error processing order row: {row_error}")
+                                import traceback
+                                traceback.print_exc()
+                                continue
                         
                         # إذا لم نجد طلبات بالبحث الدقيق، نجرب البحث النصي (إزالة الرموز غير الرقمية)
                         if not orders:
@@ -1048,21 +1170,110 @@ async def get_orders(
                             digits_only_variants = []
                             for variant in customer_phone_variants:
                                 digits_only = ''.join(filter(str.isdigit, str(variant)))
-                                if digits_only and digits_only not in digits_only_variants:
+                                if digits_only and len(digits_only) >= 9 and digits_only not in digits_only_variants:
                                     digits_only_variants.append(digits_only)
                             
                             if digits_only_variants:
-                                # البحث باستخدام LIKE للأرقام
-                                like_filters = []
-                                for digits in digits_only_variants:
-                                    # البحث عن الرقم في أي مكان في customer_phone
-                                    like_filters.append(func.replace(func.replace(Order.customer_phone, '+', ''), '-', '').like(f'%{digits}%'))
+                                # استخدام LIKE للأرقام - أبطأ لكنه يعمل كحل بديل
+                                like_placeholders = ' OR '.join([f"REPLACE(REPLACE(customer_phone, '+', ''), '-', '') LIKE :digits_{i}" for i in range(len(digits_only_variants))])
+                                like_params = {f'digits_{i}': f'%{digits}%' for i, digits in enumerate(digits_only_variants)}
+                                like_params['limit'] = 100
                                 
-                                if like_filters:
-                                    orders = db.query(Order).filter(
-                                        or_(*like_filters)
-                                    ).order_by(Order.created_at.desc()).limit(100).all()
-                                    print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
+                                orders_result = db.execute(text(f"""
+                                    SELECT id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                                        shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                                        delivery_address, delivery_latitude, delivery_longitude, delivery_address_details,
+                                        notes, staff_notes, paid_amount, remaining_amount, rating, rating_comment,
+                                        created_at, updated_at
+                                    FROM orders
+                                    WHERE {like_placeholders}
+                                    ORDER BY created_at DESC
+                                    LIMIT :limit
+                                """), like_params).fetchall()
+                                
+                                # تحويل النتائج إلى كائنات Order باستخدام setattr
+                                for row in orders_result:
+                                    order = Order()
+                                    try:
+                                        order.id = row[0]
+                                        order.order_number = row[1]
+                                        if row[2] is not None:
+                                            order.customer_id = row[2]
+                                        if row[3]:
+                                            order.customer_name = row[3]
+                                        if row[4]:
+                                            order.customer_phone = row[4]
+                                        if row[5]:
+                                            order.customer_whatsapp = row[5]
+                                        if row[6]:
+                                            order.shop_name = row[6]
+                                        if row[7]:
+                                            order.status = row[7]
+                                        if row[8] is not None:
+                                            order.total_amount = row[8]
+                                        if row[9] is not None:
+                                            order.final_amount = row[9]
+                                        if row[10]:
+                                            order.payment_status = row[10]
+                                        if row[11]:
+                                            order.delivery_type = row[11]
+                                        if row[12]:
+                                            order.delivery_address = row[12]
+                                        if row[13] is not None:
+                                            try:
+                                                order.delivery_latitude = row[13]
+                                            except AttributeError:
+                                                pass
+                                        if row[14] is not None:
+                                            try:
+                                                order.delivery_longitude = row[14]
+                                            except AttributeError:
+                                                pass
+                                        if row[15]:
+                                            try:
+                                                order.delivery_address_details = row[15]
+                                            except AttributeError:
+                                                pass
+                                        if row[16]:
+                                            order.notes = row[16]
+                                        if row[17]:
+                                            try:
+                                                order.staff_notes = row[17]
+                                            except AttributeError:
+                                                pass
+                                        if row[18] is not None:
+                                            try:
+                                                order.paid_amount = row[18]
+                                            except AttributeError:
+                                                pass
+                                        if row[19] is not None:
+                                            try:
+                                                order.remaining_amount = row[19]
+                                            except AttributeError:
+                                                pass
+                                        if row[20] is not None:
+                                            try:
+                                                order.rating = row[20]
+                                            except AttributeError:
+                                                pass
+                                        if row[21]:
+                                            try:
+                                                order.rating_comment = row[21]
+                                            except AttributeError:
+                                                pass
+                                        if row[22]:
+                                            order.created_at = row[22]
+                                        if len(row) > 23 and row[23]:
+                                            try:
+                                                order.updated_at = row[23]
+                                            except AttributeError:
+                                                pass
+                                        orders.append(order)
+                                    except Exception as row_error:
+                                        print(f"⚠️ Error processing order row: {row_error}")
+                                        continue
+                                
+                                print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
                         
                         if orders:
                             print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for phone variants: {customer_phone_variants})")
@@ -1076,8 +1287,101 @@ async def get_orders(
             elif user_role in ("مدير", "موظف"):
                 # للمديرين والموظفين: جلب جميع الطلبات
                 try:
-                    # استخدام eager loading لتحسين الأداء
-                    orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+                    # استخدام raw SQL مباشرة - أسرع من ORM
+                    orders_result = db.execute(text("""
+                        SELECT id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                            shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                            delivery_address, delivery_latitude, delivery_longitude, delivery_address_details,
+                            notes, staff_notes, paid_amount, remaining_amount, rating, rating_comment,
+                            created_at, updated_at
+                        FROM orders
+                        ORDER BY created_at DESC
+                        LIMIT 100
+                    """)).fetchall()
+                    
+                    # تحويل النتائج إلى كائنات Order
+                    orders = []
+                    for row in orders_result:
+                        order = Order()
+                        try:
+                            order.id = row[0]
+                            order.order_number = row[1]
+                            if row[2] is not None:
+                                order.customer_id = row[2]
+                            if row[3]:
+                                order.customer_name = row[3]
+                            if row[4]:
+                                order.customer_phone = row[4]
+                            if row[5]:
+                                order.customer_whatsapp = row[5]
+                            if row[6]:
+                                order.shop_name = row[6]
+                            if row[7]:
+                                order.status = row[7]
+                            if row[8] is not None:
+                                order.total_amount = row[8]
+                            if row[9] is not None:
+                                order.final_amount = row[9]
+                            if row[10]:
+                                order.payment_status = row[10]
+                            if row[11]:
+                                order.delivery_type = row[11]
+                            if row[12]:
+                                order.delivery_address = row[12]
+                            if row[13] is not None:
+                                try:
+                                    order.delivery_latitude = row[13]
+                                except AttributeError:
+                                    pass
+                            if row[14] is not None:
+                                try:
+                                    order.delivery_longitude = row[14]
+                                except AttributeError:
+                                    pass
+                            if row[15]:
+                                try:
+                                    order.delivery_address_details = row[15]
+                                except AttributeError:
+                                    pass
+                            if row[16]:
+                                order.notes = row[16]
+                            if row[17]:
+                                try:
+                                    order.staff_notes = row[17]
+                                except AttributeError:
+                                    pass
+                            if row[18] is not None:
+                                try:
+                                    order.paid_amount = row[18]
+                                except AttributeError:
+                                    pass
+                            if row[19] is not None:
+                                try:
+                                    order.remaining_amount = row[19]
+                                except AttributeError:
+                                    pass
+                            if row[20] is not None:
+                                try:
+                                    order.rating = row[20]
+                                except AttributeError:
+                                    pass
+                            if row[21]:
+                                try:
+                                    order.rating_comment = row[21]
+                                except AttributeError:
+                                    pass
+                            if row[22]:
+                                order.created_at = row[22]
+                            if len(row) > 23 and row[23]:
+                                try:
+                                    order.updated_at = row[23]
+                                except AttributeError:
+                                    pass
+                            orders.append(order)
+                        except Exception as row_error:
+                            print(f"⚠️ Error processing order row: {row_error}")
+                            continue
+                    
                     print(f"✅ Orders API - Admin/Employee orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
                 except Exception as query_error:
                     print(f"❌ Orders API - Error querying admin orders: {query_error}")
@@ -1086,38 +1390,108 @@ async def get_orders(
                     orders = []
             else:
                 # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
+                # استخدام نفس منطق البحث عن العملاء
                 print(f"⚠️ Orders API - Unknown user role ({user_role}), treating as customer")
                 if customer_phone_variants:
+                    # استخدام نفس الكود المستخدم للعملاء (مكرر لتقليل التعقيد)
                     try:
-                        # تحسين الأداء: استخدام OR بدلاً من IN
-                        # نبحث عن جميع الأشكال الممكنة لرقم الهاتف
-                        phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
-                        orders = db.query(Order).filter(
-                            or_(*phone_filters)
-                        ).order_by(Order.created_at.desc()).limit(100).all()
+                        placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
+                        params = {f'phone_{i}': variant for i, variant in enumerate(customer_phone_variants)}
+                        params['limit'] = 100
                         
-                        # إذا لم نجد طلبات بالبحث الدقيق، نجرب البحث النصي
-                        if not orders:
-                            print(f"⚠️ Orders API - No orders found with exact phone match (unknown role), trying text search...")
-                            # إنشاء قائمة بالأرقام فقط (بدون رموز)
-                            digits_only_variants = []
-                            for variant in customer_phone_variants:
-                                digits_only = ''.join(filter(str.isdigit, str(variant)))
-                                if digits_only and digits_only not in digits_only_variants:
-                                    digits_only_variants.append(digits_only)
-                            
-                            if digits_only_variants:
-                                # البحث باستخدام LIKE للأرقام
-                                like_filters = []
-                                for digits in digits_only_variants:
-                                    # البحث عن الرقم في أي مكان في customer_phone
-                                    like_filters.append(func.replace(func.replace(Order.customer_phone, '+', ''), '-', '').like(f'%{digits}%'))
-                                
-                                if like_filters:
-                                    orders = db.query(Order).filter(
-                                        or_(*like_filters)
-                                    ).order_by(Order.created_at.desc()).limit(100).all()
-                                    print(f"✅ Orders API - Unknown role customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+                        orders_result = db.execute(text(f"""
+                            SELECT id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                                shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                                delivery_address, delivery_latitude, delivery_longitude, delivery_address_details,
+                                notes, staff_notes, paid_amount, remaining_amount, rating, rating_comment,
+                                created_at, updated_at
+                            FROM orders
+                            WHERE customer_phone IN ({placeholders})
+                            ORDER BY created_at DESC
+                            LIMIT :limit
+                        """), params).fetchall()
+                        
+                        # تحويل النتائج (نستخدم نفس الكود)
+                        orders = []
+                        for row in orders_result:
+                            order = Order()
+                            try:
+                                order.id = row[0]
+                                order.order_number = row[1]
+                                if row[2] is not None:
+                                    order.customer_id = row[2]
+                                if row[3]:
+                                    order.customer_name = row[3]
+                                if row[4]:
+                                    order.customer_phone = row[4]
+                                if row[5]:
+                                    order.customer_whatsapp = row[5]
+                                if row[6]:
+                                    order.shop_name = row[6]
+                                if row[7]:
+                                    order.status = row[7]
+                                if row[8] is not None:
+                                    order.total_amount = row[8]
+                                if row[9] is not None:
+                                    order.final_amount = row[9]
+                                if row[10]:
+                                    order.payment_status = row[10]
+                                if row[11]:
+                                    order.delivery_type = row[11]
+                                if row[12]:
+                                    order.delivery_address = row[12]
+                                if row[13] is not None:
+                                    try:
+                                        order.delivery_latitude = row[13]
+                                    except AttributeError:
+                                        pass
+                                if row[14] is not None:
+                                    try:
+                                        order.delivery_longitude = row[14]
+                                    except AttributeError:
+                                        pass
+                                if row[15]:
+                                    try:
+                                        order.delivery_address_details = row[15]
+                                    except AttributeError:
+                                        pass
+                                if row[16]:
+                                    order.notes = row[16]
+                                if row[17]:
+                                    try:
+                                        order.staff_notes = row[17]
+                                    except AttributeError:
+                                        pass
+                                if row[18] is not None:
+                                    try:
+                                        order.paid_amount = row[18]
+                                    except AttributeError:
+                                        pass
+                                if row[19] is not None:
+                                    try:
+                                        order.remaining_amount = row[19]
+                                    except AttributeError:
+                                        pass
+                                if row[20] is not None:
+                                    try:
+                                        order.rating = row[20]
+                                    except AttributeError:
+                                        pass
+                                if row[21]:
+                                    try:
+                                        order.rating_comment = row[21]
+                                    except AttributeError:
+                                        pass
+                                if row[22]:
+                                    order.created_at = row[22]
+                                if len(row) > 23 and row[23]:
+                                    try:
+                                        order.updated_at = row[23]
+                                    except AttributeError:
+                                        pass
+                                orders.append(order)
+                            except Exception:
+                                continue
                         
                         if orders:
                             print(f"✅ Orders API - Unknown role customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")

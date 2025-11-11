@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import text, inspect, or_
+from sqlalchemy import text, inspect, or_, func
 from database import get_db
 from models import Order, OrderItem, User
 from pydantic import BaseModel
@@ -961,36 +961,58 @@ async def get_orders(
         
         if current_user:
             # الحصول على نوع المستخدم من قاعدة البيانات
-            user_type_row = db.execute(text("""
-                SELECT name_ar 
-                FROM user_types 
-                WHERE id = :id
-            """), {"id": current_user.user_type_id}).fetchone()
-            
-            if user_type_row:
-                user_role = user_type_row[0]
+            # مع معالجة الأخطاء للتعامل مع حالات user_type_id = None أو فشل الاستعلام
+            try:
+                if current_user.user_type_id is not None:
+                    user_type_row = db.execute(text("""
+                        SELECT name_ar 
+                        FROM user_types 
+                        WHERE id = :id
+                    """), {"id": current_user.user_type_id}).fetchone()
+                    
+                    if user_type_row and user_type_row[0]:
+                        user_role = user_type_row[0]
+                        print(f"✅ Orders API - User role found: {user_role} (user_type_id: {current_user.user_type_id})")
+                    else:
+                        print(f"⚠️ Orders API - User type not found for user_type_id: {current_user.user_type_id}")
+                else:
+                    print(f"⚠️ Orders API - user_type_id is None for user {current_user.id}")
+            except Exception as user_type_error:
+                print(f"❌ Orders API - Error fetching user type: {user_type_error}")
+                import traceback
+                traceback.print_exc()
+                # نستمر في التنفيذ - سنتعامل مع user_role = None كعميل
             
             print(f"⏱️ Orders API - User role lookup: {time.time() - start_time:.2f}s")
             
             # بناء قائمة بأشكال رقم الهاتف الممكنة للبحث
             if current_user.phone:
-                from routers.auth import normalize_phone
-                normalized_phone = normalize_phone(current_user.phone)
-                customer_phone_variants = [
-                    current_user.phone,
-                    normalized_phone,
-                    '+' + normalized_phone,
-                ]
-                
-                if current_user.phone.startswith('0'):
-                    customer_phone_variants.extend([
-                        '963' + current_user.phone[1:],
-                        '+963' + current_user.phone[1:]
-                    ])
-                if current_user.phone.startswith('+963'):
-                    customer_phone_variants.append(current_user.phone[1:])
-                if current_user.phone.startswith('963') and not current_user.phone.startswith('+'):
-                    customer_phone_variants.append('+' + current_user.phone)
+                try:
+                    from routers.auth import normalize_phone
+                    normalized_phone = normalize_phone(current_user.phone)
+                    customer_phone_variants = [
+                        current_user.phone,
+                        normalized_phone,
+                        '+' + normalized_phone,
+                    ]
+                    
+                    if current_user.phone.startswith('0'):
+                        customer_phone_variants.extend([
+                            '963' + current_user.phone[1:],
+                            '+963' + current_user.phone[1:]
+                        ])
+                    if current_user.phone.startswith('+963'):
+                        customer_phone_variants.append(current_user.phone[1:])
+                    if current_user.phone.startswith('963') and not current_user.phone.startswith('+'):
+                        customer_phone_variants.append('+' + current_user.phone)
+                    
+                    print(f"✅ Orders API - Phone variants: {customer_phone_variants}")
+                except Exception as phone_error:
+                    print(f"❌ Orders API - Error normalizing phone: {phone_error}")
+                    # نستخدم رقم الهاتف كما هو إذا فشل التطبيع
+                    customer_phone_variants = [current_user.phone] if current_user.phone else []
+            else:
+                print(f"⚠️ Orders API - User has no phone number")
         
         # جلب الطلبات مع الفلترة
         if not current_user:
@@ -1001,38 +1023,119 @@ async def get_orders(
             )
         
         # تحديد نوع المستخدم والفلترة المناسبة
-        if user_role == "عميل":
-            # للعملاء: فلترة الطلبات حسب رقم الهاتف
-            if not customer_phone_variants:
-                orders = []
+        orders_query_start = time.time()
+        try:
+            if user_role == "عميل":
+                # للعملاء: فلترة الطلبات حسب رقم الهاتف
+                if not customer_phone_variants:
+                    print(f"⚠️ Orders API - Customer has no phone variants, returning empty orders")
+                    orders = []
+                else:
+                    # تحسين الأداء: استخدام OR بدلاً من IN
+                    # نبحث عن جميع الأشكال الممكنة لرقم الهاتف
+                    try:
+                        # استخدام raw SQL للبحث المرن أكثر (يدعم LIKE أيضاً)
+                        # لكن أولاً نجرب البحث الدقيق
+                        phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
+                        orders = db.query(Order).filter(
+                            or_(*phone_filters)
+                        ).order_by(Order.created_at.desc()).limit(100).all()
+                        
+                        # إذا لم نجد طلبات بالبحث الدقيق، نجرب البحث النصي (إزالة الرموز غير الرقمية)
+                        if not orders:
+                            print(f"⚠️ Orders API - No orders found with exact phone match, trying text search...")
+                            # إنشاء قائمة بالأرقام فقط (بدون رموز)
+                            digits_only_variants = []
+                            for variant in customer_phone_variants:
+                                digits_only = ''.join(filter(str.isdigit, str(variant)))
+                                if digits_only and digits_only not in digits_only_variants:
+                                    digits_only_variants.append(digits_only)
+                            
+                            if digits_only_variants:
+                                # البحث باستخدام LIKE للأرقام
+                                like_filters = []
+                                for digits in digits_only_variants:
+                                    # البحث عن الرقم في أي مكان في customer_phone
+                                    like_filters.append(func.replace(func.replace(Order.customer_phone, '+', ''), '-', '').like(f'%{digits}%'))
+                                
+                                if like_filters:
+                                    orders = db.query(Order).filter(
+                                        or_(*like_filters)
+                                    ).order_by(Order.created_at.desc()).limit(100).all()
+                                    print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
+                        
+                        if orders:
+                            print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for phone variants: {customer_phone_variants})")
+                        else:
+                            print(f"⚠️ Orders API - No orders found for phone variants: {customer_phone_variants}")
+                    except Exception as filter_error:
+                        print(f"❌ Orders API - Error filtering customer orders: {filter_error}")
+                        import traceback
+                        traceback.print_exc()
+                        orders = []
+            elif user_role in ("مدير", "موظف"):
+                # للمديرين والموظفين: جلب جميع الطلبات
+                try:
+                    # استخدام eager loading لتحسين الأداء
+                    orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
+                    print(f"✅ Orders API - Admin/Employee orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+                except Exception as query_error:
+                    print(f"❌ Orders API - Error querying admin orders: {query_error}")
+                    import traceback
+                    traceback.print_exc()
+                    orders = []
             else:
-                # تحسين الأداء: استخدام OR بدلاً من IN
-                phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
-                orders = db.query(Order).filter(
-                    or_(*phone_filters)
-                ).order_by(Order.created_at.desc()).limit(100).all()
-        elif user_role in ("مدير", "موظف"):
-            # للمديرين والموظفين: جلب جميع الطلبات
-            orders_query_start = time.time()
-            try:
-                # استخدام eager loading لتحسين الأداء
-                orders = db.query(Order).order_by(Order.created_at.desc()).limit(100).all()
-                print(f"⏱️ Orders API - Orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
-            except Exception as query_error:
-                print(f"❌ Error querying orders: {query_error}")
-                import traceback
-                traceback.print_exc()
-                orders = []
-        else:
-            # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
-            if customer_phone_variants:
-                # تحسين الأداء: استخدام OR بدلاً من IN
-                phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
-                orders = db.query(Order).filter(
-                    or_(*phone_filters)
-                ).order_by(Order.created_at.desc()).limit(100).all()
-            else:
-                orders = []
+                # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
+                print(f"⚠️ Orders API - Unknown user role ({user_role}), treating as customer")
+                if customer_phone_variants:
+                    try:
+                        # تحسين الأداء: استخدام OR بدلاً من IN
+                        # نبحث عن جميع الأشكال الممكنة لرقم الهاتف
+                        phone_filters = [Order.customer_phone == variant for variant in customer_phone_variants]
+                        orders = db.query(Order).filter(
+                            or_(*phone_filters)
+                        ).order_by(Order.created_at.desc()).limit(100).all()
+                        
+                        # إذا لم نجد طلبات بالبحث الدقيق، نجرب البحث النصي
+                        if not orders:
+                            print(f"⚠️ Orders API - No orders found with exact phone match (unknown role), trying text search...")
+                            # إنشاء قائمة بالأرقام فقط (بدون رموز)
+                            digits_only_variants = []
+                            for variant in customer_phone_variants:
+                                digits_only = ''.join(filter(str.isdigit, str(variant)))
+                                if digits_only and digits_only not in digits_only_variants:
+                                    digits_only_variants.append(digits_only)
+                            
+                            if digits_only_variants:
+                                # البحث باستخدام LIKE للأرقام
+                                like_filters = []
+                                for digits in digits_only_variants:
+                                    # البحث عن الرقم في أي مكان في customer_phone
+                                    like_filters.append(func.replace(func.replace(Order.customer_phone, '+', ''), '-', '').like(f'%{digits}%'))
+                                
+                                if like_filters:
+                                    orders = db.query(Order).filter(
+                                        or_(*like_filters)
+                                    ).order_by(Order.created_at.desc()).limit(100).all()
+                                    print(f"✅ Orders API - Unknown role customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+                        
+                        if orders:
+                            print(f"✅ Orders API - Unknown role customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+                        else:
+                            print(f"⚠️ Orders API - No orders found for unknown role phone variants: {customer_phone_variants}")
+                    except Exception as filter_error:
+                        print(f"❌ Orders API - Error filtering unknown role orders: {filter_error}")
+                        import traceback
+                        traceback.print_exc()
+                        orders = []
+                else:
+                    print(f"⚠️ Orders API - Unknown role user has no phone variants, returning empty orders")
+                    orders = []
+        except Exception as orders_query_error:
+            print(f"❌ Orders API - Unexpected error in orders query: {orders_query_error}")
+            import traceback
+            traceback.print_exc()
+            orders = []
         
         order_ids = [order.id for order in orders]
 

@@ -202,14 +202,25 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }, [isOpen, serviceName, serviceId, serviceHandler])
 
   // إذا كان force_color = true، نضبط printColor تلقائياً على 'color'
+  // وتهيئة paperSize من stepConfig
   useEffect(() => {
     if (workflowSteps.length > 0) {
       const printOptionsStep = workflowSteps.find((s: any) => s.step_type === 'print_options')
-      if (printOptionsStep?.step_config?.force_color && printColor !== 'color') {
-        setPrintColor('color')
+      if (printOptionsStep?.step_config) {
+        const stepConfig = printOptionsStep.step_config
+        // تهيئة printColor
+        if (stepConfig.force_color && printColor !== 'color') {
+          setPrintColor('color')
+        }
+        // تهيئة paperSize من stepConfig
+        if (stepConfig.paper_size && !paperSize) {
+          setPaperSize(stepConfig.paper_size)
+        } else if (stepConfig.paper_sizes && stepConfig.paper_sizes.length > 0 && !paperSize) {
+          setPaperSize(stepConfig.paper_sizes[0])
+        }
       }
     }
-  }, [workflowSteps, printColor])
+  }, [workflowSteps, printColor, paperSize])
 
   useEffect(() => {
     if (!image) {
@@ -724,7 +735,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         checked={paperSize === size}
                         onChange={(e) => setPaperSize(e.target.value)}
                       />
-                      <span>{size === 'B5' || size === 'booklet' ? 'B5 (Booklet)' : size}</span>
+                      <span>{size === 'B5' || size === 'booklet' ? 'B5 (Booklet)' : size === 'custom' ? 'قياس آخر' : size}</span>
                     </label>
                   ))}
                 </div>
@@ -932,8 +943,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </div>
             )}
             
-            {/* إخفاء الأبعاد إذا كان hide_dimensions = true */}
-            {!stepConfig.hide_dimensions && (
+            {/* إخفاء الأبعاد إذا كان hide_dimensions = true أو إذا كان القياس ليس "custom" */}
+            {!stepConfig.hide_dimensions && (paperSize === 'custom' || (!stepConfig.paper_sizes && !stepConfig.paper_size)) && (
               <>
                 <div className="form-group">
                   <label>الطول {stepConfig.required ? <span className="required">*</span> : ''}</label>

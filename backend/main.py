@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_init_pricing_table())
         asyncio.create_task(_setup_lecture_printing_service())
         asyncio.create_task(_setup_clothing_printing_service())
+        asyncio.create_task(_setup_flier_printing_service())
         asyncio.create_task(_ensure_default_services())
         print("✅ Startup tasks initiated in background")
     except Exception as e:
@@ -562,6 +563,178 @@ async def _setup_clothing_printing_service():
             except:
                 pass
 
+async def _setup_flier_printing_service():
+    """إعداد خدمة طباعة الفلاير تلقائياً عند بدء التطبيق"""
+    import json
+    import asyncio
+    await asyncio.sleep(7)  # انتظار حتى تكون قاعدة البيانات جاهزة
+    
+    conn = None
+    try:
+        print("🔄 Starting flier printing service setup...")
+        conn = engine.connect()
+        
+        # التحقق من وجود الخدمة
+        existing_service = conn.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%طباعة فلير%' OR name_ar LIKE '%فلير%' OR name_ar LIKE '%فلاير%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            print(f"✅ خدمة طباعة الفلاير موجودة بالفعل (ID: {service_id}) - لا حاجة لإعادة إنشائها")
+            # لا نقوم بأي شيء - الخدمة موجودة بالفعل
+            return
+        else:
+            # إنشاء الخدمة الجديدة
+            result = conn.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "طباعة فلير",
+                "name_en": "Flier Printing",
+                "description_ar": "خدمة طباعة الفلاير والبروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات",
+                "icon": "📋",
+                "base_price": 0.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 8
+            })
+            service_id = result.scalar()
+            conn.commit()
+            print(f"✅ تم إنشاء خدمة طباعة الفلاير (ID: {service_id})")
+        
+        # إعادة بناء المراحل لضمان التحديث
+        conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), {"service_id": service_id})
+        conn.commit()
+        
+        # إضافة المراحل المخصصة لخدمة طباعة الفلاير
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "الكمية ورفع الملف أو الصورة",
+                "step_name_en": "Quantity and File Upload",
+                "step_description_ar": "قم برفع الملف أو الصورة وحدد الكمية المطلوبة",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": "image/*,.pdf,.jpg,.jpeg,.png",
+                    "analyze_pages": False,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "تحديد نوع الورق والقياس والدقة",
+                "step_name_en": "Paper Type, Size and Quality",
+                "step_description_ar": "اختر نوع الورق، القياس، ونوع الدقة",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "paper_sizes": ["A5", "A4", "custom"],
+                    "paper_size": "A4",
+                    "show_paper_type": True,
+                    "paper_types": [
+                        {"value": "glasse_170", "label": "Glasse 170"},
+                        {"value": "glasse_210", "label": "Glasse 210"},
+                        {"value": "glasse_250", "label": "Glasse 250"},
+                        {"value": "bristol_170", "label": "Bristol 170"},
+                        {"value": "bristol_240", "label": "Bristol 240"},
+                        {"value": "mashsh_170", "label": "مقشش 170غ"},
+                        {"value": "mashsh_250", "label": "مقشش 250غ"},
+                        {"value": "mujann", "label": "معجن"},
+                        {"value": "normal", "label": "ورق عادي"}
+                    ],
+                    "quality_options": {
+                        "standard": "عادية",
+                        "laser": "عالية (ليزرية)"
+                    },
+                    "force_color": True,  # الفلاير دائماً ملون
+                    "hide_print_sides": True,  # إخفاء عدد الوجوه (الفلاير عادة وجه واحد)
+                    "hide_dimensions": False,  # إظهار الأبعاد للقياس المخصص
+                    "show_notes_in_print_options": False
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional", "load_from_account"]
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                step_config_json = json.dumps(workflow["step_config"], ensure_ascii=False)
+                result = conn.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ Added step {workflow['step_number']}: {workflow['step_name_ar']} ({workflow['step_type']})")
+            except Exception as step_error:
+                print(f"  ❌ Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+        
+        conn.commit()
+        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة الفلاير (Service ID: {service_id})")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify = conn.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"✅ Verification: {verify} workflows found for service {service_id}")
+        
+    except Exception as e:
+        print(f"❌ Error setting up flier printing service: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
 async def _ensure_default_services():
     """التأكد من وجود الخدمات الأساسية في قاعدة البيانات"""
     import asyncio
@@ -623,6 +796,13 @@ async def _ensure_default_services():
                 "description_ar": "طباعة بانرات إعلانية بجميع المقاسات",
                 "icon": "📢",
                 "display_order": 7
+            },
+            {
+                "name_ar": "طباعة فلير",
+                "name_en": "Flier Printing",
+                "description_ar": "خدمة طباعة الفلاير والبروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات",
+                "icon": "📋",
+                "display_order": 8
             }
         ]
         
@@ -834,6 +1014,17 @@ async def setup_clothing_printing_now():
     try:
         await _setup_clothing_printing_service()
         return {"success": True, "message": "تم إعداد خدمة الطباعة على الملابس بنجاح"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/setup-flier-printing-now")
+async def setup_flier_printing_now():
+    """إعداد خدمة طباعة الفلاير مباشرة - يمكن استدعاؤها يدوياً"""
+    try:
+        await _setup_flier_printing_service()
+        return {"success": True, "message": "تم إعداد خدمة طباعة الفلاير بنجاح"}
     except Exception as e:
         import traceback
         traceback.print_exc()

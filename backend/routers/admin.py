@@ -524,25 +524,87 @@ async def get_all_works(
 async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
     """Create a new portfolio work"""
     try:
+        from sqlalchemy import text
+        
+        # التحقق من وجود عمود images أولاً
+        check_col = text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='portfolio_works' AND column_name='images'
+        """)
+        has_images_col = db.execute(check_col).fetchone()
+        
+        # إذا لم يكن العمود موجوداً، نضيفه
+        if not has_images_col:
+            try:
+                db.execute(text("""
+                    ALTER TABLE portfolio_works ADD COLUMN images TEXT[] DEFAULT ARRAY[]::TEXT[]
+                """))
+                db.commit()
+                print("✅ Added 'images' column to portfolio_works table")
+                # التحقق مرة أخرى بعد الإضافة
+                has_images_col = db.execute(check_col).fetchone()
+            except Exception as alter_error:
+                print(f"⚠️ Error adding images column: {alter_error}")
+                db.rollback()
+                # نستمر في التنفيذ بدون عمود images
+                has_images_col = None
+        
         # استخدام title كـ title_en
         title_en = work.title or work.title_ar
         
-        new_work = PortfolioWork(
-            title=title_en,  # title - العمود الفعلي في قاعدة البيانات
-            title_ar=work.title_ar,
-            description=work.description_ar or "",  # description - العمود الفعلي
-            description_ar=work.description_ar or "",
-            image_url=work.image_url if work.image_url else "",  # حفظ كما هو (base64 أو رابط مطلق)
-            images=[],  # إزالة الصور الثانوية
-            category=work.category_ar or "",  # category - العمود الفعلي
-            category_ar=work.category_ar or "",
-            is_visible=work.is_visible,
-            is_featured=work.is_featured,
-            display_order=work.display_order
-        )
-        db.add(new_work)
+        # إنشاء العمل باستخدام raw SQL - نستخدم images فقط إذا كان موجوداً
+        if has_images_col:
+            insert_query = text("""
+                INSERT INTO portfolio_works 
+                (title, title_ar, description, description_ar, image_url, category, category_ar, 
+                 is_visible, is_featured, display_order, images)
+                VALUES 
+                (:title, :title_ar, :description, :description_ar, :image_url, :category, :category_ar,
+                 :is_visible, :is_featured, :display_order, :images)
+                RETURNING id, title, title_ar, image_url, is_featured
+            """)
+            params = {
+                "title": title_en,
+                "title_ar": work.title_ar,
+                "description": work.description_ar or "",
+                "description_ar": work.description_ar or "",
+                "image_url": work.image_url if work.image_url else "",
+                "category": work.category_ar or "",
+                "category_ar": work.category_ar or "",
+                "is_visible": work.is_visible,
+                "is_featured": work.is_featured,
+                "display_order": work.display_order,
+                "images": []  # مصفوفة فارغة للصور الثانوية
+            }
+        else:
+            # إذا لم يكن العمود موجوداً، نستخدم INSERT بدون images
+            insert_query = text("""
+                INSERT INTO portfolio_works 
+                (title, title_ar, description, description_ar, image_url, category, category_ar, 
+                 is_visible, is_featured, display_order)
+                VALUES 
+                (:title, :title_ar, :description, :description_ar, :image_url, :category, :category_ar,
+                 :is_visible, :is_featured, :display_order)
+                RETURNING id, title, title_ar, image_url, is_featured
+            """)
+            params = {
+                "title": title_en,
+                "title_ar": work.title_ar,
+                "description": work.description_ar or "",
+                "description_ar": work.description_ar or "",
+                "image_url": work.image_url if work.image_url else "",
+                "category": work.category_ar or "",
+                "category_ar": work.category_ar or "",
+                "is_visible": work.is_visible,
+                "is_featured": work.is_featured,
+                "display_order": work.display_order
+            }
+        
+        result = db.execute(insert_query, params)
         db.commit()
-        db.refresh(new_work)
+        
+        new_work = result.fetchone()
+        
         return {
             "success": True,
             "work": {
@@ -556,6 +618,8 @@ async def create_work(work: WorkCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         print(f"Error creating work: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في إنشاء العمل: {str(e)}")
 
 @router.put("/works/{work_id}")
@@ -2986,24 +3050,35 @@ async def ensure_portfolio_images_column(db: Session = Depends(get_db)):
     """Ensure portfolio_works has an images TEXT[] column to store multiple image URLs."""
     try:
         from sqlalchemy import text
-        db.execute(text(
-            """
-            DO $$
-            BEGIN
-              IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_name='portfolio_works' AND column_name='images'
-              ) THEN
-                ALTER TABLE portfolio_works ADD COLUMN images TEXT[] DEFAULT ARRAY[]::TEXT[];
-              END IF;
-            END $$;
-            """
-        ))
-        db.commit()
-        return {"success": True}
+        
+        # التحقق من وجود العمود أولاً
+        check_col = text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='portfolio_works' AND column_name='images'
+        """)
+        has_images_col = db.execute(check_col).fetchone()
+        
+        if not has_images_col:
+            # إضافة العمود إذا لم يكن موجوداً
+            try:
+                db.execute(text("""
+                    ALTER TABLE portfolio_works ADD COLUMN images TEXT[] DEFAULT ARRAY[]::TEXT[]
+                """))
+                db.commit()
+                return {"success": True, "message": "تم إضافة عمود images إلى جدول portfolio_works بنجاح"}
+            except Exception as alter_error:
+                db.rollback()
+                # إذا فشلت الإضافة (مثلاً العمود موجود بالفعل)، نعيد نجاح
+                if "already exists" in str(alter_error).lower() or "duplicate" in str(alter_error).lower():
+                    return {"success": True, "message": "عمود images موجود بالفعل"}
+                raise HTTPException(status_code=500, detail=f"خطأ في إضافة عمود images: {str(alter_error)}")
+        else:
+            return {"success": True, "message": "عمود images موجود بالفعل"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"خطأ في التأكد من وجود عمود images: {str(e)}")
 
 # ============================================
 # Payment Settings Management Endpoints

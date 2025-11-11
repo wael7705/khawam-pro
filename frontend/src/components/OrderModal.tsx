@@ -162,20 +162,67 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
   }
 
+  // دالة للتحقق من صلاحية الكاش (10 دقائق)
+  const isCacheValid = (cacheTimestamp: number): boolean => {
+    const CACHE_DURATION = 10 * 60 * 1000 // 10 دقائق بالميلي ثانية
+    const now = Date.now()
+    return (now - cacheTimestamp) < CACHE_DURATION
+  }
+
+  // دالة لمسح الكاش القديم
+  const clearExpiredCache = () => {
+    try {
+      const savedState = localStorage.getItem('orderFormState')
+      if (savedState) {
+        const parsed = JSON.parse(savedState)
+        if (parsed.timestamp && !isCacheValid(parsed.timestamp)) {
+          console.log('🧹 Clearing expired cache (older than 10 minutes)')
+          localStorage.removeItem('orderFormState')
+          localStorage.removeItem('shouldReopenOrderModal')
+          localStorage.removeItem('orderModalService')
+          return true
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Error checking cache validity:', error)
+    }
+    return false
+  }
+
   const applyWorkflowSteps = (steps: any[], currentServiceName: string) => {
     setWorkflowSteps(steps)
     let savedStep: number | null = null
 
     try {
+      // مسح الكاش القديم أولاً
+      clearExpiredCache()
+      
       const savedState = localStorage.getItem('orderFormState')
       if (savedState) {
         const parsed = JSON.parse(savedState)
-        if (parsed.serviceName === currentServiceName && typeof parsed.step === 'number') {
+        
+        // التحقق من أن الكاش صالح وأنه لنفس الخدمة
+        if (parsed.serviceName === currentServiceName && 
+            typeof parsed.step === 'number' &&
+            parsed.timestamp && 
+            isCacheValid(parsed.timestamp)) {
           savedStep = parsed.step
+          console.log('✅ Valid cache found for step:', savedStep)
+        } else {
+          // إذا كان الكاش قديم أو لخدمة مختلفة، نمسحه
+          if (parsed.serviceName !== currentServiceName) {
+            console.log('🧹 Clearing cache for different service')
+            localStorage.removeItem('orderFormState')
+          } else if (!parsed.timestamp || !isCacheValid(parsed.timestamp)) {
+            console.log('🧹 Clearing expired cache')
+            localStorage.removeItem('orderFormState')
+          }
         }
       }
     } catch (error) {
       console.warn('⚠️ Unable to parse saved form state step:', error)
+      // في حالة الخطأ، نمسح الكاش
+      localStorage.removeItem('orderFormState')
     }
 
     if (savedStep && !Number.isNaN(savedStep)) {
@@ -1249,6 +1296,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       totalPages,
                       paperType,
                       serviceName,
+                      timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
                       uploadedFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
                       clothingSource,
                       clothingProduct,
@@ -1333,6 +1381,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       totalPages,
                       paperType,
                       serviceName,
+                      timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
                       uploadedFiles: uploadedFiles.map(f => ({ 
                         name: f.name, 
                         size: f.size, 
@@ -1781,6 +1830,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   totalPages,
                   paperType,
                   serviceName,
+                  timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
                   uploadedFiles: uploadedFiles.map(f => ({ 
                     name: f.name, 
                     size: f.size, 
@@ -2011,6 +2061,18 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
   // Load workflow steps when modal opens and serviceId is available
   useEffect(() => {
+    // مسح workflowSteps القديمة عند فتح خدمة جديدة
+    if (isOpen) {
+      // التحقق من أن هذه خدمة جديدة (ليس هناك shouldReopen flag)
+      const shouldReopen = localStorage.getItem('shouldReopenOrderModal')
+      if (!shouldReopen || shouldReopen !== 'true') {
+        console.log('🧹 Clearing old workflowSteps - opening new service')
+        setWorkflowSteps([])
+        setStep(1)
+        hasRestoredState.current = false
+      }
+    }
+    
     const loadWorkflow = async () => {
       console.log('🔄 loadWorkflow called - isOpen:', isOpen, 'serviceId:', serviceId, 'serviceName:', serviceName)
       
@@ -2222,6 +2284,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   // Use useLayoutEffect to restore state synchronously before render
   useLayoutEffect(() => {
     if (isOpen && !hasRestoredState.current) {
+      // مسح الكاش القديم أولاً
+      clearExpiredCache()
+      
       // Check if we should restore state (only when returning from location picker)
       const shouldReopen = localStorage.getItem('shouldReopenOrderModal')
       const savedServiceName = localStorage.getItem('orderModalService')
@@ -2229,14 +2294,31 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       // Only restore if flag is set and service name matches
       const shouldRestore = shouldReopen === 'true' && savedServiceName === serviceName
       
+      // إذا كانت خدمة مختلفة أو لا يوجد shouldReopen flag، نمسح الكاش القديم
+      if (!shouldRestore) {
+        if (savedServiceName && savedServiceName !== serviceName) {
+          console.log('🧹 Clearing cache for different service')
+        } else if (!shouldReopen) {
+          // إذا لم يكن هناك shouldReopen flag، يعني أننا نفتح خدمة جديدة
+          console.log('🧹 Clearing cache - opening new service')
+        }
+        localStorage.removeItem('orderFormState')
+        localStorage.removeItem('shouldReopenOrderModal')
+        localStorage.removeItem('orderModalService')
+        // إعادة تعيين hasRestoredState عند فتح خدمة جديدة
+        hasRestoredState.current = false
+      }
+      
       if (shouldRestore) {
         // Restore form state if exists and we're returning from location picker
         const savedFormState = localStorage.getItem('orderFormState')
         if (savedFormState) {
           try {
             const formState = JSON.parse(savedFormState)
-            // Only restore if it's for the same service
-            if (formState.serviceName === serviceName) {
+            // Only restore if it's for the same service and cache is still valid (less than 10 minutes)
+            if (formState.serviceName === serviceName && 
+                formState.timestamp && 
+                isCacheValid(formState.timestamp)) {
               console.log('🔵 Restoring form state:', formState)
               
               // Restore step FIRST (this is critical!)
@@ -2530,6 +2612,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         numberOfPages,
         totalPages,
         paperType,
+        timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
         uploadedFiles: uploadedFiles.map(f => ({ 
           name: f.name, 
           size: f.size, 

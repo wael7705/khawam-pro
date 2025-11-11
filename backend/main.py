@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_setup_clothing_printing_service())
         asyncio.create_task(_setup_flier_printing_service())
         asyncio.create_task(_ensure_default_services())
+        asyncio.create_task(_ensure_portfolio_images_column())
         print("✅ Startup tasks initiated in background")
     except Exception as e:
         print(f"⚠️ Warning: Failed to create startup tasks: {str(e)[:200]}")
@@ -739,6 +740,53 @@ async def _setup_flier_printing_service():
             except:
                 pass
 
+async def _ensure_portfolio_images_column():
+    """التأكد من وجود عمود images في جدول portfolio_works"""
+    import asyncio
+    await asyncio.sleep(9)  # انتظار حتى تكون قاعدة البيانات جاهزة
+    
+    conn = None
+    try:
+        print("🔄 Ensuring portfolio_works.images column exists...")
+        conn = engine.connect()
+        
+        from sqlalchemy import text
+        
+        # التحقق من وجود العمود
+        check_col = conn.execute(text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='portfolio_works' AND column_name='images'
+        """)).fetchone()
+        
+        if not check_col:
+            # إضافة العمود إذا لم يكن موجوداً
+            try:
+                conn.execute(text("""
+                    ALTER TABLE portfolio_works ADD COLUMN images TEXT[] DEFAULT ARRAY[]::TEXT[]
+                """))
+                conn.commit()
+                print("✅ Added 'images' column to portfolio_works table")
+            except Exception as alter_error:
+                print(f"⚠️ Error adding images column: {alter_error}")
+                conn.rollback()
+        else:
+            print("✅ portfolio_works.images column already exists")
+    except Exception as e:
+        print(f"❌ Error ensuring portfolio_works.images column: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
 async def _ensure_default_services():
     """التأكد من وجود الخدمات الأساسية في قاعدة البيانات"""
     import asyncio
@@ -1029,6 +1077,17 @@ async def setup_flier_printing_now():
     try:
         await _setup_flier_printing_service()
         return {"success": True, "message": "تم إعداد خدمة طباعة البروشورات بنجاح"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/ensure-portfolio-images-column")
+async def ensure_portfolio_images_column_now():
+    """إضافة عمود images إلى جدول portfolio_works مباشرة - يمكن استدعاؤها يدوياً"""
+    try:
+        await _ensure_portfolio_images_column()
+        return {"success": True, "message": "تم التأكد من وجود عمود images في جدول portfolio_works"}
     except Exception as e:
         import traceback
         traceback.print_exc()

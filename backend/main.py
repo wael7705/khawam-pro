@@ -564,28 +564,41 @@ async def _setup_clothing_printing_service():
                 pass
 
 async def _setup_flier_printing_service():
-    """إعداد خدمة طباعة الفلاير تلقائياً عند بدء التطبيق"""
+    """إعداد خدمة طباعة البروشورات تلقائياً عند بدء التطبيق"""
     import json
     import asyncio
     await asyncio.sleep(7)  # انتظار حتى تكون قاعدة البيانات جاهزة
     
     conn = None
     try:
-        print("🔄 Starting flier printing service setup...")
+        print("🔄 Starting brochure printing service setup...")
         conn = engine.connect()
         
         # التحقق من وجود الخدمة
         existing_service = conn.execute(text("""
             SELECT id, name_ar FROM services 
-            WHERE name_ar LIKE '%طباعة فلير%' OR name_ar LIKE '%فلير%' OR name_ar LIKE '%فلاير%'
+            WHERE name_ar LIKE '%طباعة بروشورات%' OR name_ar LIKE '%بروشورات%' OR name_ar LIKE '%طباعة فلير%' OR name_ar LIKE '%فلير%' OR name_ar LIKE '%فلاير%'
             LIMIT 1
         """)).fetchone()
         
         if existing_service:
             service_id = existing_service[0]
-            print(f"✅ خدمة طباعة الفلاير موجودة بالفعل (ID: {service_id}) - لا حاجة لإعادة إنشائها")
-            # لا نقوم بأي شيء - الخدمة موجودة بالفعل
-            return
+            # تحديث اسم الخدمة إذا كان مختلفاً
+            if existing_service[1] != "طباعة بروشورات":
+                conn.execute(text("""
+                    UPDATE services 
+                    SET name_ar = :name_ar, name_en = :name_en, description_ar = :description_ar
+                    WHERE id = :id
+                """), {
+                    "id": service_id,
+                    "name_ar": "طباعة بروشورات",
+                    "name_en": "Brochure Printing",
+                    "description_ar": "خدمة طباعة البروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات"
+                })
+                conn.commit()
+                print(f"✅ تم تحديث اسم الخدمة إلى 'طباعة بروشورات' (ID: {service_id})")
+            else:
+                print(f"✅ خدمة طباعة البروشورات موجودة بالفعل (ID: {service_id}) - لا حاجة لإعادة إنشائها")
         else:
             # إنشاء الخدمة الجديدة
             result = conn.execute(text("""
@@ -595,9 +608,9 @@ async def _setup_flier_printing_service():
                 (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
                 RETURNING id
             """), {
-                "name_ar": "طباعة فلير",
-                "name_en": "Flier Printing",
-                "description_ar": "خدمة طباعة الفلاير والبروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات",
+                "name_ar": "طباعة بروشورات",
+                "name_en": "Brochure Printing",
+                "description_ar": "خدمة طباعة البروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات",
                 "icon": "📋",
                 "base_price": 0.0,
                 "is_visible": True,
@@ -606,13 +619,13 @@ async def _setup_flier_printing_service():
             })
             service_id = result.scalar()
             conn.commit()
-            print(f"✅ تم إنشاء خدمة طباعة الفلاير (ID: {service_id})")
+            print(f"✅ تم إنشاء خدمة طباعة البروشورات (ID: {service_id})")
         
         # إعادة بناء المراحل لضمان التحديث
         conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), {"service_id": service_id})
         conn.commit()
         
-        # إضافة المراحل المخصصة لخدمة طباعة الفلاير
+        # إضافة المراحل المخصصة لخدمة طباعة البروشورات
         workflows = [
             {
                 "step_number": 1,
@@ -654,8 +667,8 @@ async def _setup_flier_printing_service():
                         "standard": "عادية",
                         "laser": "عالية (ليزرية)"
                     },
-                    "force_color": True,  # الفلاير دائماً ملون
-                    "hide_print_sides": True,  # إخفاء عدد الوجوه (الفلاير عادة وجه واحد)
+                    "force_color": True,  # البروشورات دائماً ملونة
+                    "hide_print_sides": True,  # إخفاء عدد الوجوه (البروشورات عادة وجه واحد)
                     "hide_dimensions": False,  # إظهار الأبعاد للقياس المخصص
                     "show_notes_in_print_options": False
                 }
@@ -711,7 +724,7 @@ async def _setup_flier_printing_service():
                 traceback.print_exc()
         
         conn.commit()
-        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة الفلاير (Service ID: {service_id})")
+        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة البروشورات (Service ID: {service_id})")
         
         # التحقق من أن المراحل تم إضافتها
         verify = conn.execute(text("""
@@ -720,7 +733,7 @@ async def _setup_flier_printing_service():
         print(f"✅ Verification: {verify} workflows found for service {service_id}")
         
     except Exception as e:
-        print(f"❌ Error setting up flier printing service: {str(e)}")
+        print(f"❌ Error setting up brochure printing service: {str(e)}")
         import traceback
         traceback.print_exc()
         if conn:
@@ -798,9 +811,9 @@ async def _ensure_default_services():
                 "display_order": 7
             },
             {
-                "name_ar": "طباعة فلير",
-                "name_en": "Flier Printing",
-                "description_ar": "خدمة طباعة الفلاير والبروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات",
+                "name_ar": "طباعة بروشورات",
+                "name_en": "Brochure Printing",
+                "description_ar": "خدمة طباعة البروشورات الورقية مع خيارات متعددة لأنواع الورق والقياسات",
                 "icon": "📋",
                 "display_order": 8
             }
@@ -1021,10 +1034,10 @@ async def setup_clothing_printing_now():
 
 @app.post("/api/setup-flier-printing-now")
 async def setup_flier_printing_now():
-    """إعداد خدمة طباعة الفلاير مباشرة - يمكن استدعاؤها يدوياً"""
+    """إعداد خدمة طباعة البروشورات مباشرة - يمكن استدعاؤها يدوياً"""
     try:
         await _setup_flier_printing_service()
-        return {"success": True, "message": "تم إعداد خدمة طباعة الفلاير بنجاح"}
+        return {"success": True, "message": "تم إعداد خدمة طباعة البروشورات بنجاح"}
     except Exception as e:
         import traceback
         traceback.print_exc()

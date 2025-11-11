@@ -670,7 +670,7 @@ async def _setup_flier_printing_service():
                     "force_color": True,  # البروشورات دائماً ملونة
                     "hide_print_sides": True,  # إخفاء عدد الوجوه (البروشورات عادة وجه واحد)
                     "hide_dimensions": False,  # إظهار الأبعاد للقياس المخصص
-                    "show_notes_in_print_options": False
+                    "show_notes_in_print_options": True  # إظهار خانة الملاحظات
                 }
             },
             {

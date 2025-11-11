@@ -95,7 +95,7 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
   }
 
   // البحث عن موقع باستخدام Nominatim API
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.FormEvent, onComplete?: (results: Array<{ display_name: string; lat: string; lon: string }>) => void) => {
     if (e) {
       e.preventDefault()
     }
@@ -103,6 +103,7 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
     if (!searchQuery.trim()) {
       setSearchResults([])
       setShowSearchResults(false)
+      if (onComplete) onComplete([])
       return
     }
 
@@ -110,13 +111,19 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
     setError(null)
 
     try {
-      // البحث في سوريا أولاً، ثم البحث العام
       const query = encodeURIComponent(searchQuery.trim())
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&countrycodes=sy&accept-language=ar`
       
-      const response = await fetch(url, {
+      // تحديد viewbox لدمشق لتضييق البحث (خطوط الطول والعرض)
+      // دمشق تقع تقريباً بين: 33.4-33.6 شمالاً و 36.1-36.4 شرقاً
+      const damascusViewbox = '36.1,33.4,36.4,33.6' // minlon,minlat,maxlon,maxlat
+      
+      // البحث في دمشق أولاً مع viewbox محدود
+      const damascusUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=10&countrycodes=sy&viewbox=${damascusViewbox}&bounded=1&accept-language=ar&addressdetails=1`
+      
+      let response = await fetch(damascusUrl, {
         headers: {
-          'User-Agent': 'KhawamPro/1.0'
+          'User-Agent': 'KhawamPro/1.0',
+          'Accept-Language': 'ar,en'
         }
       })
 
@@ -124,41 +131,88 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
         throw new Error('فشل البحث')
       }
 
-      const data = await response.json()
+      let data = await response.json()
       
-      if (data && data.length > 0) {
-        setSearchResults(data)
-        setShowSearchResults(true)
-      } else {
-        // إذا لم نجد نتائج في سوريا، نجرب البحث العام
-        const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=5&accept-language=ar`
-        const globalResponse = await fetch(globalUrl, {
+      // إذا لم نجد نتائج في دمشق، نبحث في سوريا بشكل عام
+      if (!data || data.length === 0) {
+        const syriaUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=10&countrycodes=sy&accept-language=ar&addressdetails=1`
+        response = await fetch(syriaUrl, {
           headers: {
-            'User-Agent': 'KhawamPro/1.0'
+            'User-Agent': 'KhawamPro/1.0',
+            'Accept-Language': 'ar,en'
           }
         })
         
-        if (globalResponse.ok) {
-          const globalData = await globalResponse.json()
-          if (globalData && globalData.length > 0) {
-            setSearchResults(globalData)
-            setShowSearchResults(true)
-          } else {
-            setSearchResults([])
-            setShowSearchResults(false)
-            setError('لم يتم العثور على نتائج للبحث')
-          }
-        } else {
-          setSearchResults([])
-          setShowSearchResults(false)
-          setError('فشل البحث. يرجى المحاولة مرة أخرى')
+        if (response.ok) {
+          data = await response.json()
         }
+      }
+      
+      // إذا لم نجد نتائج في سوريا، نبحث بشكل عام ولكن نركز على المناطق العربية
+      if (!data || data.length === 0) {
+        const globalUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${query}+سوريا&limit=10&accept-language=ar&addressdetails=1`
+        response = await fetch(globalUrl, {
+          headers: {
+            'User-Agent': 'KhawamPro/1.0',
+            'Accept-Language': 'ar,en'
+          }
+        })
+        
+        if (response.ok) {
+          data = await response.json()
+          // فلترة النتائج لتحديد سوريا أولاً
+          if (data && data.length > 0) {
+            const syriaResults = data.filter((item: any) => 
+              item.address?.country_code === 'sy' || 
+              item.display_name?.toLowerCase().includes('syria') ||
+              item.display_name?.toLowerCase().includes('سوريا') ||
+              item.display_name?.toLowerCase().includes('دمشق')
+            )
+            if (syriaResults.length > 0) {
+              data = syriaResults
+            }
+          }
+        }
+      }
+      
+      if (data && data.length > 0) {
+        // ترتيب النتائج حسب الأهمية (الأكثر صلة أولاً)
+        // النتائج التي تحتوي على "دمشق" أو "damascus" تأتي أولاً
+        const sortedData = data.sort((a: any, b: any) => {
+          const aName = (a.display_name || '').toLowerCase()
+          const bName = (b.display_name || '').toLowerCase()
+          const queryLower = searchQuery.toLowerCase()
+          
+          const aContainsQuery = aName.includes(queryLower)
+          const bContainsQuery = bName.includes(queryLower)
+          const aContainsDamascus = aName.includes('دمشق') || aName.includes('damascus')
+          const bContainsDamascus = bName.includes('دمشق') || bName.includes('damascus')
+          
+          if (aContainsDamascus && !bContainsDamascus) return -1
+          if (!aContainsDamascus && bContainsDamascus) return 1
+          if (aContainsQuery && !bContainsQuery) return -1
+          if (!aContainsQuery && bContainsQuery) return 1
+          
+          // ترتيب حسب importance (كلما زادت الأهمية، كلما كانت أفضل)
+          return (b.importance || 0) - (a.importance || 0)
+        })
+        
+        const finalResults = sortedData.slice(0, 5) // نأخذ أفضل 5 نتائج
+        setSearchResults(finalResults)
+        setShowSearchResults(true)
+        if (onComplete) onComplete(finalResults)
+      } else {
+        setSearchResults([])
+        setShowSearchResults(false)
+        setError('لم يتم العثور على نتائج للبحث. يرجى المحاولة بتحديد أكثر (مثال: ساحة المواساة، دمشق)')
+        if (onComplete) onComplete([])
       }
     } catch (err) {
       console.error('Search error:', err)
       setError('حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى')
       setSearchResults([])
       setShowSearchResults(false)
+      if (onComplete) onComplete([])
     } finally {
       setIsSearching(false)
     }
@@ -331,19 +385,33 @@ const LocationPickerPage: React.FC<LocationPickerPageProps> = ({
             <form onSubmit={handleSearch} className="search-form">
               <div className="search-input-wrapper">
                 <Search className="search-icon" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => {
-                    if (searchResults.length > 0) {
-                      setShowSearchResults(true)
-                    }
-                  }}
-                  placeholder="ابحث عن موقع (مثال: دمشق، البرامكة، شارع...)"
-                  className="form-input search-input"
-                  disabled={isLoading}
-                />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      if (searchResults.length > 0) {
+                        setShowSearchResults(true)
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // عند الضغط على Enter، نبحث ونحدد أول نتيجة تلقائياً إذا كانت موجودة
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (searchQuery.trim() && !isSearching) {
+                          handleSearch(e as any, (results) => {
+                            // بعد البحث، إذا كانت هناك نتائج، نحدد أول نتيجة تلقائياً
+                            if (results && results.length > 0) {
+                              handleSelectSearchResult(results[0])
+                            }
+                          })
+                        }
+                      }
+                    }}
+                    placeholder="ابحث عن موقع (مثال: ساحة المواساة، دمشق أو دمشق، البرامكة)"
+                    className="form-input search-input"
+                    disabled={isLoading}
+                  />
                 {isSearching && (
                   <Loader2 className="search-spinner" />
                 )}

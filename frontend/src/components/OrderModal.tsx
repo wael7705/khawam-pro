@@ -864,81 +864,101 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             
             {/* خيارات الدقة - للملون فقط أو إذا كان force_color = true */}
             {/* تحسين الشرط: عرض خيارات الدقة إذا كان force_color = true أو printColor = 'color' */}
-            {shouldShowQualityOptions && (
-              <div className="form-group">
-                <label>نوع الدقة <span className="required">*</span></label>
-                <div className="delivery-options">
-                  {/* عرض خيار standard إذا كان موجوداً */}
-                  {stepConfig.quality_options.standard && (
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printQuality"
-                        value="standard"
-                        checked={printQuality === 'standard'}
-                        onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                      />
-                      <span>{stepConfig.quality_options.standard}</span>
-                    </label>
-                  )}
-                  {/* عرض خيار uv إذا كان موجوداً */}
-                  {stepConfig.quality_options.uv && (
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printQuality"
-                        value="uv"
-                        checked={printQuality === 'uv'}
-                        onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                      />
-                      <span>{stepConfig.quality_options.uv}</span>
-                    </label>
-                  )}
-                  {/* عرض خيار laser إذا كان موجوداً */}
-                  {stepConfig.quality_options.laser && (
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printQuality"
-                        value="laser"
-                        checked={printQuality === 'laser'}
-                        onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                      />
-                      <span>{stepConfig.quality_options.laser}</span>
-                    </label>
-                  )}
-                  {/* دعم structure متداخل (quality_options.color.standard, etc.) */}
-                  {stepConfig.quality_options.color && typeof stepConfig.quality_options.color === 'object' && (
-                    <>
-                      {stepConfig.quality_options.color.standard && (
-                        <label className="radio-option">
-                          <input
-                            type="radio"
-                            name="printQuality"
-                            value="standard"
-                            checked={printQuality === 'standard'}
-                            onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                          />
-                          <span>{stepConfig.quality_options.color.standard}</span>
-                        </label>
-                      )}
-                      {stepConfig.quality_options.color.laser && (
-                        <label className="radio-option">
-                          <input
-                            type="radio"
-                            name="printQuality"
-                            value="laser"
-                            checked={printQuality === 'laser'}
-                            onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
-                          />
-                          <span>{stepConfig.quality_options.color.laser}</span>
-                        </label>
-                      )}
-                    </>
-                  )}
+            {/* إصلاح: نعرض خيارات الدقة دائماً عندما تكون موجودة و force_color = true */}
+            {(() => {
+              // التحقق مرة أخرى من stepConfig مباشرة (للتأكد من الحصول على أحدث قيمة)
+              const currentStepConfig = workflowSteps.find((s: any) => s.step_type === 'print_options')?.step_config
+              const currentIsForceColor = currentStepConfig?.force_color === true || currentStepConfig?.force_color === 'true' || currentStepConfig?.force_color === 1
+              const currentHasQualityOptions = currentStepConfig?.quality_options && 
+                                              typeof currentStepConfig.quality_options === 'object' && 
+                                              Object.keys(currentStepConfig.quality_options).length > 0
+              const shouldShow = (currentIsForceColor || printColor === 'color') && currentHasQualityOptions
+              
+              console.log('🔍 Rendering quality options - currentIsForceColor:', currentIsForceColor, 'currentHasQualityOptions:', currentHasQualityOptions, 'shouldShow:', shouldShow)
+              console.log('🔍 quality_options keys:', currentStepConfig?.quality_options ? Object.keys(currentStepConfig.quality_options) : [])
+              
+              if (!shouldShow) {
+                return null
+              }
+              
+              const qualityOpts = currentStepConfig?.quality_options || stepConfig.quality_options
+              
+              return (
+                <div className="form-group">
+                  <label>نوع الدقة <span className="required">*</span></label>
+                  <div className="delivery-options">
+                    {/* عرض خيار standard إذا كان موجوداً */}
+                    {qualityOpts.standard && (
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printQuality"
+                          value="standard"
+                          checked={printQuality === 'standard'}
+                          onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
+                        />
+                        <span>{qualityOpts.standard}</span>
+                      </label>
+                    )}
+                    {/* عرض خيار uv إذا كان موجوداً */}
+                    {qualityOpts.uv && (
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printQuality"
+                          value="uv"
+                          checked={printQuality === 'uv'}
+                          onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
+                        />
+                        <span>{qualityOpts.uv}</span>
+                      </label>
+                    )}
+                    {/* عرض خيار laser إذا كان موجوداً */}
+                    {qualityOpts.laser && (
+                      <label className="radio-option">
+                        <input
+                          type="radio"
+                          name="printQuality"
+                          value="laser"
+                          checked={printQuality === 'laser'}
+                          onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
+                        />
+                        <span>{qualityOpts.laser}</span>
+                      </label>
+                    )}
+                    {/* دعم structure متداخل (quality_options.color.standard, etc.) */}
+                    {qualityOpts.color && typeof qualityOpts.color === 'object' && (
+                      <>
+                        {qualityOpts.color.standard && (
+                          <label className="radio-option">
+                            <input
+                              type="radio"
+                              name="printQuality"
+                              value="standard"
+                              checked={printQuality === 'standard'}
+                              onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
+                            />
+                            <span>{qualityOpts.color.standard}</span>
+                          </label>
+                        )}
+                        {qualityOpts.color.laser && (
+                          <label className="radio-option">
+                            <input
+                              type="radio"
+                              name="printQuality"
+                              value="laser"
+                              checked={printQuality === 'laser'}
+                              onChange={(e) => setPrintQuality(e.target.value as PrintQuality)}
+                            />
+                            <span>{qualityOpts.color.laser}</span>
+                          </label>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
             
             {/* نوع الفينيل - إذا كان show_vinyl_type = true */}
             {stepConfig.show_vinyl_type && stepConfig.vinyl_types && stepConfig.vinyl_types.length > 0 && (
@@ -975,33 +995,48 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             )}
             
             {/* عدد الوجوه - إخفاء إذا كان hide_print_sides = true */}
-            {!stepConfig.hide_print_sides && (
-              <div className="form-group">
-                <label>عدد الوجوه <span className="required">*</span></label>
-                <div className="delivery-options">
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="printSides"
-                      value="single"
-                      checked={printSides === 'single'}
-                      onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                    />
-                    <span>وجه واحد</span>
-                  </label>
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name="printSides"
-                      value="double"
-                      checked={printSides === 'double'}
-                      onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                    />
-                    <span>وجهين</span>
-                  </label>
+            {(() => {
+              // التحقق مرة أخرى من stepConfig مباشرة (للتأكد من الحصول على أحدث قيمة)
+              const currentStepConfig = workflowSteps.find((s: any) => s.step_type === 'print_options')?.step_config
+              const shouldHidePrintSides = currentStepConfig?.hide_print_sides === true || 
+                                           currentStepConfig?.hide_print_sides === 'true' || 
+                                           currentStepConfig?.hide_print_sides === 1 ||
+                                           stepConfig?.hide_print_sides === true ||
+                                           stepConfig?.hide_print_sides === 'true' ||
+                                           stepConfig?.hide_print_sides === 1
+              
+              if (shouldHidePrintSides) {
+                return null
+              }
+              
+              return (
+                <div className="form-group">
+                  <label>عدد الوجوه <span className="required">*</span></label>
+                  <div className="delivery-options">
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="single"
+                        checked={printSides === 'single'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجه واحد</span>
+                    </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="double"
+                        checked={printSides === 'double'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجهين</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
             
             {/* إخفاء الأبعاد إذا كان hide_dimensions = true أو إذا كان القياس ليس "custom" */}
             {!stepConfig.hide_dimensions && (paperSize === 'custom' || (!stepConfig.paper_sizes && !stepConfig.paper_size)) && (

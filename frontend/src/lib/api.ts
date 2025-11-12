@@ -113,6 +113,40 @@ export const studioAPI = {
     })
     return response.data
   },
+  createPassportPhotos: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/studio/passport-photos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
+  cropRotate: async (file: File, angle: number = 0, cropParams?: { x: number; y: number; width: number; height: number }) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('angle', angle.toString())
+    if (cropParams) {
+      formData.append('x', cropParams.x.toString())
+      formData.append('y', cropParams.y.toString())
+      formData.append('width', cropParams.width.toString())
+      formData.append('height', cropParams.height.toString())
+    }
+    const response = await api.post('/studio/crop-rotate', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
+  applyFilter: async (file: File, brightness: number = 100, contrast: number = 100, saturation: number = 100) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('brightness', brightness.toString())
+    formData.append('contrast', contrast.toString())
+    formData.append('saturation', saturation.toString())
+    const response = await api.post('/studio/apply-filter', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
 }
 
 // Auth API

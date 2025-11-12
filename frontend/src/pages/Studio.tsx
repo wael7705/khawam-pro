@@ -21,6 +21,7 @@ export default function Studio() {
   const [filterType, setFilterType] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const originalFileRef = useRef<File | null>(null)
 
   // Check authentication on mount
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function Studio() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      originalFileRef.current = file
       const reader = new FileReader()
       reader.onload = (e) => {
         const imageUrl = e.target?.result as string
@@ -90,17 +92,76 @@ export default function Studio() {
   }, [brightness, contrast, saturation, rotation, zoom, activeImage, selectedTool])
 
   const handleRemoveBackground = async () => {
-    if (!fileInputRef.current?.files?.[0]) return
+    if (!originalFileRef.current) return
     
     setLoading(true)
     try {
-      const file = fileInputRef.current.files[0]
-      const response = await studioAPI.removeBackground(file)
+      const response = await studioAPI.removeBackground(originalFileRef.current)
       if (response.success && response.image) {
         setProcessedImage(response.image)
+        setActiveImage(response.image)
       }
     } catch (error) {
       console.error('Error removing background:', error)
+      alert('حدث خطأ في معالجة الصورة')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePassportPhotos = async () => {
+    if (!originalFileRef.current) return
+    
+    setLoading(true)
+    try {
+      const response = await studioAPI.createPassportPhotos(originalFileRef.current)
+      if (response.success && response.image) {
+        setProcessedImage(response.image)
+        setActiveImage(response.image)
+      }
+    } catch (error) {
+      console.error('Error creating passport photos:', error)
+      alert('حدث خطأ في معالجة الصورة')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApplyFilters = async () => {
+    if (!originalFileRef.current) return
+    
+    setLoading(true)
+    try {
+      const response = await studioAPI.applyFilter(
+        originalFileRef.current,
+        brightness,
+        contrast,
+        saturation
+      )
+      if (response.success && response.image) {
+        setProcessedImage(response.image)
+        setActiveImage(response.image)
+      }
+    } catch (error) {
+      console.error('Error applying filters:', error)
+      alert('حدث خطأ في معالجة الصورة')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleApplyCropRotate = async () => {
+    if (!originalFileRef.current) return
+    
+    setLoading(true)
+    try {
+      const response = await studioAPI.cropRotate(originalFileRef.current, rotation)
+      if (response.success && response.image) {
+        setProcessedImage(response.image)
+        setActiveImage(response.image)
+      }
+    } catch (error) {
+      console.error('Error cropping/rotating:', error)
       alert('حدث خطأ في معالجة الصورة')
     } finally {
       setLoading(false)
@@ -183,10 +244,16 @@ export default function Studio() {
                       alt="Preview" 
                       className="preview-image"
                       style={{
-                        transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
-                        filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`
+                        transform: selectedTool === 'crop' ? `rotate(${rotation}deg)` : selectedTool === 'resize' ? `scale(${zoom / 100})` : '',
+                        filter: selectedTool === 'filters' ? `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)` : ''
                       }}
                     />
+                  )}
+                  {loading && (
+                    <div className="loading-overlay">
+                      <div className="spinner"></div>
+                      <p>جاري المعالجة...</p>
+                    </div>
                   )}
                 </div>
 
@@ -221,6 +288,17 @@ export default function Studio() {
                   </button>
                 )}
 
+                {selectedTool === 'passport' && (
+                  <div className="passport-options">
+                    <p className="text-sm text-gray-600 mb-4">
+                      سيتم إزالة الخلفية وتحويل الصورة إلى حجم 3.5×4.8 سم (صور شخصية)
+                    </p>
+                    <button className="btn btn-primary w-full" onClick={handlePassportPhotos} disabled={loading}>
+                      {loading ? 'جاري المعالجة...' : 'إنشاء صور شخصية'}
+                    </button>
+                  </div>
+                )}
+
                 {selectedTool === 'filters' && (
                   <div className="filter-options">
                     <label>السطوع: {brightness}%</label>
@@ -238,6 +316,9 @@ export default function Studio() {
                       <button onClick={() => { setBrightness(100); setContrast(90); setSaturation(200) }}>نيون</button>
                       <button onClick={() => { setBrightness(110); setContrast(120); setSaturation(80) }}>سينمائي</button>
                     </div>
+                    <button className="btn btn-primary w-full mt-4" onClick={handleApplyFilters} disabled={loading}>
+                      {loading ? 'جاري المعالجة...' : 'تطبيق الفلاتر'}
+                    </button>
                   </div>
                 )}
 
@@ -245,6 +326,9 @@ export default function Studio() {
                   <div className="resize-options">
                     <label>التكبير: {zoom}%</label>
                     <input type="range" min="25" max="400" value={zoom} onChange={(e) => setZoom(parseInt(e.target.value))} />
+                    <p className="text-sm text-gray-600 mt-2">
+                      ملاحظة: التكبير يعمل على العرض فقط. استخدم أداة القص والتدوير للتطبيق الفعلي.
+                    </p>
                   </div>
                 )}
 
@@ -252,6 +336,9 @@ export default function Studio() {
                   <div className="rotation-options">
                     <label>التدوير: {rotation}°</label>
                     <input type="range" min="-180" max="180" value={rotation} onChange={(e) => setRotation(parseInt(e.target.value))} />
+                    <button className="btn btn-primary w-full mt-4" onClick={handleApplyCropRotate} disabled={loading}>
+                      {loading ? 'جاري المعالجة...' : 'تطبيق التدوير'}
+                    </button>
                   </div>
                 )}
               </div>

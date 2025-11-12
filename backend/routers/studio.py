@@ -4,7 +4,7 @@ import requests
 import os
 import base64
 import aiofiles
-from PIL import Image
+from PIL import Image, ImageDraw
 import io
 from typing import Optional
 
@@ -102,6 +102,7 @@ async def remove_background(file: UploadFile = File(...)):
 async def create_passport_photos(file: UploadFile = File(...)):
     """
     إنشاء صور شخصية: إزالة الخلفية + تحويل الحجم إلى 3.5*4.8 سم (4.8 هو الارتفاع)
+    + إضافة stroke + قالب 8 صور (2 صفوف × 4 أعمدة)
     """
     try:
         # قراءة الصورة
@@ -151,7 +152,7 @@ async def create_passport_photos(file: UploadFile = File(...)):
         resized_image = no_bg_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
         # إنشاء صورة جديدة بالحجم المطلوب مع خلفية بيضاء
-        final_image = Image.new('RGB', (target_width, target_height), (255, 255, 255))
+        single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
         
         # وضع الصورة في المنتصف
         x_offset = (target_width - new_width) // 2
@@ -159,12 +160,57 @@ async def create_passport_photos(file: UploadFile = File(...)):
         
         # إذا كانت الصورة شفافة، نحتاج لدمجها بشكل صحيح
         if resized_image.mode == 'RGBA':
-            final_image.paste(resized_image, (x_offset, y_offset), resized_image)
+            single_photo.paste(resized_image, (x_offset, y_offset), resized_image)
         else:
-            final_image.paste(resized_image, (x_offset, y_offset))
+            single_photo.paste(resized_image, (x_offset, y_offset))
+        
+        # إضافة stroke (حدود) حول الصورة
+        stroke_width = 3  # عرض الحدود بالبكسل
+        stroke_color = (0, 0, 0)  # لون أسود
+        
+        # إنشاء صورة أكبر لتضمين الحدود
+        photo_with_stroke = Image.new('RGB', 
+                                     (target_width + stroke_width * 2, 
+                                      target_height + stroke_width * 2), 
+                                     (255, 255, 255))
+        
+        # وضع الصورة الأصلية أولاً
+        photo_with_stroke.paste(single_photo, (stroke_width, stroke_width))
+        
+        # رسم الحدود حول الصورة
+        draw = ImageDraw.Draw(photo_with_stroke)
+        # رسم مستطيل كحدود حول الصورة
+        draw.rectangle(
+            [(stroke_width, stroke_width), 
+             (target_width + stroke_width - 1, target_height + stroke_width - 1)],
+            outline=stroke_color,
+            width=stroke_width
+        )
+        
+        # إنشاء قالب 8 صور (2 صفوف × 4 أعمدة)
+        rows = 2
+        cols = 4
+        spacing = 10  # المسافة بين الصور بالبكسل
+        
+        # حساب أبعاد القالب
+        photo_width_with_stroke = target_width + stroke_width * 2
+        photo_height_with_stroke = target_height + stroke_width * 2
+        
+        template_width = cols * photo_width_with_stroke + (cols - 1) * spacing
+        template_height = rows * photo_height_with_stroke + (rows - 1) * spacing
+        
+        # إنشاء القالب بخلفية بيضاء
+        template = Image.new('RGB', (template_width, template_height), (255, 255, 255))
+        
+        # وضع 8 نسخ من الصورة في القالب
+        for row in range(rows):
+            for col in range(cols):
+                x_pos = col * (photo_width_with_stroke + spacing)
+                y_pos = row * (photo_height_with_stroke + spacing)
+                template.paste(photo_with_stroke, (x_pos, y_pos))
         
         # تحويل إلى base64
-        img_data = image_to_base64(final_image, format='PNG')
+        img_data = image_to_base64(template, format='PNG')
         
         return {"success": True, "image": img_data}
         

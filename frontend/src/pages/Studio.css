@@ -127,11 +127,19 @@
   text-align: center;
   cursor: pointer;
   transition: all 0.3s;
+  position: relative;
 }
 
 .upload-zone:hover {
   border-color: var(--primary);
   background: rgba(255, 107, 53, 0.05);
+}
+
+.upload-zone.dragging {
+  border-color: var(--primary);
+  background: rgba(255, 107, 53, 0.15);
+  border-width: 4px;
+  transform: scale(1.02);
 }
 
 .upload-zone p {
@@ -185,6 +193,13 @@
 .canvas-controls {
   display: flex;
   gap: 15px;
+  flex-wrap: wrap;
+}
+
+.download-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .btn-icon {

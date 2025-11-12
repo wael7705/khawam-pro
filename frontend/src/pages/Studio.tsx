@@ -25,8 +25,10 @@ export default function Studio() {
   const [cropStartPos, setCropStartPos] = useState<{x: number, y: number} | null>(null)
   const [imageRect, setImageRect] = useState<DOMRect | null>(null)
   const [cropDragType, setCropDragType] = useState<'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const downloadCanvasRef = useRef<HTMLCanvasElement>(null)
   const originalFileRef = useRef<File | null>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const cropOverlayRef = useRef<HTMLDivElement>(null)
@@ -38,19 +40,57 @@ export default function Studio() {
     }
   }, [navigate, location])
 
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('الرجاء رفع ملف صورة صالح')
+      return
+    }
+    
+    originalFileRef.current = file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const imageUrl = e.target?.result as string
+      setUploadedImage(imageUrl)
+      setActiveImage(imageUrl)
+      setProcessedImage(null)
+      resetFilters()
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      originalFileRef.current = file
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string
-        setUploadedImage(imageUrl)
-        setActiveImage(imageUrl)
-        setProcessedImage(null)
-        resetFilters()
-      }
-      reader.readAsDataURL(file)
+      processImageFile(file)
+    }
+  }
+
+  // Drag and Drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      processImageFile(file)
     }
   }
 
@@ -429,13 +469,88 @@ export default function Studio() {
     { id: 'colors', name: 'السطوع والألوان', icon: Palette, color: '#BC4749', desc: 'التحكم بالألوان' },
   ]
 
-  const handleDownload = () => {
+  const handleDownload = async (format: 'image' | 'pdf' = 'image') => {
     if (!processedImage && !uploadedImage) return
     
-    const link = document.createElement('a')
-    link.href = processedImage || uploadedImage || ''
-    link.download = 'processed-image.png'
-    link.click()
+    setLoading(true)
+    const imageSrc = processedImage || uploadedImage || ''
+    const img = new Image()
+    
+    img.onload = async () => {
+      try {
+        // استخدام الحجم الأصلي للصورة للحفاظ على الدقة الكاملة
+        const width = img.naturalWidth > 0 ? img.naturalWidth : img.width
+        const height = img.naturalHeight > 0 ? img.naturalHeight : img.height
+        
+        const canvas = downloadCanvasRef.current || document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          setLoading(false)
+          return
+        }
+        
+        // رسم الصورة بالحجم الأصلي للحفاظ على الدقة
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        if (format === 'image') {
+          // تحميل كصورة PNG بجودة عالية
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              setLoading(false)
+              return
+            }
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `processed-image-${Date.now()}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+            setLoading(false)
+          }, 'image/png', 1.0) // جودة 100%
+        } else if (format === 'pdf') {
+          // تحميل كـ PDF
+          try {
+            const { jsPDF } = await import('jspdf')
+            
+            // تحويل البكسل إلى مليمتر (1 بوصة = 25.4 ملم، 300 DPI)
+            const mmWidth = (width / 300) * 25.4
+            const mmHeight = (height / 300) * 25.4
+            
+            const pdf = new jsPDF({
+              orientation: width > height ? 'landscape' : 'portrait',
+              unit: 'mm',
+              format: [mmWidth, mmHeight]
+            })
+            
+            const imgData = canvas.toDataURL('image/png', 1.0)
+            pdf.addImage(imgData, 'PNG', 0, 0, mmWidth, mmHeight, undefined, 'FAST')
+            pdf.save(`processed-image-${Date.now()}.pdf`)
+            setLoading(false)
+          } catch (error) {
+            console.error('Error creating PDF:', error)
+            alert('خطأ في إنشاء PDF. سيتم التحميل كصورة بدلاً من ذلك.')
+            setLoading(false)
+            handleDownload('image')
+          }
+        }
+      } catch (error) {
+        console.error('Error downloading:', error)
+        alert('حدث خطأ أثناء التحميل')
+        setLoading(false)
+      }
+    }
+    
+    img.onerror = () => {
+      alert('خطأ في تحميل الصورة')
+      setLoading(false)
+    }
+    
+    img.src = imageSrc
   }
 
   return (
@@ -473,7 +588,14 @@ export default function Studio() {
 
           <div className="canvas-area">
             {!uploadedImage ? (
-              <div className="upload-zone" onClick={() => fileInputRef.current?.click()}>
+              <div 
+                className={`upload-zone ${isDragging ? 'dragging' : ''}`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -482,7 +604,7 @@ export default function Studio() {
                   className="hidden"
                 />
                 <Upload size={48} />
-                <p>انقر لرفع صورة</p>
+                <p>{isDragging ? 'أفلت الصورة هنا' : 'انقر أو اسحب لرفع صورة'}</p>
                 <span>JPG, PNG, WEBP</span>
               </div>
             ) : (
@@ -566,13 +688,24 @@ export default function Studio() {
                   }}>
                     <X /> إزالة الصورة
                   </button>
-                  <button 
-                    className="btn-icon primary" 
-                    onClick={handleDownload}
-                    disabled={!uploadedImage}
-                  >
-                    <Download /> تحميل الصورة
-                  </button>
+                  <div className="download-buttons">
+                    <button 
+                      className="btn-icon primary" 
+                      onClick={() => handleDownload('image')}
+                      disabled={!uploadedImage}
+                      title="تحميل كصورة PNG"
+                    >
+                      <Download /> تحميل PNG
+                    </button>
+                    <button 
+                      className="btn-icon primary" 
+                      onClick={() => handleDownload('pdf')}
+                      disabled={!uploadedImage}
+                      title="تحميل كملف PDF"
+                    >
+                      <Download /> تحميل PDF
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -658,6 +791,7 @@ export default function Studio() {
         </div>
       </div>
       <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={downloadCanvasRef} className="hidden" />
     </div>
   )
 }

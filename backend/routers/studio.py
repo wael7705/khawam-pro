@@ -164,33 +164,40 @@ async def create_passport_photos(file: UploadFile = File(...)):
         else:
             single_photo.paste(resized_image, (x_offset, y_offset))
         
-        # إضافة stroke (حدود) حول الصورة
-        stroke_width = 3  # عرض الحدود بالبكسل
+        # إضافة stroke (حدود) حول الصورة - ملتصق مباشرة بالصورة
+        # 1 مم = 0.1 سم = 3.78 بكسل عند 300 DPI
+        stroke_width = 4  # سماكة 1 مم تقريباً (4 بكسل)
         stroke_color = (0, 0, 0)  # لون أسود
         
-        # إنشاء صورة أكبر لتضمين الحدود
+        # إنشاء صورة أكبر لتضمين الحدود (الحدود خارج الصورة)
         photo_with_stroke = Image.new('RGB', 
                                      (target_width + stroke_width * 2, 
                                       target_height + stroke_width * 2), 
                                      (255, 255, 255))
         
-        # وضع الصورة الأصلية أولاً
+        # وضع الصورة الأصلية في المنتصف (مع مساحة للحدود)
         photo_with_stroke.paste(single_photo, (stroke_width, stroke_width))
         
-        # رسم الحدود حول الصورة
+        # رسم الحدود ملتصقة بالصورة مباشرة
         draw = ImageDraw.Draw(photo_with_stroke)
-        # رسم مستطيل كحدود حول الصورة
-        draw.rectangle(
-            [(stroke_width, stroke_width), 
-             (target_width + stroke_width - 1, target_height + stroke_width - 1)],
-            outline=stroke_color,
-            width=stroke_width
-        )
+        # رسم مستطيل بحدود سميكة - الحدود على حافة الصورة مباشرة
+        # نرسم خطوط سميكة على كل جانب من جوانب الصورة
+        x1, y1 = stroke_width, stroke_width
+        x2, y2 = target_width + stroke_width - 1, target_height + stroke_width - 1
+        
+        # الخط العلوي
+        draw.rectangle([x1, y1, x2, y1 + stroke_width - 1], fill=stroke_color)
+        # الخط السفلي
+        draw.rectangle([x1, y2 - stroke_width + 1, x2, y2], fill=stroke_color)
+        # الخط الأيسر
+        draw.rectangle([x1, y1, x1 + stroke_width - 1, y2], fill=stroke_color)
+        # الخط الأيمن
+        draw.rectangle([x2 - stroke_width + 1, y1, x2, y2], fill=stroke_color)
         
         # إنشاء قالب 8 صور (2 صفوف × 4 أعمدة)
         rows = 2
         cols = 4
-        spacing = 10  # المسافة بين الصور بالبكسل
+        spacing = 0  # لا توجد مسافة بين الصور - ملتصقة تماماً (مثل الصورة المرفقة)
         
         # حساب أبعاد القالب
         photo_width_with_stroke = target_width + stroke_width * 2

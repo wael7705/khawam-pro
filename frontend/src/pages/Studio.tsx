@@ -122,13 +122,27 @@ export default function Studio() {
           setImageRect({
             ...rect,
             left: rect.left - containerRect.left,
-            top: rect.top - containerRect.top
+            top: rect.top - containerRect.top,
+            width: rect.width,
+            height: rect.height
           } as DOMRect)
+        }
+        // انتظار تحميل الصورة
+        if (img.complete) {
+          updateRect()
+        } else {
+          img.onload = updateRect
         }
         updateRect()
         window.addEventListener('resize', updateRect)
-        return () => window.removeEventListener('resize', updateRect)
+        window.addEventListener('scroll', updateRect, true)
+        return () => {
+          window.removeEventListener('resize', updateRect)
+          window.removeEventListener('scroll', updateRect, true)
+        }
       }
+    } else {
+      setImageRect(null)
     }
   }, [selectedTool, uploadedImage, processedImage])
 
@@ -222,18 +236,16 @@ export default function Studio() {
     if (!imageRect || !imageContainerRef.current) return null
     
     const img = imageContainerRef.current.querySelector('img')
-    if (!img) return null
-    
-    const containerRect = imageContainerRef.current.getBoundingClientRect()
-    const imgRect = img.getBoundingClientRect()
+    if (!img || !img.complete) return null
     
     // حساب الإحداثيات النسبية للصورة داخل الحاوية
-    const x = clientX - imgRect.left
-    const y = clientY - imgRect.top
+    const containerRect = imageContainerRef.current.getBoundingClientRect()
+    const x = clientX - containerRect.left - imageRect.left
+    const y = clientY - containerRect.top - imageRect.top
     
     // تحويل إلى إحداثيات الصورة الفعلية
-    const scaleX = img.naturalWidth / imgRect.width
-    const scaleY = img.naturalHeight / imgRect.height
+    const scaleX = img.naturalWidth / imageRect.width
+    const scaleY = img.naturalHeight / imageRect.height
     
     return {
       x: Math.max(0, Math.min(x * scaleX, img.naturalWidth)),
@@ -244,28 +256,36 @@ export default function Studio() {
   const handleCropMouseDown = (e: React.MouseEvent) => {
     if (selectedTool !== 'crop' || !imageRect) return
     
+    e.preventDefault()
+    e.stopPropagation()
+    
     const coords = getImageCoordinates(e.clientX, e.clientY)
     if (coords) {
       setIsCropping(true)
       setCropStartPos(coords)
-      setCropArea({ x: coords.x, y: coords.y, width: 0, height: 0 })
+      setCropArea({ x: coords.x, y: coords.y, width: 1, height: 1 }) // بدء بـ 1 بدلاً من 0 لضمان الظهور
     }
   }
 
   const handleCropMouseMove = (e: React.MouseEvent) => {
-    if (!isCropping || !cropStartPos || !imageRect) return
+    if (selectedTool !== 'crop') return
     
-    const coords = getImageCoordinates(e.clientX, e.clientY)
-    if (coords) {
-      const width = coords.x - cropStartPos.x
-      const height = coords.y - cropStartPos.y
+    if (isCropping && cropStartPos && imageRect) {
+      e.preventDefault()
+      e.stopPropagation()
       
-      setCropArea({
-        x: width < 0 ? coords.x : cropStartPos.x,
-        y: height < 0 ? coords.y : cropStartPos.y,
-        width: Math.abs(width),
-        height: Math.abs(height)
-      })
+      const coords = getImageCoordinates(e.clientX, e.clientY)
+      if (coords) {
+        const width = coords.x - cropStartPos.x
+        const height = coords.y - cropStartPos.y
+        
+        setCropArea({
+          x: width < 0 ? coords.x : cropStartPos.x,
+          y: height < 0 ? coords.y : cropStartPos.y,
+          width: Math.max(1, Math.abs(width)),
+          height: Math.max(1, Math.abs(height))
+        })
+      }
     }
   }
 
@@ -362,22 +382,29 @@ export default function Studio() {
                       }}
                     />
                   )}
-                  {selectedTool === 'crop' && cropArea && imageRect && (() => {
+                  {selectedTool === 'crop' && cropArea && imageRect && cropArea.width >= 1 && cropArea.height >= 1 && (() => {
                     const img = imageContainerRef.current?.querySelector('img')
                     if (!img) return null
-                    const imgRect = img.getBoundingClientRect()
-                    const containerRect = imageContainerRef.current!.getBoundingClientRect()
-                    const scaleX = imgRect.width / img.naturalWidth
-                    const scaleY = imgRect.height / img.naturalHeight
+                    
+                    // حساب المقياس بين الصورة المعروضة والصورة الفعلية
+                    const scaleX = imageRect.width / img.naturalWidth
+                    const scaleY = imageRect.height / img.naturalHeight
+                    
+                    // تحويل إحداثيات الصورة الفعلية إلى إحداثيات الشاشة
+                    const left = imageRect.left + (cropArea.x * scaleX)
+                    const top = imageRect.top + (cropArea.y * scaleY)
+                    const width = cropArea.width * scaleX
+                    const height = cropArea.height * scaleY
+                    
                     return (
                       <div 
                         className="crop-overlay"
                         ref={cropOverlayRef}
                         style={{
-                          left: `${imgRect.left - containerRect.left + cropArea.x * scaleX}px`,
-                          top: `${imgRect.top - containerRect.top + cropArea.y * scaleY}px`,
-                          width: `${cropArea.width * scaleX}px`,
-                          height: `${cropArea.height * scaleY}px`,
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          width: `${width}px`,
+                          height: `${height}px`,
                         }}
                       />
                     )

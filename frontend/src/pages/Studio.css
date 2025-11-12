@@ -376,13 +376,58 @@
 
 .crop-overlay {
   position: absolute;
-  border: 2px dashed var(--primary);
-  background: rgba(255, 107, 53, 0.15);
+  border: 2px dashed white;
+  background: rgba(255, 255, 255, 0.1);
   pointer-events: none;
   z-index: 100;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
   min-width: 10px;
   min-height: 10px;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border: 2px solid var(--primary);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 101;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.crop-handle-nw {
+  cursor: nw-resize;
+}
+
+.crop-handle-ne {
+  cursor: ne-resize;
+}
+
+.crop-handle-sw {
+  cursor: sw-resize;
+}
+
+.crop-handle-se {
+  cursor: se-resize;
+}
+
+.crop-handle-n {
+  cursor: n-resize;
+}
+
+.crop-handle-s {
+  cursor: s-resize;
+}
+
+.crop-handle-w {
+  cursor: w-resize;
+}
+
+.crop-handle-e {
+  cursor: e-resize;
 }
 
 .btn-secondary {

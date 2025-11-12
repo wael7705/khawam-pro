@@ -24,6 +24,7 @@ export default function Studio() {
   const [isCropping, setIsCropping] = useState(false)
   const [cropStartPos, setCropStartPos] = useState<{x: number, y: number} | null>(null)
   const [imageRect, setImageRect] = useState<DOMRect | null>(null)
+  const [cropDragType, setCropDragType] = useState<'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const originalFileRef = useRef<File | null>(null)
@@ -146,6 +147,27 @@ export default function Studio() {
     }
   }, [selectedTool, uploadedImage, processedImage])
 
+  // تهيئة إطار القص عند اختيار الأداة
+  useEffect(() => {
+    if (selectedTool === 'crop' && imageRect) {
+      const img = imageContainerRef.current?.querySelector('img')
+      if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        // إنشاء إطار يغطي الصورة بالكامل
+        setCropArea({
+          x: 0,
+          y: 0,
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        })
+      }
+    } else if (selectedTool !== 'crop') {
+      // إعادة تعيين عند الخروج من أداة القص
+      setCropArea(null)
+      setIsCropping(false)
+      setCropDragType(null)
+    }
+  }, [selectedTool, imageRect])
+
   const handleRemoveBackground = async () => {
     if (!originalFileRef.current) return
     
@@ -253,44 +275,147 @@ export default function Studio() {
     }
   }
 
+  // تحديد نوع السحب بناءً على موضع الماوس
+  const getCropDragType = (clientX: number, clientY: number): 'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null => {
+    if (!cropArea || !imageRect) return null
+    
+    const img = imageContainerRef.current?.querySelector('img')
+    if (!img) return null
+    
+    const scaleX = imageRect.width / img.naturalWidth
+    const scaleY = imageRect.height / img.naturalHeight
+    
+    const containerRect = imageContainerRef.current.getBoundingClientRect()
+    const cropLeft = containerRect.left + imageRect.left + (cropArea.x * scaleX)
+    const cropTop = containerRect.top + imageRect.top + (cropArea.y * scaleY)
+    const cropRight = cropLeft + (cropArea.width * scaleX)
+    const cropBottom = cropTop + (cropArea.height * scaleY)
+    
+    const handleSize = 10
+    const margin = 5
+    
+    // الزوايا
+    if (Math.abs(clientX - cropLeft) < handleSize && Math.abs(clientY - cropTop) < handleSize) return 'nw'
+    if (Math.abs(clientX - cropRight) < handleSize && Math.abs(clientY - cropTop) < handleSize) return 'ne'
+    if (Math.abs(clientX - cropLeft) < handleSize && Math.abs(clientY - cropBottom) < handleSize) return 'sw'
+    if (Math.abs(clientX - cropRight) < handleSize && Math.abs(clientY - cropBottom) < handleSize) return 'se'
+    
+    // الجوانب
+    if (clientX >= cropLeft - margin && clientX <= cropRight + margin && Math.abs(clientY - cropTop) < handleSize) return 'n'
+    if (clientX >= cropLeft - margin && clientX <= cropRight + margin && Math.abs(clientY - cropBottom) < handleSize) return 's'
+    if (clientY >= cropTop - margin && clientY <= cropBottom + margin && Math.abs(clientX - cropLeft) < handleSize) return 'w'
+    if (clientY >= cropTop - margin && clientY <= cropBottom + margin && Math.abs(clientX - cropRight) < handleSize) return 'e'
+    
+    // داخل الإطار = تحريك
+    if (clientX >= cropLeft && clientX <= cropRight && clientY >= cropTop && clientY <= cropBottom) return 'move'
+    
+    return null
+  }
+
   const handleCropMouseDown = (e: React.MouseEvent) => {
-    if (selectedTool !== 'crop' || !imageRect) return
+    if (selectedTool !== 'crop' || !imageRect || !cropArea) return
     
     e.preventDefault()
     e.stopPropagation()
     
-    const coords = getImageCoordinates(e.clientX, e.clientY)
-    if (coords) {
+    const dragType = getCropDragType(e.clientX, e.clientY)
+    if (dragType) {
+      setCropDragType(dragType)
       setIsCropping(true)
-      setCropStartPos(coords)
-      setCropArea({ x: coords.x, y: coords.y, width: 1, height: 1 }) // بدء بـ 1 بدلاً من 0 لضمان الظهور
+      const coords = getImageCoordinates(e.clientX, e.clientY)
+      if (coords) {
+        setCropStartPos(coords)
+      }
     }
   }
 
   const handleCropMouseMove = (e: React.MouseEvent) => {
     if (selectedTool !== 'crop') return
     
-    if (isCropping && cropStartPos && imageRect) {
-      e.preventDefault()
-      e.stopPropagation()
+    if (!isCropping) {
+      // تحديث cursor عند الحركة بدون سحب
+      if (cropArea && imageContainerRef.current) {
+        const type = getCropDragType(e.clientX, e.clientY)
+        if (type === 'move') {
+          imageContainerRef.current.style.cursor = 'move'
+        } else if (type) {
+          imageContainerRef.current.style.cursor = type === 'nw' ? 'nw-resize' : 
+                                                   type === 'ne' ? 'ne-resize' :
+                                                   type === 'sw' ? 'sw-resize' :
+                                                   type === 'se' ? 'se-resize' :
+                                                   type === 'n' ? 'n-resize' :
+                                                   type === 's' ? 's-resize' :
+                                                   type === 'w' ? 'w-resize' :
+                                                   type === 'e' ? 'e-resize' : 'resize'
+        } else {
+          imageContainerRef.current.style.cursor = 'default'
+        }
+      }
+      return
+    }
+    
+    if (!cropStartPos || !imageRect || !cropArea || !cropDragType) return
+    
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const coords = getImageCoordinates(e.clientX, e.clientY)
+    if (!coords) return
+    
+    const img = imageContainerRef.current?.querySelector('img')
+    if (!img) return
+    
+    let newCropArea = { ...cropArea }
+    
+    if (cropDragType === 'move') {
+      // تحريك الإطار
+      const deltaX = coords.x - cropStartPos.x
+      const deltaY = coords.y - cropStartPos.y
       
-      const coords = getImageCoordinates(e.clientX, e.clientY)
-      if (coords) {
-        const width = coords.x - cropStartPos.x
-        const height = coords.y - cropStartPos.y
-        
-        setCropArea({
-          x: width < 0 ? coords.x : cropStartPos.x,
-          y: height < 0 ? coords.y : cropStartPos.y,
-          width: Math.max(1, Math.abs(width)),
-          height: Math.max(1, Math.abs(height))
-        })
+      newCropArea.x = Math.max(0, Math.min(img.naturalWidth - newCropArea.width, cropArea.x + deltaX))
+      newCropArea.y = Math.max(0, Math.min(img.naturalHeight - newCropArea.height, cropArea.y + deltaY))
+    } else {
+      // تغيير الحجم
+      const deltaX = coords.x - cropStartPos.x
+      const deltaY = coords.y - cropStartPos.y
+      
+      if (cropDragType.includes('n')) {
+        newCropArea.y = Math.max(0, cropArea.y + deltaY)
+        newCropArea.height = cropArea.height - deltaY
+      }
+      if (cropDragType.includes('s')) {
+        newCropArea.height = Math.min(img.naturalHeight - newCropArea.y, cropArea.height + deltaY)
+      }
+      if (cropDragType.includes('w')) {
+        newCropArea.x = Math.max(0, cropArea.x + deltaX)
+        newCropArea.width = cropArea.width - deltaX
+      }
+      if (cropDragType.includes('e')) {
+        newCropArea.width = Math.min(img.naturalWidth - newCropArea.x, cropArea.width + deltaX)
+      }
+      
+      // التأكد من الحد الأدنى للحجم
+      if (newCropArea.width < 10) {
+        if (cropDragType.includes('w')) {
+          newCropArea.x = cropArea.x + cropArea.width - 10
+        }
+        newCropArea.width = 10
+      }
+      if (newCropArea.height < 10) {
+        if (cropDragType.includes('n')) {
+          newCropArea.y = cropArea.y + cropArea.height - 10
+        }
+        newCropArea.height = 10
       }
     }
+    
+    setCropArea(newCropArea)
+    setCropStartPos(coords)
   }
 
   const handleCropMouseUp = () => {
     setIsCropping(false)
+    setCropDragType(null)
   }
 
   const tools = [
@@ -368,8 +493,12 @@ export default function Studio() {
                   onMouseDown={selectedTool === 'crop' ? handleCropMouseDown : undefined}
                   onMouseMove={selectedTool === 'crop' ? handleCropMouseMove : undefined}
                   onMouseUp={selectedTool === 'crop' ? handleCropMouseUp : undefined}
-                  onMouseLeave={selectedTool === 'crop' ? handleCropMouseUp : undefined}
-                  style={{ cursor: selectedTool === 'crop' ? 'crosshair' : 'default' }}
+                  onMouseLeave={selectedTool === 'crop' ? () => {
+                    handleCropMouseUp()
+                    if (imageContainerRef.current) {
+                      imageContainerRef.current.style.cursor = 'default'
+                    }
+                  } : undefined}
                 >
                   {(processedImage || uploadedImage) && (
                     <img 
@@ -397,16 +526,27 @@ export default function Studio() {
                     const height = cropArea.height * scaleY
                     
                     return (
-                      <div 
-                        className="crop-overlay"
-                        ref={cropOverlayRef}
-                        style={{
-                          left: `${left}px`,
-                          top: `${top}px`,
-                          width: `${width}px`,
-                          height: `${height}px`,
-                        }}
-                      />
+                      <>
+                        <div 
+                          className="crop-overlay"
+                          ref={cropOverlayRef}
+                          style={{
+                            left: `${left}px`,
+                            top: `${top}px`,
+                            width: `${width}px`,
+                            height: `${height}px`,
+                          }}
+                        />
+                        {/* Handles للتحكم */}
+                        <div className="crop-handle crop-handle-nw" style={{ left: `${left}px`, top: `${top}px` }} />
+                        <div className="crop-handle crop-handle-ne" style={{ left: `${left + width}px`, top: `${top}px` }} />
+                        <div className="crop-handle crop-handle-sw" style={{ left: `${left}px`, top: `${top + height}px` }} />
+                        <div className="crop-handle crop-handle-se" style={{ left: `${left + width}px`, top: `${top + height}px` }} />
+                        <div className="crop-handle crop-handle-n" style={{ left: `${left + width/2}px`, top: `${top}px` }} />
+                        <div className="crop-handle crop-handle-s" style={{ left: `${left + width/2}px`, top: `${top + height}px` }} />
+                        <div className="crop-handle crop-handle-w" style={{ left: `${left}px`, top: `${top + height/2}px` }} />
+                        <div className="crop-handle crop-handle-e" style={{ left: `${left + width}px`, top: `${top + height/2}px` }} />
+                      </>
                     )
                   })()}
                   {loading && (

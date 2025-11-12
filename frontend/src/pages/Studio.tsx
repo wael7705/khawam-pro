@@ -19,9 +19,16 @@ export default function Studio() {
   const [contrast, setContrast] = useState(100)
   const [saturation, setSaturation] = useState(100)
   const [filterType, setFilterType] = useState<string | null>(null)
+  // Crop state
+  const [cropArea, setCropArea] = useState<{x: number, y: number, width: number, height: number} | null>(null)
+  const [isCropping, setIsCropping] = useState(false)
+  const [cropStartPos, setCropStartPos] = useState<{x: number, y: number} | null>(null)
+  const [imageRect, setImageRect] = useState<DOMRect | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const originalFileRef = useRef<File | null>(null)
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+  const cropOverlayRef = useRef<HTMLDivElement>(null)
 
   // Check authentication on mount
   useEffect(() => {
@@ -91,6 +98,40 @@ export default function Studio() {
     }
   }, [brightness, contrast, saturation, rotation, zoom, activeImage, selectedTool])
 
+  // تشغيل الصور الشخصية فوراً عند الضغط على التبويب
+  const passportProcessedRef = useRef(false)
+  useEffect(() => {
+    if (selectedTool === 'passport' && originalFileRef.current && !loading && !passportProcessedRef.current) {
+      passportProcessedRef.current = true
+      handlePassportPhotos().finally(() => {
+        passportProcessedRef.current = false
+      })
+    } else if (selectedTool !== 'passport') {
+      passportProcessedRef.current = false
+    }
+  }, [selectedTool])
+
+  // تحديث موضع الصورة عند تغيير الحجم
+  useEffect(() => {
+    if (selectedTool === 'crop' && imageContainerRef.current) {
+      const img = imageContainerRef.current.querySelector('img')
+      if (img) {
+        const updateRect = () => {
+          const rect = img.getBoundingClientRect()
+          const containerRect = imageContainerRef.current!.getBoundingClientRect()
+          setImageRect({
+            ...rect,
+            left: rect.left - containerRect.left,
+            top: rect.top - containerRect.top
+          } as DOMRect)
+        }
+        updateRect()
+        window.addEventListener('resize', updateRect)
+        return () => window.removeEventListener('resize', updateRect)
+      }
+    }
+  }, [selectedTool, uploadedImage, processedImage])
+
   const handleRemoveBackground = async () => {
     if (!originalFileRef.current) return
     
@@ -155,10 +196,18 @@ export default function Studio() {
     
     setLoading(true)
     try {
-      const response = await studioAPI.cropRotate(originalFileRef.current, rotation)
+      const cropParams = cropArea ? {
+        x: Math.round(cropArea.x),
+        y: Math.round(cropArea.y),
+        width: Math.round(cropArea.width),
+        height: Math.round(cropArea.height)
+      } : undefined
+      
+      const response = await studioAPI.cropRotate(originalFileRef.current, rotation, cropParams)
       if (response.success && response.image) {
         setProcessedImage(response.image)
         setActiveImage(response.image)
+        setCropArea(null)
       }
     } catch (error) {
       console.error('Error cropping/rotating:', error)
@@ -166,6 +215,62 @@ export default function Studio() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Crop handlers
+  const getImageCoordinates = (clientX: number, clientY: number) => {
+    if (!imageRect || !imageContainerRef.current) return null
+    
+    const img = imageContainerRef.current.querySelector('img')
+    if (!img) return null
+    
+    const containerRect = imageContainerRef.current.getBoundingClientRect()
+    const imgRect = img.getBoundingClientRect()
+    
+    // حساب الإحداثيات النسبية للصورة داخل الحاوية
+    const x = clientX - imgRect.left
+    const y = clientY - imgRect.top
+    
+    // تحويل إلى إحداثيات الصورة الفعلية
+    const scaleX = img.naturalWidth / imgRect.width
+    const scaleY = img.naturalHeight / imgRect.height
+    
+    return {
+      x: Math.max(0, Math.min(x * scaleX, img.naturalWidth)),
+      y: Math.max(0, Math.min(y * scaleY, img.naturalHeight))
+    }
+  }
+
+  const handleCropMouseDown = (e: React.MouseEvent) => {
+    if (selectedTool !== 'crop' || !imageRect) return
+    
+    const coords = getImageCoordinates(e.clientX, e.clientY)
+    if (coords) {
+      setIsCropping(true)
+      setCropStartPos(coords)
+      setCropArea({ x: coords.x, y: coords.y, width: 0, height: 0 })
+    }
+  }
+
+  const handleCropMouseMove = (e: React.MouseEvent) => {
+    if (!isCropping || !cropStartPos || !imageRect) return
+    
+    const coords = getImageCoordinates(e.clientX, e.clientY)
+    if (coords) {
+      const width = coords.x - cropStartPos.x
+      const height = coords.y - cropStartPos.y
+      
+      setCropArea({
+        x: width < 0 ? coords.x : cropStartPos.x,
+        y: height < 0 ? coords.y : cropStartPos.y,
+        width: Math.abs(width),
+        height: Math.abs(height)
+      })
+    }
+  }
+
+  const handleCropMouseUp = () => {
+    setIsCropping(false)
   }
 
   const tools = [
@@ -237,7 +342,15 @@ export default function Studio() {
               </div>
             ) : (
               <div className="canvas-container">
-                <div className="image-display">
+                <div 
+                  className="image-display" 
+                  ref={imageContainerRef}
+                  onMouseDown={selectedTool === 'crop' ? handleCropMouseDown : undefined}
+                  onMouseMove={selectedTool === 'crop' ? handleCropMouseMove : undefined}
+                  onMouseUp={selectedTool === 'crop' ? handleCropMouseUp : undefined}
+                  onMouseLeave={selectedTool === 'crop' ? handleCropMouseUp : undefined}
+                  style={{ cursor: selectedTool === 'crop' ? 'crosshair' : 'default' }}
+                >
                   {(processedImage || uploadedImage) && (
                     <img 
                       src={processedImage || uploadedImage} 
@@ -249,6 +362,26 @@ export default function Studio() {
                       }}
                     />
                   )}
+                  {selectedTool === 'crop' && cropArea && imageRect && (() => {
+                    const img = imageContainerRef.current?.querySelector('img')
+                    if (!img) return null
+                    const imgRect = img.getBoundingClientRect()
+                    const containerRect = imageContainerRef.current!.getBoundingClientRect()
+                    const scaleX = imgRect.width / img.naturalWidth
+                    const scaleY = imgRect.height / img.naturalHeight
+                    return (
+                      <div 
+                        className="crop-overlay"
+                        ref={cropOverlayRef}
+                        style={{
+                          left: `${imgRect.left - containerRect.left + cropArea.x * scaleX}px`,
+                          top: `${imgRect.top - containerRect.top + cropArea.y * scaleY}px`,
+                          width: `${cropArea.width * scaleX}px`,
+                          height: `${cropArea.height * scaleY}px`,
+                        }}
+                      />
+                    )
+                  })()}
                   {loading && (
                     <div className="loading-overlay">
                       <div className="spinner"></div>
@@ -291,11 +424,9 @@ export default function Studio() {
                 {selectedTool === 'passport' && (
                   <div className="passport-options">
                     <p className="text-sm text-gray-600 mb-4">
-                      سيتم إزالة الخلفية وتحويل الصورة إلى حجم 3.5×4.8 سم (صور شخصية)
+                      جاري إنشاء صور شخصية... سيتم إزالة الخلفية وتحويل الصورة إلى حجم 3.5×4.8 سم
                     </p>
-                    <button className="btn btn-primary w-full" onClick={handlePassportPhotos} disabled={loading}>
-                      {loading ? 'جاري المعالجة...' : 'إنشاء صور شخصية'}
-                    </button>
+                    {loading && <div className="spinner-small"></div>}
                   </div>
                 )}
 
@@ -333,12 +464,25 @@ export default function Studio() {
                 )}
 
                 {selectedTool === 'crop' && (
-                  <div className="rotation-options">
+                  <div className="crop-options">
                     <label>التدوير: {rotation}°</label>
                     <input type="range" min="-180" max="180" value={rotation} onChange={(e) => setRotation(parseInt(e.target.value))} />
-                    <button className="btn btn-primary w-full mt-4" onClick={handleApplyCropRotate} disabled={loading}>
-                      {loading ? 'جاري المعالجة...' : 'تطبيق التدوير'}
+                    <p className="text-sm text-gray-600 mt-2 mb-2">
+                      اسحب على الصورة لتحديد منطقة القص
+                    </p>
+                    {cropArea && (
+                      <div className="crop-info">
+                        <p>المنطقة المحددة: {Math.round(cropArea.width)} × {Math.round(cropArea.height)}</p>
+                      </div>
+                    )}
+                    <button className="btn btn-primary w-full mt-4" onClick={handleApplyCropRotate} disabled={loading || !cropArea}>
+                      {loading ? 'جاري المعالجة...' : 'تطبيق القص والتدوير'}
                     </button>
+                    {cropArea && (
+                      <button className="btn btn-secondary w-full mt-2" onClick={() => setCropArea(null)}>
+                        إلغاء القص
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

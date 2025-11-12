@@ -345,6 +345,60 @@
   gap: 15px;
 }
 
+.spinner-small {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+.crop-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.crop-info {
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.crop-info p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.crop-overlay {
+  position: absolute;
+  border: 2px dashed var(--primary);
+  background: rgba(255, 107, 53, 0.1);
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+}
+
+.btn-secondary {
+  background: var(--gray);
+  color: var(--text);
+  border: 2px solid var(--gray);
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+  border-color: #e0e0e0;
+}
+
 @media (max-width: 768px) {
   .tools-grid {
     grid-template-columns: repeat(2, 1fr);

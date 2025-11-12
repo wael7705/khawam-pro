@@ -7,6 +7,7 @@ type ClothingOption = {
   products?: Array<{
     id: string
     name: string
+    image_url?: string
     colors?: string[]
     sizes?: string[]
   }>
@@ -80,22 +81,6 @@ export const ClothingPrintingService: ServiceHandler = {
           }
         }
 
-        const handleProductChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-          const productId = event.target.value
-          setClothingProduct(productId)
-          const productColors = products.find(product => product.id === productId)?.colors || []
-          if (productColors.length > 0) {
-            setClothingColor(productColors[0])
-          } else {
-            setClothingColor('')
-          }
-          const productSizes = products.find(product => product.id === productId)?.sizes || []
-          if (productSizes && productSizes.length > 0) {
-            setClothingSize(productSizes[0])
-          } else {
-            setClothingSize('')
-          }
-        }
 
         return (
           <div className="modal-body">
@@ -123,13 +108,55 @@ export const ClothingPrintingService: ServiceHandler = {
               <>
                 <div className="form-group">
                   <label>اختر المنتج <span className="required">*</span></label>
-                  <select value={clothingProduct} onChange={handleProductChange} className="form-input">
+                  <div className="product-grid">
                     {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
+                      <div
+                        key={product.id}
+                        className={`product-card ${clothingProduct === product.id ? 'selected' : ''}`}
+                        onClick={() => {
+                          setClothingProduct(product.id)
+                          const productColors = product.colors || []
+                          if (productColors.length > 0) {
+                            setClothingColor(productColors[0])
+                          } else {
+                            setClothingColor('')
+                          }
+                          const productSizes = product.sizes || []
+                          if (productSizes && productSizes.length > 0) {
+                            setClothingSize(productSizes[0])
+                          } else {
+                            setClothingSize('')
+                          }
+                        }}
+                      >
+                        <div className="product-image-wrapper">
+                          {product.image_url ? (
+                            <img 
+                              src={product.image_url} 
+                              alt={product.name}
+                              className="product-image"
+                              onError={(e) => {
+                                // إذا فشل تحميل الصورة، عرض placeholder
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                                const placeholder = target.nextElementSibling as HTMLElement
+                                if (placeholder) placeholder.style.display = 'flex'
+                              }}
+                            />
+                          ) : null}
+                          <div className="product-image-placeholder" style={{ display: product.image_url ? 'none' : 'flex' }}>
+                            <span>{product.name.charAt(0)}</span>
+                          </div>
+                          {clothingProduct === product.id && (
+                            <div className="product-selected-indicator">
+                              <span>✓</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="product-name">{product.name}</div>
+                      </div>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 {availableColors.length > 0 && (

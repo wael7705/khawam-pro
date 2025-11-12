@@ -461,12 +461,14 @@ async def _setup_clothing_printing_service():
                                 {
                                     "id": "hoodie",
                                     "name": "كنزة هودي",
+                                    "image_url": "",
                                     "colors": ["أبيض", "أسود", "رمادي"],
                                     "sizes": ["S", "M", "L", "XL", "XXL"]
                                 },
                                 {
                                     "id": "summer_cotton_sweatshirt",
                                     "name": "كنزة صيفي قطن",
+                                    "image_url": "",
                                     "colors": ["أبيض", "أسود"],
                                     "sizes": ["S", "M", "L", "XL", "XXL"]
                                 }

@@ -164,57 +164,48 @@ async def create_passport_photos(file: UploadFile = File(...)):
         else:
             single_photo.paste(resized_image, (x_offset, y_offset))
         
-        # إضافة stroke (حدود) حول الصورة - ملتصق مباشرة بالصورة
-        # 1 مم = 0.1 سم = 3.78 بكسل عند 300 DPI
-        stroke_width = 4  # سماكة 1 مم تقريباً (4 بكسل)
-        stroke_color = (0, 0, 0)  # لون أسود
-        
-        # إنشاء صورة أكبر لتضمين الحدود (الحدود خارج الصورة)
-        photo_with_stroke = Image.new('RGB', 
-                                     (target_width + stroke_width * 2, 
-                                      target_height + stroke_width * 2), 
-                                     (255, 255, 255))
-        
-        # وضع الصورة الأصلية في المنتصف (مع مساحة للحدود)
-        photo_with_stroke.paste(single_photo, (stroke_width, stroke_width))
-        
-        # رسم الحدود ملتصقة بالصورة مباشرة
-        draw = ImageDraw.Draw(photo_with_stroke)
-        # رسم مستطيل بحدود سميكة - الحدود على حافة الصورة مباشرة
-        # نرسم خطوط سميكة على كل جانب من جوانب الصورة
-        x1, y1 = stroke_width, stroke_width
-        x2, y2 = target_width + stroke_width - 1, target_height + stroke_width - 1
-        
-        # الخط العلوي
-        draw.rectangle([x1, y1, x2, y1 + stroke_width - 1], fill=stroke_color)
-        # الخط السفلي
-        draw.rectangle([x1, y2 - stroke_width + 1, x2, y2], fill=stroke_color)
-        # الخط الأيسر
-        draw.rectangle([x1, y1, x1 + stroke_width - 1, y2], fill=stroke_color)
-        # الخط الأيمن
-        draw.rectangle([x2 - stroke_width + 1, y1, x2, y2], fill=stroke_color)
-        
         # إنشاء قالب 8 صور (2 صفوف × 4 أعمدة)
         rows = 2
         cols = 4
-        spacing = 0  # لا توجد مسافة بين الصور - ملتصقة تماماً (مثل الصورة المرفقة)
+        cut_line_width = 1  # خط القص بسماكة 1px
         
         # حساب أبعاد القالب
-        photo_width_with_stroke = target_width + stroke_width * 2
-        photo_height_with_stroke = target_height + stroke_width * 2
-        
-        template_width = cols * photo_width_with_stroke + (cols - 1) * spacing
-        template_height = rows * photo_height_with_stroke + (rows - 1) * spacing
+        # الصور ملتصقة + خطوط القص بينها
+        template_width = cols * target_width + (cols - 1) * cut_line_width
+        template_height = rows * target_height + (rows - 1) * cut_line_width
         
         # إنشاء القالب بخلفية بيضاء
         template = Image.new('RGB', (template_width, template_height), (255, 255, 255))
+        draw = ImageDraw.Draw(template)
         
         # وضع 8 نسخ من الصورة في القالب
         for row in range(rows):
             for col in range(cols):
-                x_pos = col * (photo_width_with_stroke + spacing)
-                y_pos = row * (photo_height_with_stroke + spacing)
-                template.paste(photo_with_stroke, (x_pos, y_pos))
+                # حساب موضع الصورة
+                x_pos = col * (target_width + cut_line_width)
+                y_pos = row * (target_height + cut_line_width)
+                
+                # وضع الصورة
+                template.paste(single_photo, (x_pos, y_pos))
+        
+        # رسم خطوط القص السوداء بين الصور (1px)
+        cut_line_color = (0, 0, 0)  # أسود
+        
+        # رسم الخطوط العمودية بين الأعمدة
+        for col in range(1, cols):
+            x_line = col * target_width + (col - 1) * cut_line_width
+            draw.rectangle(
+                [x_line, 0, x_line + cut_line_width - 1, template_height - 1],
+                fill=cut_line_color
+            )
+        
+        # رسم الخطوط الأفقية بين الصفوف
+        for row in range(1, rows):
+            y_line = row * target_height + (row - 1) * cut_line_width
+            draw.rectangle(
+                [0, y_line, template_width - 1, y_line + cut_line_width - 1],
+                fill=cut_line_color
+            )
         
         # تحويل إلى base64
         img_data = image_to_base64(template, format='PNG')

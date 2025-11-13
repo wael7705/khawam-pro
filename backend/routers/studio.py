@@ -127,8 +127,9 @@ async def remove_background(file: UploadFile = File(...)):
 @router.post("/passport-photos")
 async def create_passport_photos(file: UploadFile = File(...)):
     """
-    إنشاء صور شخصية: إزالة الخلفية + تحويل الحجم إلى 3.5*4.8 سم (4.8 هو الارتفاع)
-    + إضافة stroke + قالب 8 صور (2 صفوف × 4 أعمدة)
+    إنشاء صور شخصية: إزالة الخلفية + تحويل الحجم إلى 3.5 سم (عرض) × 4.8 سم (ارتفاع) بالضبط
+    + قالب 8 صور (2 صفوف × 4 أعمدة) مع خطوط قص 1px بين الصور
+    الأبعاد الدقيقة: 3.5 سم = 413 بكسل، 4.8 سم = 567 بكسل عند 300 DPI
     """
     try:
         # قراءة الصورة
@@ -154,36 +155,39 @@ async def create_passport_photos(file: UploadFile = File(...)):
         # قراءة الصورة بعد إزالة الخلفية
         no_bg_image = Image.open(io.BytesIO(response.content))
         
-        # تحويل الحجم إلى 3.5*4.8 سم بجودة 300 DPI
+        # تحويل الحجم إلى 3.5 سم (عرض) × 4.8 سم (ارتفاع) بجودة 300 DPI
         # 1 بوصة = 2.54 سم
         # 300 DPI = 300 بكسل لكل بوصة
-        # 1 سم = 300 / 2.54 = 118.11 بكسل (تقريباً 118 بكسل)
-        # 3.5 سم = 3.5 * 118.11 = 413.39 بكسل
-        # 4.8 سم = 4.8 * 118.11 = 566.93 بكسل
+        # 1 سم = 300 / 2.54 = 118.11023622047244 بكسل
+        # 3.5 سم = 3.5 × 118.11023622047244 = 413.3858267716535 بكسل
+        # 4.8 سم = 4.8 × 118.11023622047244 = 566.9291338582677 بكسل
         pixels_per_cm = PRINT_DPI / 2.54
-        target_width = int(3.5 * pixels_per_cm)  # ~413 بكسل عند 300 DPI
-        target_height = int(4.8 * pixels_per_cm)  # ~567 بكسل عند 300 DPI
+        target_width = round(3.5 * pixels_per_cm)  # 413 بكسل بالضبط عند 300 DPI
+        target_height = round(4.8 * pixels_per_cm)  # 567 بكسل بالضبط عند 300 DPI
         
-        # حساب النسبة للحفاظ على الأبعاد
+        # حساب النسبة للحفاظ على الأبعاد الأصلية للصورة
+        # الهدف: ملء الصورة في إطار 3.5 سم × 4.8 سم مع الحفاظ على النسبة
         img_width, img_height = no_bg_image.size
         aspect_ratio = img_width / img_height
         target_aspect = target_width / target_height
         
-        # إذا كانت الصورة أوسع من المطلوب، نضبط العرض
+        # حساب الحجم الجديد للصورة لملء الإطار مع الحفاظ على النسبة
         if aspect_ratio > target_aspect:
+            # الصورة أوسع من المطلوب - نملأ العرض بالكامل
             new_width = target_width
-            new_height = int(target_width / aspect_ratio)
+            new_height = round(target_width / aspect_ratio)
         else:
+            # الصورة أطول من المطلوب - نملأ الارتفاع بالكامل
             new_height = target_height
-            new_width = int(target_height * aspect_ratio)
+            new_width = round(target_height * aspect_ratio)
         
-        # تغيير الحجم مع الحفاظ على الجودة
+        # تغيير الحجم مع الحفاظ على الجودة (LANCZOS للجودة العالية)
         resized_image = no_bg_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
-        # إنشاء صورة جديدة بالحجم المطلوب مع خلفية بيضاء
+        # إنشاء صورة جديدة بالحجم المطلوب بالضبط: 3.5 سم × 4.8 سم مع خلفية بيضاء
         single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
         
-        # وضع الصورة في المنتصف
+        # وضع الصورة في المنتصف (مركز عمودي وأفقي)
         x_offset = (target_width - new_width) // 2
         y_offset = (target_height - new_height) // 2
         

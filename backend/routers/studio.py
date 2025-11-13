@@ -162,52 +162,101 @@ async def create_passport_photos(file: UploadFile = File(...)):
         # 3.5 سم = 3.5 × 118.11023622047244 = 413.3858267716535 بكسل
         # 4.8 سم = 4.8 × 118.11023622047244 = 566.9291338582677 بكسل
         pixels_per_cm = PRINT_DPI / 2.54
-        target_width = round(3.5 * pixels_per_cm)  # 413 بكسل بالضبط عند 300 DPI
-        target_height = round(4.8 * pixels_per_cm)  # 567 بكسل بالضبط عند 300 DPI
+        target_width = int(3.5 * pixels_per_cm + 0.5)  # 413 بكسل بالضبط عند 300 DPI (تقريب صحيح)
+        target_height = int(4.8 * pixels_per_cm + 0.5)  # 567 بكسل بالضبط عند 300 DPI (تقريب صحيح)
         
         # حساب النسبة للحفاظ على الأبعاد الأصلية للصورة
-        # الهدف: ملء الصورة في إطار 3.5 سم × 4.8 سم مع الحفاظ على النسبة
+        # الهدف: ملء الصورة في إطار 3.5 سم × 4.8 سم بالضبط مع الحفاظ على النسبة
+        # نستخدم "cover" strategy: نكبر الصورة لتملأ الإطار بالكامل ثم نستخدم crop
         img_width, img_height = no_bg_image.size
         aspect_ratio = img_width / img_height
         target_aspect = target_width / target_height
         
-        # حساب الحجم الجديد للصورة لملء الإطار مع الحفاظ على النسبة
+        # حساب الحجم المطلوب لملء الإطار بالكامل
+        # نكبر الصورة بحيث تغطي الإطار بالكامل (أكبر من الإطار)
         if aspect_ratio > target_aspect:
-            # الصورة أوسع من المطلوب - نملأ العرض بالكامل
-            new_width = target_width
-            new_height = round(target_width / aspect_ratio)
-        else:
-            # الصورة أطول من المطلوب - نملأ الارتفاع بالكامل
+            # الصورة أوسع من المطلوب - نكبرها بناءً على الارتفاع
+            scale = target_height / img_height
+            new_width = int(img_width * scale + 0.5)
             new_height = target_height
-            new_width = round(target_height * aspect_ratio)
+        else:
+            # الصورة أطول من المطلوب - نكبرها بناءً على العرض
+            scale = target_width / img_width
+            new_width = target_width
+            new_height = int(img_height * scale + 0.5)
         
         # تغيير الحجم مع الحفاظ على الجودة (LANCZOS للجودة العالية)
         resized_image = no_bg_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
-        # إنشاء صورة جديدة بالحجم المطلوب بالضبط: 3.5 سم × 4.8 سم مع خلفية بيضاء
+        # قص الصورة من المنتصف للحصول على الأبعاد الدقيقة 3.5 × 4.8 سم
+        left = (new_width - target_width) // 2
+        top = (new_height - target_height) // 2
+        right = left + target_width
+        bottom = top + target_height
+        cropped_image = resized_image.crop((left, top, right, bottom))
+        
+        # إنشاء صورة جديدة بالحجم المطلوب بالضبط: 3.5 سم × 4.8 سم
+        # التأكد من أن الصورة بالضبط target_width × target_height
         single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
         
-        # وضع الصورة في المنتصف (مركز عمودي وأفقي)
-        x_offset = (target_width - new_width) // 2
-        y_offset = (target_height - new_height) // 2
-        
-        # إذا كانت الصورة شفافة، نحتاج لدمجها بشكل صحيح
-        if resized_image.mode == 'RGBA':
-            single_photo.paste(resized_image, (x_offset, y_offset), resized_image)
+        # وضع الصورة المقطوعة (التي هي بالضبط target_width × target_height)
+        if cropped_image.mode == 'RGBA':
+            single_photo.paste(cropped_image, (0, 0), cropped_image)
         else:
-            single_photo.paste(resized_image, (x_offset, y_offset))
+            single_photo.paste(cropped_image, (0, 0))
         
         # إنشاء قالب 8 صور (2 صفوف × 4 أعمدة)
+        # القالب يجب أن يكون بالضبط: 14 سم عرض × 9.6 سم ارتفاع
         rows = 2
         cols = 4
+        
+        # حساب أبعاد القالب بالضبط: 14 سم × 9.6 سم
+        template_width_cm = 14.0
+        template_height_cm = 9.6
+        template_width = int(template_width_cm * pixels_per_cm + 0.5)  # 1654 بكسل عند 300 DPI
+        template_height = int(template_height_cm * pixels_per_cm + 0.5)  # 1134 بكسل عند 300 DPI
+        
+        # حساب خطوط القص بين الصور
+        # 3 خطوط عمودية بين 4 أعمدة، 1 خط أفقي بين صفين
         cut_line_width = 1  # خط القص بسماكة 1px
         
-        # حساب أبعاد القالب
-        # الصور ملتصقة + خطوط القص بينها
-        template_width = cols * target_width + (cols - 1) * cut_line_width
-        template_height = rows * target_height + (rows - 1) * cut_line_width
+        # حساب المساحة المتاحة للصور (بعد خصم خطوط القص)
+        # القالب = 14 سم × 9.6 سم بالضبط
+        # كل صورة = 3.5 سم × 4.8 سم بالضبط
+        # 4 صور × 3.5 سم = 14 سم (مع 3 خطوط قص بينها)
+        # 2 صفوف × 4.8 سم = 9.6 سم (مع 1 خط قص بينهما)
+        total_cut_lines_width = (cols - 1) * cut_line_width  # 3px
+        total_cut_lines_height = (rows - 1) * cut_line_width  # 1px
         
-        # إنشاء القالب بخلفية بيضاء
+        # حساب حجم كل صورة في القالب
+        # يجب أن تكون الصور بالضبط target_width × target_height
+        # لكن مع خطوط القص، يجب أن نتحقق من أن القالب = 14 × 9.6 سم
+        # 4 × 3.5 سم = 14 سم، 2 × 4.8 سم = 9.6 سم
+        # مع خطوط القص: (4 × 3.5) + (3 × 1px) = 14 سم + 3px
+        # لكن 1px عند 300 DPI = 0.00847 سم (صغير جداً)
+        # لذلك يمكننا تجاهل خطوط القص في الحساب أو تضمينها
+        
+        # استخدام target_width و target_height للصور (3.5 × 4.8 سم)
+        photo_width_in_template = target_width
+        photo_height_in_template = target_height
+        
+        # التحقق من أن القالب بالضبط 14 × 9.6 سم
+        # حساب القالب الفعلي مع خطوط القص
+        calculated_template_width = cols * photo_width_in_template + (cols - 1) * cut_line_width
+        calculated_template_height = rows * photo_height_in_template + (rows - 1) * cut_line_width
+        
+        # إذا كان هناك فرق بسيط، نضبط القالب ليكون بالضبط 14 × 9.6 سم
+        if abs(calculated_template_width - template_width) > 1 or abs(calculated_template_height - template_height) > 1:
+            # ضبط حجم الصور قليلاً لتناسب القالب بالضبط
+            available_width = template_width - total_cut_lines_width
+            available_height = template_height - total_cut_lines_height
+            photo_width_in_template = available_width // cols
+            photo_height_in_template = available_height // rows
+            
+            # إعادة ضبط حجم الصورة لتناسب القالب
+            single_photo = single_photo.resize((photo_width_in_template, photo_height_in_template), Image.Resampling.LANCZOS)
+        
+        # إنشاء القالب بخلفية بيضاء بالضبط 14 سم × 9.6 سم
         template = Image.new('RGB', (template_width, template_height), (255, 255, 255))
         draw = ImageDraw.Draw(template)
         
@@ -215,8 +264,8 @@ async def create_passport_photos(file: UploadFile = File(...)):
         for row in range(rows):
             for col in range(cols):
                 # حساب موضع الصورة
-                x_pos = col * (target_width + cut_line_width)
-                y_pos = row * (target_height + cut_line_width)
+                x_pos = col * (photo_width_in_template + cut_line_width)
+                y_pos = row * (photo_height_in_template + cut_line_width)
                 
                 # وضع الصورة
                 template.paste(single_photo, (x_pos, y_pos))
@@ -226,7 +275,7 @@ async def create_passport_photos(file: UploadFile = File(...)):
         
         # رسم الخطوط العمودية بين الأعمدة
         for col in range(1, cols):
-            x_line = col * target_width + (col - 1) * cut_line_width
+            x_line = col * photo_width_in_template + (col - 1) * cut_line_width
             draw.rectangle(
                 [x_line, 0, x_line + cut_line_width - 1, template_height - 1],
                 fill=cut_line_color
@@ -234,7 +283,7 @@ async def create_passport_photos(file: UploadFile = File(...)):
         
         # رسم الخطوط الأفقية بين الصفوف
         for row in range(1, rows):
-            y_line = row * target_height + (row - 1) * cut_line_width
+            y_line = row * photo_height_in_template + (row - 1) * cut_line_width
             draw.rectangle(
                 [0, y_line, template_width - 1, y_line + cut_line_width - 1],
                 fill=cut_line_color

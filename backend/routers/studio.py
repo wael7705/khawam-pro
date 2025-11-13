@@ -145,8 +145,14 @@ async def create_passport_photos(file: UploadFile = File(...)):
         
         # إذا كانت الصورة بالضبط 3.5 × 4.8 سم، نستخدمها مباشرة (تم قصها مسبقاً)
         if abs(img_width - expected_width) <= 2 and abs(img_height - expected_height) <= 2:
-            # الصورة مقطوعة بالفعل - نستخدمها مباشرة
-            no_bg_image = original_image
+            # الصورة مقطوعة بالفعل بالضبط 3.5 × 4.8 سم - نستخدمها مباشرة
+            target_width = expected_width
+            target_height = expected_height
+            single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
+            if original_image.mode == 'RGBA':
+                single_photo.paste(original_image, (0, 0), original_image)
+            else:
+                single_photo.paste(original_image, (0, 0))
         else:
             # ضغط الصورة قبل الإرسال لـ remove.bg
             compressed_image = compress_image(original_image, max_size_mb=5.0, quality=85)
@@ -214,15 +220,6 @@ async def create_passport_photos(file: UploadFile = File(...)):
                 single_photo.paste(cropped_image, (0, 0), cropped_image)
             else:
                 single_photo.paste(cropped_image, (0, 0))
-        else:
-            # الصورة مقطوعة بالفعل بالضبط 3.5 × 4.8 سم - نستخدمها مباشرة
-            target_width = expected_width
-            target_height = expected_height
-            single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
-            if no_bg_image.mode == 'RGBA':
-                single_photo.paste(no_bg_image, (0, 0), no_bg_image)
-            else:
-                single_photo.paste(no_bg_image, (0, 0))
         
         # إنشاء قالب 8 صور (2 صفوف × 4 أعمدة)
         # القالب يجب أن يكون بالضبط: 14 سم عرض × 9.6 سم ارتفاع

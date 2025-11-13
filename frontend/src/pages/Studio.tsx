@@ -26,6 +26,8 @@ export default function Studio() {
   const [imageRect, setImageRect] = useState<DOMRect | null>(null)
   const [cropDragType, setCropDragType] = useState<'move' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [cropPreset, setCropPreset] = useState<'free' | 'passport'>('free')
+  const [croppedImageForPassport, setCroppedImageForPassport] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const downloadCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -192,21 +194,41 @@ export default function Studio() {
     if (selectedTool === 'crop' && imageRect) {
       const img = imageContainerRef.current?.querySelector('img')
       if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
-        // إنشاء إطار يغطي الصورة بالكامل
-        setCropArea({
-          x: 0,
-          y: 0,
-          width: img.naturalWidth,
-          height: img.naturalHeight
-        })
+        if (cropPreset === 'passport') {
+          // إنشاء إطار بالضبط 3.5 سم × 4.8 سم (413 × 567 بكسل عند 300 DPI)
+          const PRINT_DPI = 300
+          const pixels_per_cm = PRINT_DPI / 2.54
+          const passport_width = Math.round(3.5 * pixels_per_cm)  // 413 بكسل
+          const passport_height = Math.round(4.8 * pixels_per_cm)  // 567 بكسل
+          
+          // وضع الإطار في المنتصف
+          const x = Math.max(0, (img.naturalWidth - passport_width) / 2)
+          const y = Math.max(0, (img.naturalHeight - passport_height) / 2)
+          
+          setCropArea({
+            x: Math.floor(x),
+            y: Math.floor(y),
+            width: passport_width,
+            height: passport_height
+          })
+        } else {
+          // إنشاء إطار يغطي الصورة بالكامل
+          setCropArea({
+            x: 0,
+            y: 0,
+            width: img.naturalWidth,
+            height: img.naturalHeight
+          })
+        }
       }
     } else if (selectedTool !== 'crop') {
       // إعادة تعيين عند الخروج من أداة القص
       setCropArea(null)
       setIsCropping(false)
       setCropDragType(null)
+      setCropPreset('free')
     }
-  }, [selectedTool, imageRect])
+  }, [selectedTool, imageRect, cropPreset])
 
   const handleRemoveBackground = async () => {
     if (!originalFileRef.current) return
@@ -227,11 +249,26 @@ export default function Studio() {
   }
 
   const handlePassportPhotos = async () => {
-    if (!originalFileRef.current) return
+    // استخدام الصورة المقطوعة إذا كانت موجودة، وإلا استخدام الصورة الأصلية
+    let fileToUse = originalFileRef.current
+    
+    if (croppedImageForPassport) {
+      // تحويل base64 إلى File
+      try {
+        const response = await fetch(croppedImageForPassport)
+        const blob = await response.blob()
+        fileToUse = new File([blob], 'cropped-image.png', { type: 'image/png' })
+      } catch (error) {
+        console.error('Error converting cropped image:', error)
+        // استخدام الصورة الأصلية كبديل
+      }
+    }
+    
+    if (!fileToUse) return
     
     setLoading(true)
     try {
-      const response = await studioAPI.createPassportPhotos(originalFileRef.current)
+      const response = await studioAPI.createPassportPhotos(fileToUse)
       if (response.success && response.image) {
         setProcessedImage(response.image)
         setActiveImage(response.image)
@@ -268,22 +305,29 @@ export default function Studio() {
   }
 
   const handleApplyCropRotate = async () => {
-    if (!originalFileRef.current) return
+    if (!originalFileRef.current || !cropArea) return
     
     setLoading(true)
     try {
-      const cropParams = cropArea ? {
+      const cropParams = {
         x: Math.round(cropArea.x),
         y: Math.round(cropArea.y),
         width: Math.round(cropArea.width),
         height: Math.round(cropArea.height)
-      } : undefined
+      }
       
       const response = await studioAPI.cropRotate(originalFileRef.current, rotation, cropParams)
       if (response.success && response.image) {
         setProcessedImage(response.image)
         setActiveImage(response.image)
+        
+        // إذا كان preset الصور الشخصية، حفظ الصورة المقطوعة
+        if (cropPreset === 'passport') {
+          setCroppedImageForPassport(response.image)
+        }
+        
         setCropArea(null)
+        setCropPreset('free')
       }
     } catch (error) {
       console.error('Error cropping/rotating:', error)
@@ -330,6 +374,13 @@ export default function Studio() {
     const cropTop = containerRect.top + imageRect.top + (cropArea.y * scaleY)
     const cropRight = cropLeft + (cropArea.width * scaleX)
     const cropBottom = cropTop + (cropArea.height * scaleY)
+    
+    // إذا كان preset الصور الشخصية، فقط التحريك مسموح
+    if (cropPreset === 'passport') {
+      // داخل الإطار = تحريك
+      if (clientX >= cropLeft && clientX <= cropRight && clientY >= cropTop && clientY <= cropBottom) return 'move'
+      return null
+    }
     
     const handleSize = 10
     const margin = 5
@@ -407,7 +458,20 @@ export default function Studio() {
     
     let newCropArea = { ...cropArea }
     
-    if (cropDragType === 'move') {
+    // إذا كان preset الصور الشخصية، منع تغيير الحجم (الإطار ثابت)
+    if (cropPreset === 'passport' && cropDragType !== 'move') {
+      // في preset الصور الشخصية، فقط التحريك مسموح
+      // إذا حاول المستخدم تغيير الحجم، نتحول إلى تحريك
+      const deltaX = coords.x - cropStartPos.x
+      const deltaY = coords.y - cropStartPos.y
+      
+      newCropArea.x = Math.max(0, Math.min(img.naturalWidth - newCropArea.width, cropArea.x + deltaX))
+      newCropArea.y = Math.max(0, Math.min(img.naturalHeight - newCropArea.height, cropArea.y + deltaY))
+      
+      // الحفاظ على الأبعاد الثابتة
+      newCropArea.width = cropArea.width
+      newCropArea.height = cropArea.height
+    } else if (cropDragType === 'move') {
       // تحريك الإطار
       const deltaX = coords.x - cropStartPos.x
       const deltaY = coords.y - cropStartPos.y
@@ -415,7 +479,7 @@ export default function Studio() {
       newCropArea.x = Math.max(0, Math.min(img.naturalWidth - newCropArea.width, cropArea.x + deltaX))
       newCropArea.y = Math.max(0, Math.min(img.naturalHeight - newCropArea.height, cropArea.y + deltaY))
     } else {
-      // تغيير الحجم
+      // تغيير الحجم (فقط في الوضع الحر)
       const deltaX = coords.x - cropStartPos.x
       const deltaY = coords.y - cropStartPos.y
       
@@ -693,15 +757,19 @@ export default function Studio() {
                             height: `${height}px`,
                           }}
                         />
-                        {/* Handles للتحكم */}
-                        <div className="crop-handle crop-handle-nw" style={{ left: `${left}px`, top: `${top}px` }} />
-                        <div className="crop-handle crop-handle-ne" style={{ left: `${left + width}px`, top: `${top}px` }} />
-                        <div className="crop-handle crop-handle-sw" style={{ left: `${left}px`, top: `${top + height}px` }} />
-                        <div className="crop-handle crop-handle-se" style={{ left: `${left + width}px`, top: `${top + height}px` }} />
-                        <div className="crop-handle crop-handle-n" style={{ left: `${left + width/2}px`, top: `${top}px` }} />
-                        <div className="crop-handle crop-handle-s" style={{ left: `${left + width/2}px`, top: `${top + height}px` }} />
-                        <div className="crop-handle crop-handle-w" style={{ left: `${left}px`, top: `${top + height/2}px` }} />
-                        <div className="crop-handle crop-handle-e" style={{ left: `${left + width}px`, top: `${top + height/2}px` }} />
+                        {/* Handles للتحكم - إخفاؤها في preset الصور الشخصية */}
+                        {cropPreset !== 'passport' && (
+                          <>
+                            <div className="crop-handle crop-handle-nw" style={{ left: `${left}px`, top: `${top}px` }} />
+                            <div className="crop-handle crop-handle-ne" style={{ left: `${left + width}px`, top: `${top}px` }} />
+                            <div className="crop-handle crop-handle-sw" style={{ left: `${left}px`, top: `${top + height}px` }} />
+                            <div className="crop-handle crop-handle-se" style={{ left: `${left + width}px`, top: `${top + height}px` }} />
+                            <div className="crop-handle crop-handle-n" style={{ left: `${left + width/2}px`, top: `${top}px` }} />
+                            <div className="crop-handle crop-handle-s" style={{ left: `${left + width/2}px`, top: `${top + height}px` }} />
+                            <div className="crop-handle crop-handle-w" style={{ left: `${left}px`, top: `${top + height/2}px` }} />
+                            <div className="crop-handle crop-handle-e" style={{ left: `${left + width}px`, top: `${top + height/2}px` }} />
+                          </>
+                        )}
                       </>
                     )
                   })()}
@@ -799,21 +867,53 @@ export default function Studio() {
 
                 {selectedTool === 'crop' && (
                   <div className="crop-options">
+                    <div className="crop-presets mb-4">
+                      <label className="block mb-2 font-semibold">نوع القص:</label>
+                      <div className="flex gap-2">
+                        <button
+                          className={`btn ${cropPreset === 'free' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setCropPreset('free')}
+                        >
+                          حر
+                        </button>
+                        <button
+                          className={`btn ${cropPreset === 'passport' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setCropPreset('passport')}
+                        >
+                          صور شخصية (3.5×4.8 سم)
+                        </button>
+                      </div>
+                      {cropPreset === 'passport' && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          سيتم إنشاء إطار بالضبط 3.5 سم × 4.8 سم. حرك الإطار ليناسب الصورة.
+                        </p>
+                      )}
+                    </div>
                     <label>التدوير: {rotation}°</label>
                     <input type="range" min="-180" max="180" value={rotation} onChange={(e) => setRotation(parseInt(e.target.value))} />
                     <p className="text-sm text-gray-600 mt-2 mb-2">
-                      اسحب على الصورة لتحديد منطقة القص
+                      {cropPreset === 'passport' 
+                        ? 'حرك الإطار ليناسب الصورة (الإطار ثابت الحجم)' 
+                        : 'اسحب على الصورة لتحديد منطقة القص'}
                     </p>
                     {cropArea && (
                       <div className="crop-info">
-                        <p>المنطقة المحددة: {Math.round(cropArea.width)} × {Math.round(cropArea.height)}</p>
+                        <p>المنطقة المحددة: {Math.round(cropArea.width)} × {Math.round(cropArea.height)} بكسل</p>
+                        {cropPreset === 'passport' && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ 3.5 سم × 4.8 سم (للصور الشخصية)
+                          </p>
+                        )}
                       </div>
                     )}
                     <button className="btn btn-primary w-full mt-4" onClick={handleApplyCropRotate} disabled={loading || !cropArea}>
-                      {loading ? 'جاري المعالجة...' : 'تطبيق القص والتدوير'}
+                      {loading ? 'جاري المعالجة...' : cropPreset === 'passport' ? 'قص للصور الشخصية' : 'تطبيق القص والتدوير'}
                     </button>
                     {cropArea && (
-                      <button className="btn btn-secondary w-full mt-2" onClick={() => setCropArea(null)}>
+                      <button className="btn btn-secondary w-full mt-2" onClick={() => {
+                        setCropArea(null)
+                        setCropPreset('free')
+                      }}>
                         إلغاء القص
                       </button>
                     )}

@@ -136,74 +136,93 @@ async def create_passport_photos(file: UploadFile = File(...)):
         file_content = await file.read()
         original_image = Image.open(io.BytesIO(file_content))
         
-        # ضغط الصورة قبل الإرسال لـ remove.bg
-        compressed_image = compress_image(original_image, max_size_mb=5.0, quality=85)
-        compressed_image.seek(0)
-        
-        # إزالة الخلفية باستخدام remove.bg
-        response = requests.post(
-            'https://api.remove.bg/v1.0/removebg',
-            files={'image_file': compressed_image},
-            data={'size': 'auto'},
-            headers={'X-Api-Key': REMOVE_BG_API_KEY},
-        )
-        
-        if response.status_code != 200:
-            error_detail = response.text if hasattr(response, 'text') else "Unknown error"
-            raise HTTPException(status_code=response.status_code, detail=f"Failed to remove background: {error_detail}")
-        
-        # قراءة الصورة بعد إزالة الخلفية
-        no_bg_image = Image.open(io.BytesIO(response.content))
-        
-        # تحويل الحجم إلى 3.5 سم (عرض) × 4.8 سم (ارتفاع) بجودة 300 DPI
-        # 1 بوصة = 2.54 سم
-        # 300 DPI = 300 بكسل لكل بوصة
-        # 1 سم = 300 / 2.54 = 118.11023622047244 بكسل
-        # 3.5 سم = 3.5 × 118.11023622047244 = 413.3858267716535 بكسل
-        # 4.8 سم = 4.8 × 118.11023622047244 = 566.9291338582677 بكسل
+        # التحقق من أن الصورة بالضبط 3.5 × 4.8 سم (413 × 567 بكسل عند 300 DPI)
         pixels_per_cm = PRINT_DPI / 2.54
-        target_width = int(3.5 * pixels_per_cm + 0.5)  # 413 بكسل بالضبط عند 300 DPI (تقريب صحيح)
-        target_height = int(4.8 * pixels_per_cm + 0.5)  # 567 بكسل بالضبط عند 300 DPI (تقريب صحيح)
+        expected_width = int(3.5 * pixels_per_cm + 0.5)  # 413 بكسل
+        expected_height = int(4.8 * pixels_per_cm + 0.5)  # 567 بكسل
         
-        # حساب النسبة للحفاظ على الأبعاد الأصلية للصورة
-        # الهدف: ملء الصورة في إطار 3.5 سم × 4.8 سم بالضبط مع الحفاظ على النسبة
-        # نستخدم "cover" strategy: نكبر الصورة لتملأ الإطار بالكامل ثم نستخدم crop
-        img_width, img_height = no_bg_image.size
-        aspect_ratio = img_width / img_height
-        target_aspect = target_width / target_height
+        img_width, img_height = original_image.size
         
-        # حساب الحجم المطلوب لملء الإطار بالكامل
-        # نكبر الصورة بحيث تغطي الإطار بالكامل (أكبر من الإطار)
-        if aspect_ratio > target_aspect:
-            # الصورة أوسع من المطلوب - نكبرها بناءً على الارتفاع
-            scale = target_height / img_height
-            new_width = int(img_width * scale + 0.5)
-            new_height = target_height
+        # إذا كانت الصورة بالضبط 3.5 × 4.8 سم، نستخدمها مباشرة (تم قصها مسبقاً)
+        if abs(img_width - expected_width) <= 2 and abs(img_height - expected_height) <= 2:
+            # الصورة مقطوعة بالفعل - نستخدمها مباشرة
+            no_bg_image = original_image
         else:
-            # الصورة أطول من المطلوب - نكبرها بناءً على العرض
-            scale = target_width / img_width
-            new_width = target_width
-            new_height = int(img_height * scale + 0.5)
-        
-        # تغيير الحجم مع الحفاظ على الجودة (LANCZOS للجودة العالية)
-        resized_image = no_bg_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        # قص الصورة من المنتصف للحصول على الأبعاد الدقيقة 3.5 × 4.8 سم
-        left = (new_width - target_width) // 2
-        top = (new_height - target_height) // 2
-        right = left + target_width
-        bottom = top + target_height
-        cropped_image = resized_image.crop((left, top, right, bottom))
-        
-        # إنشاء صورة جديدة بالحجم المطلوب بالضبط: 3.5 سم × 4.8 سم
-        # التأكد من أن الصورة بالضبط target_width × target_height
-        single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
-        
-        # وضع الصورة المقطوعة (التي هي بالضبط target_width × target_height)
-        if cropped_image.mode == 'RGBA':
-            single_photo.paste(cropped_image, (0, 0), cropped_image)
+            # ضغط الصورة قبل الإرسال لـ remove.bg
+            compressed_image = compress_image(original_image, max_size_mb=5.0, quality=85)
+            compressed_image.seek(0)
+            
+            # إزالة الخلفية باستخدام remove.bg
+            response = requests.post(
+                'https://api.remove.bg/v1.0/removebg',
+                files={'image_file': compressed_image},
+                data={'size': 'auto'},
+                headers={'X-Api-Key': REMOVE_BG_API_KEY},
+            )
+            
+            if response.status_code != 200:
+                error_detail = response.text if hasattr(response, 'text') else "Unknown error"
+                raise HTTPException(status_code=response.status_code, detail=f"Failed to remove background: {error_detail}")
+            
+            # قراءة الصورة بعد إزالة الخلفية
+            no_bg_image = Image.open(io.BytesIO(response.content))
+            
+            # تحويل الحجم إلى 3.5 سم (عرض) × 4.8 سم (ارتفاع) بجودة 300 DPI
+            target_width = int(3.5 * pixels_per_cm + 0.5)  # 413 بكسل بالضبط عند 300 DPI
+            target_height = int(4.8 * pixels_per_cm + 0.5)  # 567 بكسل بالضبط عند 300 DPI
+            
+            # حساب النسبة للحفاظ على الأبعاد الأصلية للصورة
+            # الهدف: ملء الصورة في إطار 3.5 سم × 4.8 سم بالضبط مع الحفاظ على النسبة
+            # نستخدم "cover" strategy: نكبر الصورة لتملأ الإطار بالكامل ثم نستخدم crop
+            img_width, img_height = no_bg_image.size
+            aspect_ratio = img_width / img_height
+            target_aspect = target_width / target_height
+            
+            # حساب الحجم المطلوب لملء الإطار بالكامل
+            # نكبر الصورة بحيث تغطي الإطار بالكامل (أكبر من الإطار)
+            if aspect_ratio > target_aspect:
+                # الصورة أوسع من المطلوب - نكبرها بناءً على الارتفاع
+                scale = target_height / img_height
+                new_width = int(img_width * scale + 0.5)
+                new_height = target_height
+            else:
+                # الصورة أطول من المطلوب - نكبرها بناءً على العرض
+                scale = target_width / img_width
+                new_width = target_width
+                new_height = int(img_height * scale + 0.5)
+            
+            # تغيير الحجم مع الحفاظ على الجودة (LANCZOS للجودة العالية)
+            resized_image = no_bg_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # قص الصورة من المنتصف للحصول على الأبعاد الدقيقة 3.5 × 4.8 سم
+            left = (new_width - target_width) // 2
+            top = (new_height - target_height) // 2
+            right = left + target_width
+            bottom = top + target_height
+            cropped_image = resized_image.crop((left, top, right, bottom))
+            
+            # التأكد من أن الصورة المقطوعة بالضبط target_width × target_height
+            if cropped_image.size[0] != target_width or cropped_image.size[1] != target_height:
+                # إعادة ضبط الحجم إذا لزم الأمر
+                cropped_image = cropped_image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            
+            # إنشاء صورة جديدة بالحجم المطلوب بالضبط: 3.5 سم × 4.8 سم
+            single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
+            
+            # وضع الصورة المقطوعة (التي هي بالضبط target_width × target_height)
+            if cropped_image.mode == 'RGBA':
+                single_photo.paste(cropped_image, (0, 0), cropped_image)
+            else:
+                single_photo.paste(cropped_image, (0, 0))
         else:
-            single_photo.paste(cropped_image, (0, 0))
+            # الصورة مقطوعة بالفعل بالضبط 3.5 × 4.8 سم - نستخدمها مباشرة
+            target_width = expected_width
+            target_height = expected_height
+            single_photo = Image.new('RGB', (target_width, target_height), (255, 255, 255))
+            if no_bg_image.mode == 'RGBA':
+                single_photo.paste(no_bg_image, (0, 0), no_bg_image)
+            else:
+                single_photo.paste(no_bg_image, (0, 0))
         
         # إنشاء قالب 8 صور (2 صفوف × 4 أعمدة)
         # القالب يجب أن يكون بالضبط: 14 سم عرض × 9.6 سم ارتفاع

@@ -473,48 +473,82 @@ export default function Studio() {
     if (!processedImage && !uploadedImage) return
     
     setLoading(true)
-    const imageSrc = processedImage || uploadedImage || ''
-    const img = new Image()
     
-    img.onload = async () => {
-      try {
-        // استخدام الحجم الأصلي للصورة للحفاظ على الدقة الكاملة
-        const width = img.naturalWidth > 0 ? img.naturalWidth : img.width
-        const height = img.naturalHeight > 0 ? img.naturalHeight : img.height
-        
-        const canvas = downloadCanvasRef.current || document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
+    try {
+      if (format === 'image') {
+        // إذا كانت الصورة من backend (processedImage)، فهي بالفعل 300 DPI
+        // نحمّلها مباشرة بدون canvas للحفاظ على DPI metadata
+        if (processedImage) {
+          // تحويل base64 إلى blob وتحويله مباشرة
+          const response = await fetch(processedImage)
+          const blob = await response.blob()
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `processed-image-${Date.now()}.png`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
           setLoading(false)
-          return
+        } else if (uploadedImage) {
+          // الصورة من المستخدم - إرسال للـ backend لإضافة DPI = 300
+          const response = await fetch(uploadedImage)
+          const blob = await response.blob()
+          const file = new File([blob], 'image.png', { type: 'image/png' })
+          
+          const formData = new FormData()
+          formData.append('file', file)
+          
+          const apiResponse = await fetch(`${import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'}/studio/add-dpi`, {
+            method: 'POST',
+            body: formData
+          })
+          
+          if (apiResponse.ok) {
+            const result = await apiResponse.json()
+            if (result.success && result.image) {
+              // تحميل الصورة مع DPI = 300
+              const downloadResponse = await fetch(result.image)
+              const downloadBlob = await downloadResponse.blob()
+              const downloadUrl = URL.createObjectURL(downloadBlob)
+              const link = document.createElement('a')
+              link.href = downloadUrl
+              link.download = `processed-image-${Date.now()}.png`
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+              URL.revokeObjectURL(downloadUrl)
+              setLoading(false)
+            } else {
+              throw new Error('Failed to add DPI')
+            }
+          } else {
+            throw new Error('API request failed')
+          }
         }
+      } else if (format === 'pdf') {
+        // للـ PDF، نحتاج canvas
+        const imageSrc = processedImage || uploadedImage || ''
+        const img = new Image()
         
-        // رسم الصورة بالحجم الأصلي للحفاظ على الدقة
-        ctx.drawImage(img, 0, 0, width, height)
-        
-        if (format === 'image') {
-          // تحميل كصورة PNG بجودة عالية
-          canvas.toBlob((blob) => {
-            if (!blob) {
+        img.onload = async () => {
+          try {
+            const width = img.naturalWidth > 0 ? img.naturalWidth : img.width
+            const height = img.naturalHeight > 0 ? img.naturalHeight : img.height
+            
+            const canvas = downloadCanvasRef.current || document.createElement('canvas')
+            canvas.width = width
+            canvas.height = height
+            
+            const ctx = canvas.getContext('2d')
+            if (!ctx) {
               setLoading(false)
               return
             }
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `processed-image-${Date.now()}.png`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-            setLoading(false)
-          }, 'image/png', 1.0) // جودة 100%
-        } else if (format === 'pdf') {
-          // تحميل كـ PDF
-          try {
+            
+            ctx.drawImage(img, 0, 0, width, height)
+            
             const { jsPDF } = await import('jspdf')
             
             // تحويل البكسل إلى مليمتر (1 بوصة = 25.4 ملم، 300 DPI)
@@ -538,19 +572,19 @@ export default function Studio() {
             handleDownload('image')
           }
         }
-      } catch (error) {
-        console.error('Error downloading:', error)
-        alert('حدث خطأ أثناء التحميل')
-        setLoading(false)
+        
+        img.onerror = () => {
+          alert('خطأ في تحميل الصورة')
+          setLoading(false)
+        }
+        
+        img.src = imageSrc
       }
-    }
-    
-    img.onerror = () => {
-      alert('خطأ في تحميل الصورة')
+    } catch (error) {
+      console.error('Error downloading:', error)
+      alert('حدث خطأ أثناء التحميل')
       setLoading(false)
     }
-    
-    img.src = imageSrc
   }
 
   return (

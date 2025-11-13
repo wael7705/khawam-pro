@@ -14,6 +14,9 @@ REMOVE_BG_API_KEY = os.getenv("REMOVE_BG_API_KEY", "QP2YU5oSDaLwXpzDRKv4fjo9")
 if not REMOVE_BG_API_KEY:
     print("⚠️ REMOVE_BG_API_KEY is not set. remove.bg integration will fail until provided.")
 
+# ثابت DPI للطباعة
+PRINT_DPI = 300
+
 # وظيفة ضغط الصور
 def compress_image(image: Image.Image, max_size_mb: float = 5.0, quality: int = 85) -> io.BytesIO:
     """
@@ -41,9 +44,9 @@ def compress_image(image: Image.Image, max_size_mb: float = 5.0, quality: int = 
         output.truncate(0)
         
         if format == 'JPEG':
-            image.save(output, format='JPEG', quality=quality_level, optimize=True)
+            image.save(output, format='JPEG', quality=quality_level, optimize=True, dpi=(PRINT_DPI, PRINT_DPI))
         else:
-            image.save(output, format=format, quality=quality_level, optimize=True)
+            image.save(output, format=format, quality=quality_level, optimize=True, dpi=(PRINT_DPI, PRINT_DPI))
         
         size_mb = output.tell() / (1024 * 1024)
         
@@ -56,10 +59,33 @@ def compress_image(image: Image.Image, max_size_mb: float = 5.0, quality: int = 
     return output
 
 # وظيفة تحويل الصورة إلى base64
-def image_to_base64(image: Image.Image, format: str = 'PNG') -> str:
-    """تحويل الصورة إلى base64 string"""
+def image_to_base64(image: Image.Image, format: str = 'PNG', dpi: int = PRINT_DPI) -> str:
+    """
+    تحويل الصورة إلى base64 string مع الحفاظ على DPI للطباعة
+    format: صيغة الصورة (PNG, JPEG)
+    dpi: دقة الصورة (افتراضي 300 DPI للطباعة)
+    """
     buffer = io.BytesIO()
-    image.save(buffer, format=format)
+    
+    # حفظ الصورة مع DPI = 300 للطباعة
+    # PIL يحفظ DPI في metadata تلقائياً
+    save_kwargs = {
+        'dpi': (dpi, dpi),
+        'optimize': True
+    }
+    
+    if format.upper() == 'PNG':
+        # PNG يدعم DPI في metadata
+        image.save(buffer, format='PNG', **save_kwargs)
+    elif format.upper() == 'JPEG' or format.upper() == 'JPG':
+        # JPEG يدعم DPI في EXIF
+        save_kwargs['quality'] = 95
+        image.save(buffer, format='JPEG', **save_kwargs)
+    else:
+        # للصيغ الأخرى
+        save_kwargs['quality'] = 95
+        image.save(buffer, format=format, **save_kwargs)
+    
     buffer.seek(0)
     img_data = base64.b64encode(buffer.read()).decode('utf-8')
     return f"data:image/{format.lower()};base64,{img_data}"
@@ -87,8 +113,8 @@ async def remove_background(file: UploadFile = File(...)):
             # قراءة الصورة الناتجة
             result_image = Image.open(io.BytesIO(response.content))
             
-            # تحويل إلى base64
-            img_data = image_to_base64(result_image, format='PNG')
+            # تحويل إلى base64 مع DPI = 300 للطباعة
+            img_data = image_to_base64(result_image, format='PNG', dpi=PRINT_DPI)
             
             return {"success": True, "image": img_data}
         else:
@@ -128,12 +154,15 @@ async def create_passport_photos(file: UploadFile = File(...)):
         # قراءة الصورة بعد إزالة الخلفية
         no_bg_image = Image.open(io.BytesIO(response.content))
         
-        # تحويل الحجم إلى 3.5*4.8 سم
-        # 1 سم = 37.8 بكسل (300 DPI)
-        # 3.5 سم = 132.3 بكسل
-        # 4.8 سم = 181.44 بكسل
-        target_width = int(3.5 * 37.8)  # 132 بكسل
-        target_height = int(4.8 * 37.8)  # 181 بكسل
+        # تحويل الحجم إلى 3.5*4.8 سم بجودة 300 DPI
+        # 1 بوصة = 2.54 سم
+        # 300 DPI = 300 بكسل لكل بوصة
+        # 1 سم = 300 / 2.54 = 118.11 بكسل (تقريباً 118 بكسل)
+        # 3.5 سم = 3.5 * 118.11 = 413.39 بكسل
+        # 4.8 سم = 4.8 * 118.11 = 566.93 بكسل
+        pixels_per_cm = PRINT_DPI / 2.54
+        target_width = int(3.5 * pixels_per_cm)  # ~413 بكسل عند 300 DPI
+        target_height = int(4.8 * pixels_per_cm)  # ~567 بكسل عند 300 DPI
         
         # حساب النسبة للحفاظ على الأبعاد
         img_width, img_height = no_bg_image.size
@@ -207,8 +236,8 @@ async def create_passport_photos(file: UploadFile = File(...)):
                 fill=cut_line_color
             )
         
-        # تحويل إلى base64
-        img_data = image_to_base64(template, format='PNG')
+        # تحويل إلى base64 مع DPI = 300 للطباعة
+        img_data = image_to_base64(template, format='PNG', dpi=PRINT_DPI)
         
         return {"success": True, "image": img_data}
         
@@ -245,8 +274,26 @@ async def crop_rotate(
         if x is not None and y is not None and width is not None and height is not None:
             image = image.crop((x, y, x + width, y + height))
         
-        # تحويل إلى base64
-        img_data = image_to_base64(image, format='PNG')
+        # تحويل إلى base64 مع DPI = 300 للطباعة
+        img_data = image_to_base64(image, format='PNG', dpi=PRINT_DPI)
+        
+        return {"success": True, "image": img_data}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/add-dpi")
+async def add_dpi(file: UploadFile = File(...)):
+    """
+    إضافة DPI = 300 للصورة (للاستخدام عند التحميل من frontend)
+    """
+    try:
+        # قراءة الصورة
+        file_content = await file.read()
+        image = Image.open(io.BytesIO(file_content))
+        
+        # تحويل إلى base64 مع DPI = 300 للطباعة
+        img_data = image_to_base64(image, format='PNG', dpi=PRINT_DPI)
         
         return {"success": True, "image": img_data}
         
@@ -292,8 +339,8 @@ async def apply_filter(
             enhancer = ImageEnhance.Color(image)
             image = enhancer.enhance(saturation / 100.0)
         
-        # تحويل إلى base64
-        img_data = image_to_base64(image, format='PNG')
+        # تحويل إلى base64 مع DPI = 300 للطباعة
+        img_data = image_to_base64(image, format='PNG', dpi=PRINT_DPI)
         
         return {"success": True, "image": img_data}
         

@@ -709,7 +709,8 @@ def _persist_design_files(
 async def create_order(
     order_data: OrderCreate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Create a new order"""
     try:
@@ -730,9 +731,15 @@ async def create_order(
         paid_amount = 0.0  # يبدأ من 0 عند إنشاء الطلب
         remaining_amount = float(order_data.final_amount) - paid_amount
         
+        # ربط الطلب بالمستخدم الحالي إذا كان مسجل دخول
+        customer_id = None
+        if current_user:
+            customer_id = current_user.id
+            print(f"✅ Order {order_number} linked to user ID: {customer_id}")
+        
         order_dict = {
             'order_number': order_number,
-            'customer_id': None,
+            'customer_id': customer_id,
             'customer_name': order_data.customer_name,
             'customer_phone': order_data.customer_phone,
             'customer_whatsapp': order_data.customer_whatsapp or order_data.customer_phone,
@@ -1096,16 +1103,44 @@ async def get_orders(
         orders_query_start = time.time()
         try:
             if user_role == "عميل":
-                # للعملاء: فلترة الطلبات حسب رقم الهاتف
-                if not customer_phone_variants:
-                    print(f"⚠️ Orders API - Customer has no phone variants, returning empty orders")
-                    orders = []
-                else:
-                    # تحسين الأداء: استخدام raw SQL مع IN clause - أسرع من OR filters
-                    try:
-                        # استخدام raw SQL للبحث الدقيق أولاً - أسرع من ORM
-                        placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
-                        params = {f'phone_{i}': variant for i, variant in enumerate(customer_phone_variants)}
+                # للعملاء: فلترة الطلبات حسب customer_id أولاً، ثم customer_phone
+                # أولوية: customer_id > customer_phone (لضمان ربط صحيح)
+                try:
+                    # بناء شروط البحث: customer_id أولاً، ثم customer_phone
+                    where_conditions = []
+                    params = {}
+                    
+                    # إضافة شرط customer_id إذا كان المستخدم موجوداً
+                    if current_user and current_user.id:
+                        where_conditions.append("customer_id = :customer_id")
+                        params['customer_id'] = current_user.id
+                        print(f"✅ Orders API - Filtering by customer_id: {current_user.id}")
+                    
+                    # إضافة شرط customer_phone كبديل أو إضافي
+                    if customer_phone_variants:
+                        if where_conditions:
+                            # إذا كان هناك customer_id، نضيف customer_phone كـ OR
+                            phone_placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
+                            for i, variant in enumerate(customer_phone_variants):
+                                params[f'phone_{i}'] = variant
+                            where_conditions.append(f"customer_phone IN ({phone_placeholders})")
+                            where_clause = " OR ".join([f"({cond})" for cond in where_conditions])
+                        else:
+                            # إذا لم يكن هناك customer_id، نستخدم customer_phone فقط
+                            phone_placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
+                            for i, variant in enumerate(customer_phone_variants):
+                                params[f'phone_{i}'] = variant
+                            where_clause = f"customer_phone IN ({phone_placeholders})"
+                    elif where_conditions:
+                        # إذا كان هناك customer_id فقط
+                        where_clause = where_conditions[0]
+                    else:
+                        # لا توجد شروط - لا طلبات
+                        print(f"⚠️ Orders API - Customer has no customer_id or phone variants, returning empty orders")
+                        orders = []
+                        where_clause = None
+                    
+                    if where_clause:
                         params['limit'] = 100
                         
                         # استخدام raw SQL مباشرة - أسرع من ORM
@@ -1116,7 +1151,7 @@ async def get_orders(
                                 notes, staff_notes, paid_amount, remaining_amount, rating, rating_comment,
                                 created_at, updated_at
                             FROM orders
-                            WHERE customer_phone IN ({placeholders})
+                            WHERE {where_clause}
                             ORDER BY created_at DESC
                             LIMIT :limit
                         """), params).fetchall()

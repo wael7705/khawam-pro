@@ -195,11 +195,46 @@ export default function Studio() {
       const img = imageContainerRef.current?.querySelector('img')
       if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
         if (cropPreset === 'passport') {
-          // إنشاء إطار بالضبط 3.5 سم × 4.8 سم (413 × 567 بكسل عند 300 DPI)
-          const PRINT_DPI = 300
-          const pixels_per_cm = PRINT_DPI / 2.54
-          const passport_width = Math.round(3.5 * pixels_per_cm)  // 413 بكسل
-          const passport_height = Math.round(4.8 * pixels_per_cm)  // 567 بكسل
+          // حساب نسبة الصورة الشخصية: 3.5 سم عرض × 4.8 سم ارتفاع
+          // النسبة: 3.5 / 4.8 = 0.729
+          const passport_ratio = 3.5 / 4.8  // 0.729
+          const img_ratio = img.naturalWidth / img.naturalHeight
+          
+          let passport_width: number
+          let passport_height: number
+          
+          // حساب حجم الإطار بناءً على الصورة الفعلية
+          // نريد أن يكون الإطار بحجم مناسب للصورة (حوالي 60-80% من الصورة)
+          // لكن مع الحفاظ على نسبة 3.5:4.8
+          if (img_ratio > passport_ratio) {
+            // الصورة أوسع من المطلوب - نحدد الارتفاع أولاً
+            passport_height = Math.min(img.naturalHeight * 0.7, img.naturalHeight)
+            passport_width = Math.round(passport_height * passport_ratio)
+            // التأكد من أن العرض لا يتجاوز حدود الصورة
+            if (passport_width > img.naturalWidth) {
+              passport_width = img.naturalWidth
+              passport_height = Math.round(passport_width / passport_ratio)
+            }
+          } else {
+            // الصورة أطول من المطلوب - نحدد العرض أولاً
+            passport_width = Math.min(img.naturalWidth * 0.7, img.naturalWidth)
+            passport_height = Math.round(passport_width / passport_ratio)
+            // التأكد من أن الارتفاع لا يتجاوز حدود الصورة
+            if (passport_height > img.naturalHeight) {
+              passport_height = img.naturalHeight
+              passport_width = Math.round(passport_height * passport_ratio)
+            }
+          }
+          
+          // التأكد من الحد الأدنى للحجم (100 بكسل على الأقل)
+          if (passport_width < 100) {
+            passport_width = Math.min(100, img.naturalWidth)
+            passport_height = Math.round(passport_width / passport_ratio)
+          }
+          if (passport_height < 100) {
+            passport_height = Math.min(100, img.naturalHeight)
+            passport_width = Math.round(passport_height * passport_ratio)
+          }
           
           // وضع الإطار في المنتصف
           const x = Math.max(0, (img.naturalWidth - passport_width) / 2)
@@ -208,8 +243,8 @@ export default function Studio() {
           setCropArea({
             x: Math.floor(x),
             y: Math.floor(y),
-            width: passport_width,
-            height: passport_height
+            width: Math.floor(passport_width),
+            height: Math.floor(passport_height)
           })
         } else {
           // إنشاء إطار يغطي الصورة بالكامل
@@ -249,9 +284,10 @@ export default function Studio() {
   }
 
   const handlePassportPhotos = async () => {
-    // استخدام الصورة المقطوعة إذا كانت موجودة، وإلا استخدام الصورة الأصلية
+    // استخدام الصورة المقطوعة إذا كانت موجودة، وإلا استخدام الصورة المعالجة أو الأصلية
     let fileToUse = originalFileRef.current
     
+    // أولوية: الصورة المقطوعة للصور الشخصية > الصورة المعالجة > الصورة الأصلية
     if (croppedImageForPassport) {
       // تحويل base64 إلى File
       try {
@@ -260,6 +296,26 @@ export default function Studio() {
         fileToUse = new File([blob], 'cropped-image.png', { type: 'image/png' })
       } catch (error) {
         console.error('Error converting cropped image:', error)
+        // استخدام الصورة المعالجة كبديل
+        if (processedImage) {
+          try {
+            const response = await fetch(processedImage)
+            const blob = await response.blob()
+            fileToUse = new File([blob], 'processed-image.png', { type: 'image/png' })
+          } catch (error) {
+            console.error('Error converting processed image:', error)
+            // استخدام الصورة الأصلية كبديل
+          }
+        }
+      }
+    } else if (processedImage) {
+      // استخدام الصورة المعالجة إذا كانت موجودة
+      try {
+        const response = await fetch(processedImage)
+        const blob = await response.blob()
+        fileToUse = new File([blob], 'processed-image.png', { type: 'image/png' })
+      } catch (error) {
+        console.error('Error converting processed image:', error)
         // استخدام الصورة الأصلية كبديل
       }
     }
@@ -316,10 +372,17 @@ export default function Studio() {
         height: Math.round(cropArea.height)
       }
       
-      const response = await studioAPI.cropRotate(originalFileRef.current, rotation, cropParams)
+      // استخدام الصورة المعالجة إذا كانت موجودة، وإلا الصورة الأصلية
+      const fileToUse = processedImage 
+        ? await fetch(processedImage).then(r => r.blob()).then(blob => new File([blob], 'image.png', { type: 'image/png' }))
+        : originalFileRef.current
+      
+      const response = await studioAPI.cropRotate(fileToUse, rotation, cropParams)
       if (response.success && response.image) {
         setProcessedImage(response.image)
         setActiveImage(response.image)
+        // تحديث uploadedImage أيضاً لاستخدام الصورة المقطوعة في المعالجة التالية
+        setUploadedImage(response.image)
         
         // إذا كان preset الصور الشخصية، حفظ الصورة المقطوعة
         if (cropPreset === 'passport') {

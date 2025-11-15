@@ -182,20 +182,32 @@ async def create_passport_photos(file: UploadFile = File(...)):
             # نستخدم "cover" strategy: نكبر الصورة لتملأ الإطار بالكامل ثم نستخدم crop
             img_width, img_height = no_bg_image.size
             aspect_ratio = img_width / img_height
-            target_aspect = target_width / target_height
+            target_aspect = target_width / target_height  # 3.5 / 4.8 = 0.729
             
             # حساب الحجم المطلوب لملء الإطار بالكامل
             # نكبر الصورة بحيث تغطي الإطار بالكامل (أكبر من الإطار)
             if aspect_ratio > target_aspect:
                 # الصورة أوسع من المطلوب - نكبرها بناءً على الارتفاع
+                # نريد أن يكون الارتفاع = target_height بالضبط
                 scale = target_height / img_height
                 new_width = int(img_width * scale + 0.5)
                 new_height = target_height
             else:
                 # الصورة أطول من المطلوب - نكبرها بناءً على العرض
+                # نريد أن يكون العرض = target_width بالضبط
                 scale = target_width / img_width
                 new_width = target_width
                 new_height = int(img_height * scale + 0.5)
+            
+            # التأكد من أن الحجم الجديد أكبر من أو يساوي الحجم المطلوب
+            if new_width < target_width:
+                new_width = target_width
+                scale = new_width / img_width
+                new_height = int(img_height * scale + 0.5)
+            if new_height < target_height:
+                new_height = target_height
+                scale = new_height / img_height
+                new_width = int(img_width * scale + 0.5)
             
             # تغيير الحجم مع الحفاظ على الجودة (LANCZOS للجودة العالية)
             resized_image = no_bg_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -205,6 +217,13 @@ async def create_passport_photos(file: UploadFile = File(...)):
             top = (new_height - target_height) // 2
             right = left + target_width
             bottom = top + target_height
+            
+            # التأكد من أن الإحداثيات صحيحة
+            left = max(0, min(left, new_width - target_width))
+            top = max(0, min(top, new_height - target_height))
+            right = left + target_width
+            bottom = top + target_height
+            
             cropped_image = resized_image.crop((left, top, right, bottom))
             
             # التأكد من أن الصورة المقطوعة بالضبط target_width × target_height

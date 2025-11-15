@@ -1109,6 +1109,7 @@ async def get_orders(
                     # بناء شروط البحث: customer_id أولاً، ثم customer_phone
                     where_conditions = []
                     params = {}
+                    where_clause = None
                     
                     # إضافة شرط customer_id إذا كان المستخدم موجوداً
                     if current_user and current_user.id:
@@ -1118,18 +1119,16 @@ async def get_orders(
                     
                     # إضافة شرط customer_phone كبديل أو إضافي
                     if customer_phone_variants:
+                        phone_placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
+                        for i, variant in enumerate(customer_phone_variants):
+                            params[f'phone_{i}'] = variant
+                        
                         if where_conditions:
                             # إذا كان هناك customer_id، نضيف customer_phone كـ OR
-                            phone_placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
-                            for i, variant in enumerate(customer_phone_variants):
-                                params[f'phone_{i}'] = variant
                             where_conditions.append(f"customer_phone IN ({phone_placeholders})")
                             where_clause = " OR ".join([f"({cond})" for cond in where_conditions])
                         else:
                             # إذا لم يكن هناك customer_id، نستخدم customer_phone فقط
-                            phone_placeholders = ', '.join([f':phone_{i}' for i in range(len(customer_phone_variants))])
-                            for i, variant in enumerate(customer_phone_variants):
-                                params[f'phone_{i}'] = variant
                             where_clause = f"customer_phone IN ({phone_placeholders})"
                     elif where_conditions:
                         # إذا كان هناك customer_id فقط
@@ -1138,7 +1137,6 @@ async def get_orders(
                         # لا توجد شروط - لا طلبات
                         print(f"⚠️ Orders API - Customer has no customer_id or phone variants, returning empty orders")
                         orders = []
-                        where_clause = None
                     
                     if where_clause:
                         params['limit'] = 100
@@ -1351,12 +1349,12 @@ async def get_orders(
                                         print(f"⚠️ Error processing order row: {row_error}")
                                         continue
                                 
-                                    print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
+                                print(f"✅ Orders API - Customer orders query (text search): {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for digits: {digits_only_variants})")
                         
                         if orders:
-                            print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for phone variants: {customer_phone_variants})")
+                            print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
                         else:
-                            print(f"⚠️ Orders API - No orders found for phone variants: {customer_phone_variants}")
+                            print(f"⚠️ Orders API - No orders found for customer")
                     except Exception as filter_error:
                         print(f"❌ Orders API - Error filtering customer orders: {filter_error}")
                         import traceback

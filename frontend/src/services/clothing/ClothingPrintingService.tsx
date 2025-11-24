@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ServiceHandler } from '../serviceRegistry'
+import FlipCard3D from '../../components/FlipCard3D'
 
 type ClothingOption = {
   id: string
@@ -20,8 +21,6 @@ const DESIGN_LOCATIONS = [
   { id: 'shoulder_right', label: 'كتف أيمن' },
   { id: 'shoulder_left', label: 'كتف أيسر' },
 ]
-
-const DEFAULT_PRODUCT_ID = 'hoodie'
 
 export const ClothingPrintingService: ServiceHandler = {
   id: 'clothing-printing',
@@ -81,6 +80,30 @@ export const ClothingPrintingService: ServiceHandler = {
           }
         }
 
+        const handleProductSelect = (productId: string | number, color: string | undefined, size: string | undefined) => {
+          setClothingProduct(productId as string)
+          if (color !== undefined && color !== '') {
+            setClothingColor(color)
+          }
+          if (size !== undefined && size !== '') {
+            setClothingSize(size)
+          }
+          
+          // تحديث labels إذا لزم الأمر
+          const selectedProduct = products.find(p => p.id === productId)
+          if (selectedProduct) {
+            // تحديث labels إذا كانت متوفرة في serviceData
+            if ('setClothingProductLabel' in serviceData && typeof serviceData.setClothingProductLabel === 'function') {
+              serviceData.setClothingProductLabel(selectedProduct.name)
+            }
+            if (color !== undefined && color !== '' && 'setClothingColorLabel' in serviceData && typeof serviceData.setClothingColorLabel === 'function') {
+              serviceData.setClothingColorLabel(color)
+            }
+            if (size !== undefined && size !== '' && 'setClothingSizeLabel' in serviceData && typeof serviceData.setClothingSizeLabel === 'function') {
+              serviceData.setClothingSizeLabel(size)
+            }
+          }
+        }
 
         return (
           <div className="modal-body">
@@ -105,98 +128,27 @@ export const ClothingPrintingService: ServiceHandler = {
             </div>
 
             {clothingSource === 'store' && products.length > 0 && (
-              <>
-                <div className="form-group">
-                  <label>اختر المنتج <span className="required">*</span></label>
-                  <div className="product-grid">
-                    {products.map(product => (
-                      <div
-                        key={product.id}
-                        className={`product-card ${clothingProduct === product.id ? 'selected' : ''}`}
-                        onClick={() => {
-                          setClothingProduct(product.id)
-                          const productColors = product.colors || []
-                          if (productColors.length > 0) {
-                            setClothingColor(productColors[0])
-                          } else {
-                            setClothingColor('')
-                          }
-                          const productSizes = product.sizes || []
-                          if (productSizes && productSizes.length > 0) {
-                            setClothingSize(productSizes[0])
-                          } else {
-                            setClothingSize('')
-                          }
-                        }}
-                      >
-                        <div className="product-image-wrapper">
-                          {product.image_url ? (
-                            <img 
-                              src={product.image_url} 
-                              alt={product.name}
-                              className="product-image"
-                              onError={(e) => {
-                                // إذا فشل تحميل الصورة، عرض placeholder
-                                const target = e.target as HTMLImageElement
-                                target.style.display = 'none'
-                                const placeholder = target.nextElementSibling as HTMLElement
-                                if (placeholder) placeholder.style.display = 'flex'
-                              }}
-                            />
-                          ) : null}
-                          <div className="product-image-placeholder" style={{ display: product.image_url ? 'none' : 'flex' }}>
-                            <span>{product.name.charAt(0)}</span>
-                          </div>
-                          {clothingProduct === product.id && (
-                            <div className="product-selected-indicator">
-                              <span>✓</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="product-name">{product.name}</div>
-                      </div>
-                    ))}
-                  </div>
+              <div className="form-group">
+                <label>اختر المنتج <span className="required">*</span></label>
+                <div className="product-grid">
+                  {products.map(product => (
+                    <FlipCard3D
+                      key={product.id}
+                      product={{
+                        id: product.id,
+                        name: product.name,
+                        image_url: product.image_url,
+                        colors: product.colors || [],
+                        sizes: product.sizes || []
+                      }}
+                      isSelected={clothingProduct === product.id}
+                      selectedColor={clothingProduct === product.id ? clothingColor : undefined}
+                      selectedSize={clothingProduct === product.id ? clothingSize : undefined}
+                      onSelect={handleProductSelect}
+                    />
+                  ))}
                 </div>
-
-                {availableColors.length > 0 && (
-                  <div className="form-group">
-                    <label>اختر اللون <span className="required">*</span></label>
-                    <div className="delivery-options">
-                      {availableColors.map(color => (
-                        <label key={color} className="radio-option">
-                          <input
-                            type="radio"
-                            value={color}
-                            checked={clothingColor === color}
-                            onChange={(event) => setClothingColor(event.target.value)}
-                          />
-                          <span>{color}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {availableSizes.length > 0 && (
-                  <div className="form-group">
-                    <label>اختر المقاس <span className="required">*</span></label>
-                    <div className="delivery-options">
-                      {availableSizes.map(size => (
-                        <label key={size} className="radio-option">
-                          <input
-                            type="radio"
-                            value={size}
-                            checked={clothingSize === size}
-                            onChange={(event) => setClothingSize(event.target.value)}
-                          />
-                          <span>{size.toUpperCase()}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
+              </div>
             )}
           </div>
         )
@@ -317,9 +269,11 @@ export const ClothingPrintingService: ServiceHandler = {
     if (clothingSource === 'store') {
       specifications.clothing_product = clothingProductLabel || clothingProduct
       specifications.clothing_product_code = clothingProduct
-      specifications.clothing_color = clothingColorLabel || clothingColor
-      specifications.clothing_color_code = clothingColor
-      if (clothingSizeLabel || clothingSize) {
+      if (clothingColor && clothingColor !== '') {
+        specifications.clothing_color = clothingColorLabel || clothingColor
+        specifications.clothing_color_code = clothingColor
+      }
+      if (clothingSize && clothingSize !== '') {
         specifications.clothing_size = clothingSizeLabel || clothingSize
         specifications.clothing_size_code = clothingSize
       }
@@ -377,10 +331,10 @@ export const ClothingPrintingService: ServiceHandler = {
       clothing_source_value: clothingSource,
       clothing_product: clothingSource === 'store' ? (clothingProductLabel || clothingProduct) : undefined,
       clothing_product_code: clothingSource === 'store' ? clothingProduct : undefined,
-      clothing_color: clothingSource === 'store' ? (clothingColorLabel || clothingColor) : undefined,
-      clothing_color_code: clothingSource === 'store' ? clothingColor : undefined,
-      clothing_size: clothingSource === 'store' ? (clothingSizeLabel || clothingSize) : undefined,
-      clothing_size_code: clothingSource === 'store' ? clothingSize : undefined,
+      clothing_color: clothingSource === 'store' && clothingColor && clothingColor !== '' ? (clothingColorLabel || clothingColor) : undefined,
+      clothing_color_code: clothingSource === 'store' && clothingColor && clothingColor !== '' ? clothingColor : undefined,
+      clothing_size: clothingSource === 'store' && clothingSize && clothingSize !== '' ? (clothingSizeLabel || clothingSize) : undefined,
+      clothing_size_code: clothingSource === 'store' && clothingSize && clothingSize !== '' ? clothingSize : undefined,
       quantity: quantity || 1,
       design_positions: designEntries.map(([location, file]) => ({
         location,

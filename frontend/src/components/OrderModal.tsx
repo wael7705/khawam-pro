@@ -1197,7 +1197,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               />
             </div>
             <div className="form-group">
-              <label>رقم واتساب {stepConfig.required ? <span className="required">*</span> : ''}</label>
+              <label>
+                رقم واتساب 
+                {stepConfig.fields?.includes('whatsapp_optional') 
+                  ? <span className="optional">(اختياري)</span>
+                  : stepConfig.required ? <span className="required">*</span> : ''
+                }
+              </label>
               <input
                 type="tel"
                 value={customerWhatsApp}
@@ -1207,7 +1213,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 }}
                 className="form-input"
                 placeholder="09xxxxxxxx"
-                required={stepConfig.required}
+                required={!stepConfig.fields?.includes('whatsapp_optional') && stepConfig.required}
               />
             </div>
             {stepConfig.fields?.includes('whatsapp_optional') && (
@@ -2689,7 +2695,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           showError('يرجى إدخال اسم العميل')
           return
         }
-        if (!customerWhatsApp.trim()) {
+        const isWhatsAppOptional = currentStep?.step_config?.fields?.includes('whatsapp_optional')
+        if (!isWhatsAppOptional && !customerWhatsApp.trim()) {
           showError('يرجى إدخال رقم واتساب')
           return
         }
@@ -2717,7 +2724,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       showError('يرجى إدخال اسم العميل')
       return
     }
-    if (!customerWhatsApp.trim()) {
+    // التحقق من رقم واتساب - يكون اختياري إذا كان whatsapp_optional موجود في fields
+    const customerInfoStep = workflowSteps.find((s: any) => s.step_type === 'customer_info')
+    const isWhatsAppOptional = customerInfoStep?.step_config?.fields?.includes('whatsapp_optional')
+    if (!isWhatsAppOptional && !customerWhatsApp.trim()) {
       showError('يرجى إدخال رقم واتساب')
       return
     }

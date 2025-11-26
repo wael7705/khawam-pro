@@ -18,5 +18,24 @@ fi
 # Start the application
 # Use exec to replace shell process with uvicorn
 echo "✅ Starting uvicorn server on port ${PORT:-8000}..."
-exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --log-level info --timeout-keep-alive 30
+
+# Ensure we're in the right directory
+cd /app || exit 1
+
+# Check if main.py exists
+if [ ! -f "main.py" ]; then
+    echo "❌ Error: main.py not found in /app"
+    ls -la /app
+    exit 1
+fi
+
+# Start uvicorn with proper error handling
+exec uvicorn main:app \
+    --host 0.0.0.0 \
+    --port ${PORT:-8000} \
+    --workers 1 \
+    --log-level info \
+    --timeout-keep-alive 30 \
+    --timeout-graceful-shutdown 30 \
+    --access-log
 

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck, MapPin, Download, Trash2 } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck, MapPin, Download, Trash2, Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
 import { adminAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
 import SimpleMap from '../../components/SimpleMap'
+import { useOrderNotifications } from '../../hooks/useOrderNotifications'
+import { useNotificationSound } from '../../hooks/useNotificationSound'
 
 interface Order {
   id: number
@@ -60,6 +62,18 @@ export default function OrdersManagement() {
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteAllPendingModalOpen, setDeleteAllPendingModalOpen] = useState(false)
   const [deletingAllPending, setDeletingAllPending] = useState(false)
+  
+  // نظام الإشعارات
+  const knownOrderIdsRef = useRef<Set<number>>(new Set())
+  const { notifications, isConnected } = useOrderNotifications({
+    onNotificationClick: (orderId) => {
+      navigate(`/dashboard/orders/${orderId}`)
+      loadOrders(true)
+    },
+    enableDesktopNotifications: true,
+    enableSoundNotifications: true,
+  })
+  const { playSound } = useNotificationSound()
 
   const loadOrders = async (showLoading = false) => {
     try {
@@ -134,9 +148,67 @@ export default function OrdersManagement() {
     }
   }
 
+  // كشف الطلبات الجديدة وإظهار الإشعارات
+  useEffect(() => {
+    if (orders.length === 0) return
+
+    const currentOrderIds = new Set(orders.map((o) => o.id))
+    const newOrderIds = new Set<number>()
+
+    orders.forEach((order) => {
+      if (!knownOrderIdsRef.current.has(order.id)) {
+        newOrderIds.add(order.id)
+      }
+    })
+
+    if (newOrderIds.size > 0) {
+      const newOrders = orders.filter((o) => newOrderIds.has(o.id))
+
+      // تحديث قائمة الطلبات المعروفة
+      newOrderIds.forEach((id) => knownOrderIdsRef.current.add(id))
+
+      // إظهار إشعار لكل طلب جديد
+      newOrders.forEach((order) => {
+        playSound('new_order')
+
+        // إظهار إشعار المتصفح إذا كان مسموحاً
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            const notification = new Notification('🆕 طلب جديد', {
+              body: `طلب ${order.order_number} من ${order.customer_name}`,
+              icon: order.image_url || '/logo.png',
+              badge: '/logo.png',
+              tag: `order-${order.id}`,
+              requireInteraction: false,
+            })
+
+            notification.onclick = () => {
+              window.focus()
+              navigate(`/dashboard/orders/${order.id}`)
+              notification.close()
+            }
+          } catch (error) {
+            console.warn('⚠️ فشل إظهار إشعار المتصفح:', error)
+          }
+        }
+
+        // إظهار toast notification
+        showSuccess(`طلب جديد: ${order.order_number}`)
+      })
+    }
+  }, [orders, navigate, playSound, showSuccess])
+
   useEffect(() => {
     loadOrders(true) // Show loading only on initial load
     loadArchivedOrders()
+    
+    // حفظ IDs الطلبات الحالية عند التحميل الأول
+    const initialLoadTimeout = setTimeout(() => {
+      orders.forEach((order) => {
+        knownOrderIdsRef.current.add(order.id)
+      })
+    }, 2000)
+
     // Refresh every 30 seconds in background - فقط إذا كانت الصفحة مرئية
     let interval: NodeJS.Timeout | null = null
     const handleVisibilityChange = () => {
@@ -151,6 +223,13 @@ export default function OrdersManagement() {
         if (!interval) {
           interval = setInterval(() => loadOrders(false), 30000)
         }
+      }
+    }
+    
+    return () => {
+      clearTimeout(initialLoadTimeout)
+      if (interval) {
+        clearInterval(interval)
       }
     }
     
@@ -657,6 +736,27 @@ export default function OrdersManagement() {
 
   return (
     <div className="orders-management">
+      {/* مؤشر الاتصال بالإشعارات */}
+      {isConnected && (
+        <div className="notification-status" style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: '#10B981',
+          color: 'white',
+          padding: '8px 16px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+        }}>
+          <Bell size={16} />
+          <span>الإشعارات نشطة</span>
+        </div>
+      )}
       <div className="section-header">
         <div>
           <h1>إدارة الطلبات</h1>

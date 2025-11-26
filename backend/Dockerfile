@@ -71,9 +71,10 @@ ENV PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 
 # Health check for Railway
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
 
 # Use startup script for better error handling
 # Railway sets PORT automatically, fallback to 8000
-CMD ["/app/start.sh"]
+# Use shell form to ensure environment variables are expanded
+CMD ["/bin/bash", "/app/start.sh"]

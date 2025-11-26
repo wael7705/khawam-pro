@@ -59,6 +59,10 @@ COPY --from=frontend-builder /frontend/dist /app/static
 RUN mkdir -p uploads/orders && \
     chmod -R 755 uploads
 
+# Copy and make startup script executable
+COPY backend/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Set environment variables
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
@@ -70,7 +74,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
 
-# Use uvicorn directly - Railway compatible
+# Use startup script for better error handling
 # Railway sets PORT automatically, fallback to 8000
-# Use shell form to allow PORT variable expansion
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --log-level info"]
+CMD ["/app/start.sh"]

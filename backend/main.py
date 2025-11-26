@@ -10,12 +10,23 @@ import os
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler - بديل لـ @app.on_event("startup")"""
-    # Startup - تشغيل المهام في الخلفية بدون انتظار أو منع بدء التطبيق
+    # Startup - تأكد من أن التطبيق يبدأ حتى لو فشلت المهام الخلفية
     print("🚀 Application starting...")
+    print(f"📊 PORT: {os.getenv('PORT', '8000')}")
+    print(f"📊 DATABASE_URL: {'configured' if os.getenv('DATABASE_URL') else 'not set'}")
     
-    import asyncio
+    # اختبار الاتصال بقاعدة البيانات (بدون إيقاف التطبيق إذا فشل)
+    try:
+        from database import engine
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        print("✅ Database connection verified")
+    except Exception as db_error:
+        print(f"⚠️ Database connection check failed (will retry later): {str(db_error)[:100]}")
+        # لا نرفع الخطأ - التطبيق يجب أن يبدأ حتى لو كانت قاعدة البيانات غير متاحة مؤقتاً
     
     # بدء المهام في الخلفية - لا ننتظرها ولا نمنع بدء التطبيق
+    import asyncio
     try:
         # استخدام create_task مباشرة - ستعمل في الخلفية
         asyncio.create_task(_init_pricing_table())

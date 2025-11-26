@@ -87,7 +87,17 @@ except Exception as e:
         # نرفع الخطأ فقط إذا كنا متأكدين أن المشكلة ليست مؤقتة
         # لكن نعطي رسالة واضحة
         if not DATABASE_URL or DATABASE_URL == "postgresql://postgres@localhost:5432/khawam_local":
-            raise RuntimeError(f"Database connection failed. Please check DATABASE_URL environment variable on Railway.")
+            # في Railway، إذا لم يكن DATABASE_URL موجود، يجب أن نرفع خطأ واضح
+            print("❌ CRITICAL: DATABASE_URL not set. Please configure PostgreSQL service on Railway.")
+            # لكن لا نرفع RuntimeError هنا - نترك التطبيق يبدأ وسيفشل عند أول استعلام
+            # هذا يسمح للتطبيق بالبدء حتى لو كانت قاعدة البيانات غير متاحة مؤقتاً
+            engine = create_engine(
+                DATABASE_URL or "postgresql://postgres@localhost:5432/khawam_local",
+                pool_pre_ping=True,
+                echo=False,
+                connect_args={"connect_timeout": 3}
+            )
+            print("⚠️ Created fallback database engine - will fail on first query if DATABASE_URL not set")
         else:
             # DATABASE_URL موجود - المشكلة قد تكون مؤقتة
             # نحاول المتابعة - pool_pre_ping سيحاول إعادة الاتصال

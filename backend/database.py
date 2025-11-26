@@ -8,7 +8,13 @@ load_dotenv()
 
 # Railway provides DATABASE_URL automatically as an environment variable
 # Get DATABASE_URL from environment (Railway sets this automatically)
-DATABASE_URL = os.environ.get("DATABASE_URL") or os.getenv("DATABASE_URL", "")
+# Try multiple environment variable names for compatibility
+DATABASE_URL = (
+    os.environ.get("DATABASE_URL") or 
+    os.environ.get("POSTGRES_URL") or 
+    os.environ.get("PGDATABASE") or
+    os.getenv("DATABASE_URL", "")
+)
 
 if not DATABASE_URL:
     # Fallback for local development only
@@ -18,9 +24,16 @@ if not DATABASE_URL:
 
 # Fix for Railway PostgreSQL connection
 # Railway sometimes provides postgres:// instead of postgresql://
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    # SQLAlchemy needs postgresql:// not postgres://
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Also handle postgresql+psycopg2:// format
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        # SQLAlchemy needs postgresql:// not postgres://
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        print("✅ Fixed postgres:// to postgresql://")
+    elif DATABASE_URL.startswith("postgresql+psycopg2://"):
+        # Remove psycopg2 driver specification if present
+        DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql://", 1)
+        print("✅ Fixed postgresql+psycopg2:// to postgresql://")
 
 # Print connection info (without sensitive data)
 if DATABASE_URL:

@@ -1,18 +1,18 @@
+# Multi-stage build for Railway
 FROM node:20-slim AS frontend-builder
 
 # Build frontend
 WORKDIR /frontend
 
-# Copy package files first
-COPY frontend/package.json ./
+# Copy package files first for better caching
+COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 
 # Copy frontend source files
 COPY frontend/ .
 
 # Install dependencies using npm with --legacy-peer-deps
 # This handles React 19 peer dependency conflicts reliably
-# --legacy-peer-deps tells npm to ignore peer dependency conflicts
-RUN echo "📦 Installing dependencies with npm --legacy-peer-deps..." && \
+RUN echo "📦 Installing dependencies..." && \
     npm install --legacy-peer-deps && \
     echo "✅ Dependencies installed successfully"
 
@@ -27,23 +27,27 @@ RUN if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then \
         ls -la; \
         exit 1; \
     else \
-        echo "✅ Frontend build completed successfully"; \
-        ls -la dist/; \
+        echo "✅ Frontend build verified"; \
+        ls -la dist/ | head -10; \
     fi
 
+# Python backend stage
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for PostgreSQL
+# Install system dependencies for PostgreSQL, build tools, and curl for health check
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements.txt from backend directory (build context is project root)
+# Copy requirements.txt first for better caching
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy all backend files to /app
 COPY backend/ .
@@ -51,13 +55,22 @@ COPY backend/ .
 # Copy frontend dist files from frontend-builder stage
 COPY --from=frontend-builder /frontend/dist /app/static
 
-# Create uploads directory
-RUN mkdir -p uploads/orders
+# Create uploads directory with proper permissions
+RUN mkdir -p uploads/orders && \
+    chmod -R 755 uploads
 
+# Set environment variables
 ENV PORT=8000
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
 EXPOSE 8000
 
-# Use uvicorn directly for better Railway compatibility
-# Railway will set PORT environment variable automatically
-# Use exec form with shell to allow variable expansion
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+# Health check for Railway
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
+
+# Use uvicorn directly - Railway compatible
+# Railway sets PORT automatically, fallback to 8000
+# Use shell form to allow PORT variable expansion
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --log-level info"]

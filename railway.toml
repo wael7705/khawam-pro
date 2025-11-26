@@ -4,8 +4,10 @@ dockerfilePath = "backend/Dockerfile"
 # Build context is project root, so Dockerfile copies from backend/
 
 [deploy]
-# لا نحدد startCommand - Dockerfile يتعامل مع الأمر
-# startCommand سيتم استبداله بـ CMD في Dockerfile
+# لا نحدد startCommand - Dockerfile CMD يتعامل مع الأمر
+# Railway will use the CMD from Dockerfile
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100
 

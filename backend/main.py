@@ -1098,8 +1098,22 @@ async def ensure_portfolio_images_column_now():
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "ok", "message": "API is running", "database": "connected"}
+    """Health check endpoint for Railway"""
+    try:
+        # Test database connection
+        from database import engine
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)[:50]}"
+    
+    return {
+        "status": "ok", 
+        "message": "API is running", 
+        "database": db_status,
+        "port": os.getenv("PORT", "8000")
+    }
 
 if __name__ == "__main__":
     import uvicorn

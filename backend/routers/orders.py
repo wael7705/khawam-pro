@@ -816,146 +816,146 @@ async def create_order(
             
             # Create order items using raw SQL (بدون commit بعد)
             for item_index, item_data in enumerate(order_data.items):
-            # Prepare specifications JSON
-            specs = {}
-            if item_data.specifications:
-                specs.update(item_data.specifications)
-            if item_data.dimensions:
-                specs["dimensions"] = item_data.dimensions
-            if item_data.colors:
-                specs["colors"] = item_data.colors
+                # Prepare specifications JSON
+                specs = {}
+                if item_data.specifications:
+                    specs.update(item_data.specifications)
+                if item_data.dimensions:
+                    specs["dimensions"] = item_data.dimensions
+                if item_data.colors:
+                    specs["colors"] = item_data.colors
+                
+                import json
+                
+                # Collect design_files - من item_data.design_files فقط
+                # لا نجمع من specifications.design_files لتجنب التكرار
+                design_files_list = _safe_design_file_list(item_data.design_files)
+                print(f"📎 Order {order_number}, Item {item_index}: Found {len(design_files_list)} design_files from item_data.design_files")
+                
+                # نبحث في مفاتيح specifications الأخرى (لكن نتجاهل design_files لتجنب التكرار)
+                # فقط المفاتيح الأخرى مثل files, attachments, etc.
+                if specs:
+                    for key, value in specs.items():
+                        # نتجاهل design_files لأنها موجودة في design_files column
+                        if key == 'design_files':
+                            continue
+                        if value:
+                            # إذا كان المفتاح يحتوي على "file" أو "upload" أو "attachment"
+                            key_lower = key.lower()
+                            if any(term in key_lower for term in ['file', 'upload', 'attachment', 'image', 'document', 'pdf']):
+                                print(f"📎 Order {order_number}, Item {item_index}: Found potential file key '{key}' in specifications")
+                                file_entries = _safe_design_file_list(value)
+                                if file_entries:
+                                    print(f"  ✅ Found {len(file_entries)} files in '{key}'")
+                                    for file_entry in file_entries:
+                                        # تجنب التكرار - تحقق من أن الملف غير موجود بالفعل
+                                        if file_entry not in design_files_list:
+                                            design_files_list.append(file_entry)
+                                            print(f"  ✅ Added file from '{key}': {str(file_entry)[:50]}")
+                                        else:
+                                            print(f"  ⏭️ Skipped duplicate file from '{key}'")
+                
+                print(f"📎 Order {order_number}, Item {item_index}: Final design_files count: {len(design_files_list)}")
+                
+                # حفظ أول صورة من design_files_list للإشعار (فقط من أول عنصر)
+                if item_index == 0 and not first_order_image_url and design_files_list:
+                    try:
+                        for file_entry in design_files_list:
+                            file_url = None
+                            if isinstance(file_entry, dict):
+                                file_url = file_entry.get('url') or file_entry.get('file_url') or file_entry.get('download_url') or file_entry.get('data_url')
+                            elif isinstance(file_entry, str):
+                                file_url = file_entry
+                            
+                            if file_url:
+                                # إذا كانت صورة (data URL أو رابط http)
+                                if file_url.startswith('data:image') or file_url.startswith('http'):
+                                    first_order_image_url = file_url
+                                    break
+                    except Exception as img_error:
+                        print(f"⚠️ Failed to extract image URL from design_files: {img_error}")
+                
+                # Persist design files to disk
+                persisted_design_files = _persist_design_files(
+                    order_number,
+                    item_index,
+                    design_files_list
+                )
+                print(f"📎 Order {order_number}, Item {item_index}: Persisted {len(persisted_design_files)} design_files")
+                
+                # إذا لم نجد صورة من data URL، نحاول الحصول على رابط من persisted files
+                if item_index == 0 and not first_order_image_url and persisted_design_files:
+                    try:
+                        for file_entry in persisted_design_files:
+                            if isinstance(file_entry, dict) and file_entry.get('file_key'):
+                                file_key = file_entry.get('file_key')
+                                if file_key:
+                                    # بناء رابط للصورة من الخادم
+                                    public_base_url = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+                                    if not public_base_url:
+                                        domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+                                        if domain:
+                                            public_base_url = f"https://{domain}" if not domain.startswith("http") else domain
+                                        else:
+                                            public_base_url = "https://khawam-pro-production.up.railway.app"
+                                    first_order_image_url = f"{public_base_url}/api/orders/{order_id}/attachments/{file_key}"
+                                    break
+                    except Exception as img_error:
+                        print(f"⚠️ Failed to build image URL from persisted files: {img_error}")
+                
+                # Save design_files in design_files column ONLY
+                # لا نضيف design_files إلى specifications لتجنب التكرار
+                # الملفات موجودة في design_files column وهذا كافٍ
+                design_files_json = json.dumps(persisted_design_files or [])
+                
+                # إزالة design_files من specifications إذا كانت موجودة لتجنب التكرار
+                if 'design_files' in specs:
+                    # نحتفظ فقط بالملفات الموجودة في specifications إذا لم تكن موجودة في design_files column
+                    # لكن لتجنب التكرار، نزيل design_files من specifications تماماً
+                    # لأن الملفات موجودة في design_files column
+                    removed_from_specs = specs.pop('design_files', None)
+                    if removed_from_specs:
+                        print(f"📎 Removed design_files from specifications to avoid duplication (files are in design_files column)")
+                
+                # لا نضيف design_files إلى specifications بعد الآن لتجنب التكرار
+                
+                specs_json = json.dumps(specs) if specs else None
+                
+                # Get product name if product_id is provided
+                product_name = item_data.service_name or "Service Item"
+                if item_data.product_id:
+                    try:
+                        product_result = db.execute(text("""
+                            SELECT name_ar FROM products WHERE id = :product_id
+                        """), {"product_id": item_data.product_id}).fetchone()
+                        if product_result:
+                            product_name = product_result[0]
+                    except:
+                        pass
+                
+                # Insert order item using raw SQL with proper JSONB casting
+                # Use CAST instead of ::jsonb in VALUES to avoid SQL syntax error
+                db.execute(text("""
+                    INSERT INTO order_items 
+                    (order_id, product_id, product_name, quantity, unit_price, total_price, 
+                     specifications, design_files, status)
+                    VALUES 
+                    (:order_id, :product_id, :product_name, :quantity, :unit_price, :total_price,
+                     CAST(:specifications AS jsonb), CAST(:design_files AS jsonb), :status)
+                """), {
+                    "order_id": order_id,
+                    "product_id": item_data.product_id,
+                    "product_name": product_name,
+                    "quantity": item_data.quantity,
+                    "unit_price": float(item_data.unit_price),
+                    "total_price": float(item_data.total_price),
+                    "specifications": specs_json,
+                    "design_files": design_files_json,
+                    "status": "pending"
+                })
+                
+                print(f"✅ Order item {item_index + 1} inserted for order {order_number} (not committed yet)")
             
-            import json
-            
-            # Collect design_files - من item_data.design_files فقط
-            # لا نجمع من specifications.design_files لتجنب التكرار
-            design_files_list = _safe_design_file_list(item_data.design_files)
-            print(f"📎 Order {order_number}, Item {item_index}: Found {len(design_files_list)} design_files from item_data.design_files")
-            
-            # نبحث في مفاتيح specifications الأخرى (لكن نتجاهل design_files لتجنب التكرار)
-            # فقط المفاتيح الأخرى مثل files, attachments, etc.
-            if specs:
-                for key, value in specs.items():
-                    # نتجاهل design_files لأنها موجودة في design_files column
-                    if key == 'design_files':
-                        continue
-                    if value:
-                        # إذا كان المفتاح يحتوي على "file" أو "upload" أو "attachment"
-                        key_lower = key.lower()
-                        if any(term in key_lower for term in ['file', 'upload', 'attachment', 'image', 'document', 'pdf']):
-                            print(f"📎 Order {order_number}, Item {item_index}: Found potential file key '{key}' in specifications")
-                            file_entries = _safe_design_file_list(value)
-                            if file_entries:
-                                print(f"  ✅ Found {len(file_entries)} files in '{key}'")
-                                for file_entry in file_entries:
-                                    # تجنب التكرار - تحقق من أن الملف غير موجود بالفعل
-                                    if file_entry not in design_files_list:
-                                        design_files_list.append(file_entry)
-                                        print(f"  ✅ Added file from '{key}': {str(file_entry)[:50]}")
-                                    else:
-                                        print(f"  ⏭️ Skipped duplicate file from '{key}'")
-            
-            print(f"📎 Order {order_number}, Item {item_index}: Final design_files count: {len(design_files_list)}")
-            
-            # حفظ أول صورة من design_files_list للإشعار (فقط من أول عنصر)
-            if item_index == 0 and not first_order_image_url and design_files_list:
-                try:
-                    for file_entry in design_files_list:
-                        file_url = None
-                        if isinstance(file_entry, dict):
-                            file_url = file_entry.get('url') or file_entry.get('file_url') or file_entry.get('download_url') or file_entry.get('data_url')
-                        elif isinstance(file_entry, str):
-                            file_url = file_entry
-                        
-                        if file_url:
-                            # إذا كانت صورة (data URL أو رابط http)
-                            if file_url.startswith('data:image') or file_url.startswith('http'):
-                                first_order_image_url = file_url
-                                break
-                except Exception as img_error:
-                    print(f"⚠️ Failed to extract image URL from design_files: {img_error}")
-            
-            # Persist design files to disk
-            persisted_design_files = _persist_design_files(
-                order_number,
-                item_index,
-                design_files_list
-            )
-            print(f"📎 Order {order_number}, Item {item_index}: Persisted {len(persisted_design_files)} design_files")
-            
-            # إذا لم نجد صورة من data URL، نحاول الحصول على رابط من persisted files
-            if item_index == 0 and not first_order_image_url and persisted_design_files:
-                try:
-                    for file_entry in persisted_design_files:
-                        if isinstance(file_entry, dict) and file_entry.get('file_key'):
-                            file_key = file_entry.get('file_key')
-                            if file_key:
-                                # بناء رابط للصورة من الخادم
-                                public_base_url = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
-                                if not public_base_url:
-                                    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
-                                    if domain:
-                                        public_base_url = f"https://{domain}" if not domain.startswith("http") else domain
-                                    else:
-                                        public_base_url = "https://khawam-pro-production.up.railway.app"
-                                first_order_image_url = f"{public_base_url}/api/orders/{order_id}/attachments/{file_key}"
-                                break
-                except Exception as img_error:
-                    print(f"⚠️ Failed to build image URL from persisted files: {img_error}")
-            
-            # Save design_files in design_files column ONLY
-            # لا نضيف design_files إلى specifications لتجنب التكرار
-            # الملفات موجودة في design_files column وهذا كافٍ
-            design_files_json = json.dumps(persisted_design_files or [])
-            
-            # إزالة design_files من specifications إذا كانت موجودة لتجنب التكرار
-            if 'design_files' in specs:
-                # نحتفظ فقط بالملفات الموجودة في specifications إذا لم تكن موجودة في design_files column
-                # لكن لتجنب التكرار، نزيل design_files من specifications تماماً
-                # لأن الملفات موجودة في design_files column
-                removed_from_specs = specs.pop('design_files', None)
-                if removed_from_specs:
-                    print(f"📎 Removed design_files from specifications to avoid duplication (files are in design_files column)")
-            
-            # لا نضيف design_files إلى specifications بعد الآن لتجنب التكرار
-            
-            specs_json = json.dumps(specs) if specs else None
-            
-            # Get product name if product_id is provided
-            product_name = item_data.service_name or "Service Item"
-            if item_data.product_id:
-                try:
-                    product_result = db.execute(text("""
-                        SELECT name_ar FROM products WHERE id = :product_id
-                    """), {"product_id": item_data.product_id}).fetchone()
-                    if product_result:
-                        product_name = product_result[0]
-                except:
-                    pass
-            
-            # Insert order item using raw SQL with proper JSONB casting
-            # Use CAST instead of ::jsonb in VALUES to avoid SQL syntax error
-            db.execute(text("""
-                INSERT INTO order_items 
-                (order_id, product_id, product_name, quantity, unit_price, total_price, 
-                 specifications, design_files, status)
-                VALUES 
-                (:order_id, :product_id, :product_name, :quantity, :unit_price, :total_price,
-                 CAST(:specifications AS jsonb), CAST(:design_files AS jsonb), :status)
-            """), {
-                "order_id": order_id,
-                "product_id": item_data.product_id,
-                "product_name": product_name,
-                "quantity": item_data.quantity,
-                "unit_price": float(item_data.unit_price),
-                "total_price": float(item_data.total_price),
-                "specifications": specs_json,
-                "design_files": design_files_json,
-                "status": "pending"
-            })
-            
-            print(f"✅ Order item {item_index + 1} inserted for order {order_number} (not committed yet)")
-        
             # الآن نقوم بـ commit لكل شيء معاً - transaction واحدة آمنة
             db.commit()
             print(f"✅ Transaction committed successfully: Order {order_number} (ID: {order_id}) and all items saved to database")

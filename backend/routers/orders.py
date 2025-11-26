@@ -1369,96 +1369,96 @@ async def get_orders(
                             ORDER BY created_at DESC
                             LIMIT 100
                         """)).fetchall()
-                    
-                    # تحويل النتائج إلى كائنات Order
-                    orders = []
-                    for row in orders_result:
-                        order = Order()
-                        try:
-                            order.id = row[0]
-                            order.order_number = row[1]
-                            if row[2] is not None:
-                                order.customer_id = row[2]
-                            if row[3]:
-                                order.customer_name = row[3]
-                            if row[4]:
-                                order.customer_phone = row[4]
-                            if row[5]:
-                                order.customer_whatsapp = row[5]
-                            if row[6]:
-                                order.shop_name = row[6]
-                            if row[7]:
-                                order.status = row[7]
-                            if row[8] is not None:
-                                order.total_amount = row[8]
-                            if row[9] is not None:
-                                order.final_amount = row[9]
-                            if row[10]:
-                                order.payment_status = row[10]
-                            if row[11]:
-                                order.delivery_type = row[11]
-                            if row[12]:
-                                order.delivery_address = row[12]
-                            if row[13] is not None:
-                                try:
-                                    order.delivery_latitude = row[13]
-                                except AttributeError:
-                                    pass
-                            if row[14] is not None:
-                                try:
-                                    order.delivery_longitude = row[14]
-                                except AttributeError:
-                                    pass
-                            if row[15]:
-                                try:
-                                    order.delivery_address_details = row[15]
-                                except AttributeError:
-                                    pass
-                            if row[16]:
-                                order.notes = row[16]
-                            if row[17]:
-                                try:
-                                    order.staff_notes = row[17]
-                                except AttributeError:
-                                    pass
-                            if row[18] is not None:
-                                try:
-                                    order.paid_amount = row[18]
-                                except AttributeError:
-                                    pass
-                            if row[19] is not None:
-                                try:
-                                    order.remaining_amount = row[19]
-                                except AttributeError:
-                                    pass
-                            if row[20] is not None:
-                                try:
-                                    order.rating = row[20]
-                                except AttributeError:
-                                    pass
-                            if row[21]:
-                                try:
-                                    order.rating_comment = row[21]
-                                except AttributeError:
-                                    pass
-                            if row[22]:
-                                order.created_at = row[22]
-                            if len(row) > 23 and row[23]:
-                                try:
-                                    order.updated_at = row[23]
-                                except AttributeError:
-                                    pass
-                            orders.append(order)
-                        except Exception as row_error:
-                            print(f"⚠️ Error processing order row: {row_error}")
-                            continue
-                    
-                    print(f"✅ Orders API - Admin/Employee orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
-                except Exception as query_error:
-                    print(f"❌ Orders API - Error querying admin orders: {query_error}")
-                    import traceback
-                    traceback.print_exc()
-                    orders = []
+                        
+                        # تحويل النتائج إلى كائنات Order
+                        orders = []
+                        for row in orders_result:
+                            order = Order()
+                            try:
+                                order.id = row[0]
+                                order.order_number = row[1]
+                                if row[2] is not None:
+                                    order.customer_id = row[2]
+                                if row[3]:
+                                    order.customer_name = row[3]
+                                if row[4]:
+                                    order.customer_phone = row[4]
+                                if row[5]:
+                                    order.customer_whatsapp = row[5]
+                                if row[6]:
+                                    order.shop_name = row[6]
+                                if row[7]:
+                                    order.status = row[7]
+                                if row[8] is not None:
+                                    order.total_amount = row[8]
+                                if row[9] is not None:
+                                    order.final_amount = row[9]
+                                if row[10]:
+                                    order.payment_status = row[10]
+                                if row[11]:
+                                    order.delivery_type = row[11]
+                                if row[12]:
+                                    order.delivery_address = row[12]
+                                if row[13] is not None:
+                                    try:
+                                        order.delivery_latitude = row[13]
+                                    except AttributeError:
+                                        pass
+                                if row[14] is not None:
+                                    try:
+                                        order.delivery_longitude = row[14]
+                                    except AttributeError:
+                                        pass
+                                if row[15]:
+                                    try:
+                                        order.delivery_address_details = row[15]
+                                    except AttributeError:
+                                        pass
+                                if row[16]:
+                                    order.notes = row[16]
+                                if row[17]:
+                                    try:
+                                        order.staff_notes = row[17]
+                                    except AttributeError:
+                                        pass
+                                if row[18] is not None:
+                                    try:
+                                        order.paid_amount = row[18]
+                                    except AttributeError:
+                                        pass
+                                if row[19] is not None:
+                                    try:
+                                        order.remaining_amount = row[19]
+                                    except AttributeError:
+                                        pass
+                                if row[20] is not None:
+                                    try:
+                                        order.rating = row[20]
+                                    except AttributeError:
+                                        pass
+                                if row[21]:
+                                    try:
+                                        order.rating_comment = row[21]
+                                    except AttributeError:
+                                        pass
+                                if row[22]:
+                                    order.created_at = row[22]
+                                if len(row) > 23 and row[23]:
+                                    try:
+                                        order.updated_at = row[23]
+                                    except AttributeError:
+                                        pass
+                                orders.append(order)
+                            except Exception as row_error:
+                                print(f"⚠️ Error processing order row: {row_error}")
+                                continue
+                        
+                        print(f"✅ Orders API - Admin/Employee orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders)")
+                    except Exception as query_error:
+                        print(f"❌ Orders API - Error querying admin orders: {query_error}")
+                        import traceback
+                        traceback.print_exc()
+                        orders = []
             else:
                 # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
                 # استخدام customer_id فقط - نفس منطق العملاء

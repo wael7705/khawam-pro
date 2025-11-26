@@ -46,9 +46,10 @@ if DATABASE_URL:
                 user_pass = parts[0].split(":")
                 if len(user_pass) > 1:
                     safe_url = f"{user_pass[0]}:***@{parts[1]}"
-        print(f"📊 Database URL: {safe_url[:80]}...")
+        safe_display = safe_url[:80] if len(safe_url) > 80 else safe_url
+        print(f"Database URL: {safe_display}...")
     except Exception as e:
-        print(f"📊 Database URL configured (password hidden)")
+        print(f"Database URL configured (password hidden)")
 
 # Create engine with connection pooling and error handling
 # على Railway، قد تكون قاعدة البيانات غير جاهزة مباشرة

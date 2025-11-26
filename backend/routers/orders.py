@@ -1030,15 +1030,15 @@ async def create_order(
             "order": order_dict_response,
             "message": f"تم إنشاء الطلب بنجاح: {order_number}"
         }
-            
-        except Exception as transaction_error:
-            # في حالة أي خطأ، نقوم بـ rollback للتراجع عن كل شيء
-            db.rollback()
-            print(f"❌ Transaction failed for order {order_number}: {str(transaction_error)}")
-            print(f"🔄 Rolling back transaction - no data saved")
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(status_code=500, detail=f"خطأ في إنشاء الطلب: {str(transaction_error)}")
+        
+    except Exception as transaction_error:
+        # في حالة أي خطأ، نقوم بـ rollback للتراجع عن كل شيء
+        db.rollback()
+        print(f"❌ Transaction failed for order {order_number}: {str(transaction_error)}")
+        print(f"🔄 Rolling back transaction - no data saved")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في إنشاء الطلب: {str(transaction_error)}")
 
 @router.get("/")
 async def get_orders(

@@ -94,7 +94,7 @@ export const servicesAPI = {
 
 // Orders API
 export const ordersAPI = {
-  getAll: () => api.get('/orders/'),
+  getAll: (myOrders: boolean = true) => api.get('/orders/', { params: { my_orders: myOrders } }),  // my_orders=true للفلترة بناءً على customer_id
   create: (data: any) => api.post('/orders/', data),
   getAttachments: (orderId: number) => api.get(`/orders/${orderId}/attachments`),
   getFile: (orderId: number, fileKey: string) =>

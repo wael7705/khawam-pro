@@ -712,7 +712,7 @@ async def create_order(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    """Create a new order"""
+    """Create a new order - يستخدم transaction واحدة آمنة لضمان حفظ كل شيء معاً"""
     try:
         # Generate unique order number: ORDYYMMDD-xxx
         date_str = datetime.now().strftime('%y%m%d')
@@ -795,38 +795,27 @@ async def create_order(
             RETURNING id
         """
         
-        # Execute SQL and get the order ID
-        result = db.execute(text(sql_query), values_dict)
-        order_id = result.scalar()
-        db.commit()
+        # استخدام transaction واحدة لضمان حفظ كل شيء معاً أو لا شيء
+        # Start transaction - كل شيء يجب أن يتم حفظه معاً
+        print(f"📝 Starting transaction for order {order_number} with data: customer_id={customer_id}, customer_name={order_data.customer_name}, customer_phone={order_data.customer_phone}")
         
-        # Get order data using raw SQL to avoid ORM issues with missing columns
-        order_result = db.execute(text("""
-            SELECT 
-                id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
-                shop_name, status, total_amount, final_amount, payment_status, delivery_type,
-                delivery_address, notes, created_at
-            FROM orders
-            WHERE id = :order_id
-        """), {"order_id": order_id}).fetchone()
-        
-        # Create a simple order object for response
-        order_dict_response = {
-            "id": order_result[0],
-            "order_number": order_result[1],
-            "status": order_result[7],
-            "total_amount": float(order_result[8]) if order_result[8] else 0.0,
-            "final_amount": float(order_result[9]) if order_result[9] else 0.0,
-            "created_at": order_result[14].isoformat() if order_result[14] else None
-        }
-        
-        ensure_order_items_columns(db)
-        
-        # متغير لحفظ أول صورة للطلب (لإظهارها في الإشعار)
-        first_order_image_url = None
-        
-        # Create order items using raw SQL
-        for item_index, item_data in enumerate(order_data.items):
+        try:
+            # Execute SQL and get the order ID (بدون commit بعد)
+            result = db.execute(text(sql_query), values_dict)
+            order_id = result.scalar()
+            
+            if not order_id:
+                raise HTTPException(status_code=500, detail=f"فشل في إنشاء الطلب: لم يتم إرجاع ID")
+            
+            print(f"✅ Order {order_number} inserted with ID: {order_id} (not committed yet)")
+            
+            ensure_order_items_columns(db)
+            
+            # متغير لحفظ أول صورة للطلب (لإظهارها في الإشعار)
+            first_order_image_url = None
+            
+            # Create order items using raw SQL (بدون commit بعد)
+            for item_index, item_data in enumerate(order_data.items):
             # Prepare specifications JSON
             specs = {}
             if item_data.specifications:
@@ -964,48 +953,93 @@ async def create_order(
                 "design_files": design_files_json,
                 "status": "pending"
             })
+            
+            print(f"✅ Order item {item_index + 1} inserted for order {order_number} (not committed yet)")
         
-        db.commit()
-        
-        first_item = order_data.items[0] if order_data.items else None
-        
-        notification_payload: Dict[str, Any] = {
-            "order_id": order_result[0],
-            "order_number": order_number,
-            "customer_name": order_data.customer_name,
-            "customer_phone": order_data.customer_phone,
-            "total_amount": float(order_data.total_amount),
-            "final_amount": float(order_data.final_amount),
-            "delivery_type": order_data.delivery_type,
-            "service_name": order_data.service_name or (first_item.service_name if first_item else None),
-            "items_count": len(order_data.items),
-            "created_at": order_result[14].isoformat() if order_result[14] else datetime.utcnow().isoformat(),
-            "image_url": first_order_image_url,  # صورة الطلب للإشعار (تم استخراجها من design_files)
-        }
+            # الآن نقوم بـ commit لكل شيء معاً - transaction واحدة آمنة
+            db.commit()
+            print(f"✅ Transaction committed successfully: Order {order_number} (ID: {order_id}) and all items saved to database")
+            
+            # التحقق من أن الطلب موجود في القاعدة بعد الـ commit
+            order_result = db.execute(text("""
+                SELECT 
+                    id, order_number, customer_id, customer_name, customer_phone, customer_whatsapp,
+                    shop_name, status, total_amount, final_amount, payment_status, delivery_type,
+                    delivery_address, notes, created_at
+                FROM orders
+                WHERE id = :order_id
+            """), {"order_id": order_id}).fetchone()
+            
+            if not order_result:
+                raise HTTPException(status_code=500, detail=f"فشل في جلب بيانات الطلب بعد الـ commit: {order_id}")
+            
+            # التحقق من وجود order_items
+            items_count = db.execute(text("""
+                SELECT COUNT(*) FROM order_items WHERE order_id = :order_id
+            """), {"order_id": order_id}).scalar()
+            
+            if items_count == 0:
+                raise HTTPException(status_code=500, detail=f"فشل التحقق: الطلب موجود لكن بدون items")
+            
+            print(f"✅ Order verification passed: order {order_number} (ID: {order_id}) exists with {items_count} items")
+            
+            # Create a simple order object for response
+            order_dict_response = {
+                "id": order_result[0],
+                "order_number": order_result[1],
+                "customer_id": order_result[2],
+                "status": order_result[7],
+                "total_amount": float(order_result[8]) if order_result[8] else 0.0,
+                "final_amount": float(order_result[9]) if order_result[9] else 0.0,
+                "created_at": order_result[14].isoformat() if order_result[14] else None
+            }
+            
+            # الآن بعد التأكد من حفظ كل شيء، نكمل باقي العملية
+            first_item = order_data.items[0] if order_data.items else None
+            
+            notification_payload: Dict[str, Any] = {
+                "order_id": order_result[0],
+                "order_number": order_number,
+                "customer_name": order_data.customer_name,
+                "customer_phone": order_data.customer_phone,
+                "total_amount": float(order_data.total_amount),
+                "final_amount": float(order_data.final_amount),
+                "delivery_type": order_data.delivery_type,
+                "service_name": order_data.service_name or (first_item.service_name if first_item else None),
+                "items_count": len(order_data.items),
+                "created_at": order_result[14].isoformat() if order_result[14] else datetime.utcnow().isoformat(),
+                "image_url": first_order_image_url,  # صورة الطلب للإشعار (تم استخراجها من design_files)
+            }
 
-        # Add background task for external notifications (email/SMS)
-        background_tasks.add_task(send_order_notification, notification_payload)
+            # Add background task for external notifications (email/SMS)
+            background_tasks.add_task(send_order_notification, notification_payload)
 
-        # بث الإشعار الفوري للموظفين عبر WebSocket
-        try:
-            await order_notifications.broadcast({
-                "event": "order_created",
-                "data": notification_payload
-            })
-        except Exception as notify_error:
-            print(f"⚠️ Failed to broadcast order notification: {notify_error}")
-        
-        return {
-            "success": True,
-            "order": order_dict_response,
-            "message": f"تم إنشاء الطلب بنجاح: {order_number}"
-        }
-    except Exception as e:
-        db.rollback()
-        print(f"Error creating order: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ في إنشاء الطلب: {str(e)}")
+            # بث الإشعار الفوري للموظفين عبر WebSocket
+            try:
+                await order_notifications.broadcast({
+                    "event": "order_created",
+                    "data": notification_payload
+                })
+                print(f"✅ Order notification broadcasted successfully for order {order_number}")
+            except Exception as notify_error:
+                print(f"⚠️ Failed to broadcast order notification: {notify_error}")
+            
+            print(f"🎉 Order {order_number} (ID: {order_id}) created and verified successfully!")
+            
+            return {
+                "success": True,
+                "order": order_dict_response,
+                "message": f"تم إنشاء الطلب بنجاح: {order_number}"
+            }
+            
+        except Exception as transaction_error:
+            # في حالة أي خطأ، نقوم بـ rollback للتراجع عن كل شيء
+            db.rollback()
+            print(f"❌ Transaction failed for order {order_number}: {str(transaction_error)}")
+            print(f"🔄 Rolling back transaction - no data saved")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"خطأ في إنشاء الطلب: {str(transaction_error)}")
 
 @router.get("/")
 async def get_orders(

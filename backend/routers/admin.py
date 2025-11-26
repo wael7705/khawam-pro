@@ -917,6 +917,7 @@ async def get_all_orders(db: Session = Depends(get_db)):
             print(f"Executing query with {len(select_parts)} columns")
             result = db.execute(text(query))
             rows = result.fetchall()
+            print(f"✅ Found {len(rows)} orders in database")
             
             # تحسين الأداء: جلب جميع items دفعة واحدة بدلاً من loop
             order_ids = [row[0] for row in rows]
@@ -1128,10 +1129,20 @@ async def get_all_orders(db: Session = Depends(get_db)):
                 })
             total_time = time.time() - start_time
             print(f"⏱️ Admin Orders API - Total time: {total_time:.2f}s (returning {len(orders_list)} orders)")
+            
+            # Log summary of orders by status
+            status_counts = {}
+            for order in orders_list:
+                status = order.get('status', 'unknown')
+                status_counts[status] = status_counts.get(status, 0) + 1
+            
+            print(f"📊 Orders by status: {status_counts}")
+            
             return {
                 "success": True,
                 "orders": orders_list,
-                "count": len(orders_list)
+                "count": len(orders_list),
+                "status_counts": status_counts
             }
         except Exception as sql_err:
             print(f"Raw SQL failed, trying ORM: {sql_err}")
@@ -1378,6 +1389,59 @@ def _safe_get_design_files(item):
         import traceback
         traceback.print_exc()
         return []
+
+@router.get("/orders/verify/{order_number}")
+async def verify_order(order_number: str, db: Session = Depends(get_db)):
+    """Verify that an order exists and can be retrieved"""
+    try:
+        from sqlalchemy import text
+        
+        # Check if order exists
+        order_result = db.execute(text("""
+            SELECT id, order_number, customer_id, customer_name, customer_phone, 
+                   status, total_amount, final_amount, created_at
+            FROM orders
+            WHERE order_number = :order_number
+        """), {"order_number": order_number}).fetchone()
+        
+        if not order_result:
+            return {
+                "success": False,
+                "exists": False,
+                "message": f"الطلب {order_number} غير موجود"
+            }
+        
+        # Check if order has items
+        items_count = db.execute(text("""
+            SELECT COUNT(*) FROM order_items WHERE order_id = :order_id
+        """), {"order_id": order_result[0]}).scalar()
+        
+        return {
+            "success": True,
+            "exists": True,
+            "order": {
+                "id": order_result[0],
+                "order_number": order_result[1],
+                "customer_id": order_result[2],
+                "customer_name": order_result[3],
+                "customer_phone": order_result[4],
+                "status": order_result[5],
+                "total_amount": float(order_result[6]) if order_result[6] else 0.0,
+                "final_amount": float(order_result[7]) if order_result[7] else 0.0,
+                "created_at": order_result[8].isoformat() if order_result[8] else None,
+                "items_count": items_count
+            },
+            "message": f"الطلب {order_number} موجود ويمكن الوصول إليه"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "exists": False,
+            "error": str(e),
+            "message": f"خطأ في التحقق من الطلب: {str(e)}"
+        }
 
 @router.get("/orders/{order_id}")
 async def get_order_details(order_id: int, db: Session = Depends(get_db)):

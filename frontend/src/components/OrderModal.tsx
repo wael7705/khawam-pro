@@ -3102,10 +3102,22 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         delete orderData.uploadedFiles
       }
 
+      console.log('📤 Sending order data:', {
+        customer_name: orderData.customer_name,
+        customer_phone: orderData.customer_phone,
+        items_count: orderData.items?.length || 0,
+        total_amount: orderData.total_amount,
+        final_amount: orderData.final_amount
+      })
+      
       const response = await ordersAPI.create(orderData)
+      
+      console.log('📥 Order creation response:', response.data)
       
       if (response.data.success) {
         const orderNumber = response.data?.order?.order_number || 'غير متوفر'
+        const orderId = response.data?.order?.id
+        console.log(`✅ Order created successfully: ${orderNumber} (ID: ${orderId})`)
         setSuccessInfo({ orderNumber })
         // Clear saved form state and delivery address
         localStorage.removeItem('orderFormState')

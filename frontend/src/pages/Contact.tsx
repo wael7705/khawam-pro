@@ -48,8 +48,8 @@ export default function Contact() {
                   <h3>البريد الإلكتروني</h3>
                   <p>استفسارات الشركات والشراكات والتوظيف.</p>
                 </div>
-                <a className="contact-card__action" href="mailto:hello@khawamprint.com">
-                  hello@khawamprint.com
+                <a className="contact-card__action" href="mailto:eyadmrx@gmail.com">
+                  eyadmrx@gmail.com
                 </a>
               </article>
             </div>

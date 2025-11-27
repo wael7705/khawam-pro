@@ -2584,10 +2584,28 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const workflowStep = workflowSteps.find(s => s.step_type === 'files')
     const stepConfig = workflowStep?.step_config || {}
     
-    if (stepConfig.multiple && stepConfig.analyze_pages) {
-      // Handle multiple PDF files - append to existing files
-      setUploadedFiles(prev => [...prev, ...fileArray])
-      analyzePDFPages(fileArray)
+    if (stepConfig.multiple) {
+      // Handle multiple files - append to existing files
+      setUploadedFiles(prev => {
+        // تجنب إضافة ملفات مكررة (نفس الاسم والحجم)
+        const existingSignatures = new Set(prev.map(f => `${f.name}-${f.size}-${f.lastModified}`))
+        const newFiles = fileArray.filter(f => {
+          const signature = `${f.name}-${f.size}-${f.lastModified}`
+          return !existingSignatures.has(signature)
+        })
+        return [...prev, ...newFiles]
+      })
+      
+      // تحليل الصفحات إذا كان مفعّل
+      if (stepConfig.analyze_pages) {
+        analyzePDFPages(fileArray)
+      } else {
+        // تحليل PDFs فقط إذا لم يكن analyze_pages مفعّل
+        const pdfFiles = fileArray.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+        if (pdfFiles.length > 0) {
+          analyzePDFPages(pdfFiles)
+        }
+      }
     } else {
       // Single file - replace existing files
       setUploadedFiles([fileArray[0]])

@@ -39,7 +39,7 @@ export default function GoogleMap({ title = 'خوام للطباعة والتص�
 
   return (
     <div className="google-map">
-      <MapContainerAny center={COORDINATES} zoom={16} scrollWheelZoom={false} className="google-map__canvas">
+      <MapContainerAny center={COORDINATES} zoom={19} scrollWheelZoom={false} className="google-map__canvas">
         <TileLayerAny
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

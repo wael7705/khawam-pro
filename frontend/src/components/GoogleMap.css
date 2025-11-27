@@ -20,6 +20,16 @@
   background: #f8fafc;
 }
 
+.google-map__canvas .leaflet-marker-icon {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  z-index: 1000;
+}
+
+.google-map__canvas .leaflet-container {
+  border-radius: 24px;
+  background: #f8fafc;
+}
+
 .map-placeholder {
   display: grid;
   place-items: center;

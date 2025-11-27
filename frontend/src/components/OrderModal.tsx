@@ -162,6 +162,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
   }
 
+  // دالة للحصول على مفتاح الكاش الخاص بكل خدمة
+  const getCacheKey = (serviceName: string) => `orderFormState_${serviceName.replace(/\s+/g, '_')}`
+  
   // دالة للتحقق من صلاحية الكاش (10 دقائق)
   const isCacheValid = (cacheTimestamp: number): boolean => {
     const CACHE_DURATION = 10 * 60 * 1000 // 10 دقائق بالميلي ثانية
@@ -170,18 +173,39 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }
 
   // دالة لمسح الكاش القديم
-  const clearExpiredCache = () => {
+  const clearExpiredCache = (serviceName?: string) => {
     try {
-      const savedState = localStorage.getItem('orderFormState')
-      if (savedState) {
-        const parsed = JSON.parse(savedState)
-        if (parsed.timestamp && !isCacheValid(parsed.timestamp)) {
-          console.log('🧹 Clearing expired cache (older than 10 minutes)')
-          localStorage.removeItem('orderFormState')
-          localStorage.removeItem('shouldReopenOrderModal')
-          localStorage.removeItem('orderModalService')
-          return true
+      if (serviceName) {
+        // مسح كاش خدمة محددة
+        const cacheKey = getCacheKey(serviceName)
+        const savedState = localStorage.getItem(cacheKey)
+        if (savedState) {
+          const parsed = JSON.parse(savedState)
+          if (parsed.timestamp && !isCacheValid(parsed.timestamp)) {
+            console.log(`🧹 Clearing expired cache for service: ${serviceName}`)
+            localStorage.removeItem(cacheKey)
+            return true
+          }
         }
+      } else {
+        // مسح جميع الكاشات المنتهية الصلاحية
+        const keys = Object.keys(localStorage)
+        keys.forEach(key => {
+          if (key.startsWith('orderFormState_')) {
+            try {
+              const savedState = localStorage.getItem(key)
+              if (savedState) {
+                const parsed = JSON.parse(savedState)
+                if (parsed.timestamp && !isCacheValid(parsed.timestamp)) {
+                  console.log(`🧹 Clearing expired cache: ${key}`)
+                  localStorage.removeItem(key)
+                }
+              }
+            } catch (e) {
+              // تجاهل الأخطاء
+            }
+          }
+        })
       }
     } catch (error) {
       console.warn('⚠️ Error checking cache validity:', error)
@@ -195,9 +219,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
 
     try {
       // مسح الكاش القديم أولاً
-      clearExpiredCache()
+      clearExpiredCache(currentServiceName)
       
-      const savedState = localStorage.getItem('orderFormState')
+      const cacheKey = getCacheKey(currentServiceName)
+      const savedState = localStorage.getItem(cacheKey)
       if (savedState) {
         const parsed = JSON.parse(savedState)
         
@@ -212,17 +237,18 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           // إذا كان الكاش قديم أو لخدمة مختلفة، نمسحه
           if (parsed.serviceName !== currentServiceName) {
             console.log('🧹 Clearing cache for different service')
-            localStorage.removeItem('orderFormState')
+            localStorage.removeItem(cacheKey)
           } else if (!parsed.timestamp || !isCacheValid(parsed.timestamp)) {
             console.log('🧹 Clearing expired cache')
-            localStorage.removeItem('orderFormState')
+            localStorage.removeItem(cacheKey)
           }
         }
       }
     } catch (error) {
       console.warn('⚠️ Unable to parse saved form state step:', error)
       // في حالة الخطأ، نمسح الكاش
-      localStorage.removeItem('orderFormState')
+      const cacheKey = getCacheKey(currentServiceName)
+      localStorage.removeItem(cacheKey)
     }
 
     if (savedStep && !Number.isNaN(savedStep)) {
@@ -527,6 +553,39 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         ) : null}
                       </div>
                     )}
+                    {/* زر رفع ملف إضافي */}
+                    <button
+                      type="button"
+                      className="add-more-files-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        fileInputRef.current?.click()
+                      }}
+                      style={{
+                        marginTop: '12px',
+                        padding: '10px 16px',
+                        background: '#f0f9ff',
+                        border: '2px dashed #3b82f6',
+                        borderRadius: '8px',
+                        color: '#3b82f6',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        fontWeight: '600',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#dbeafe'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#f0f9ff'
+                      }}
+                    >
+                      <span>+</span>
+                      <span>رفع ملف إضافي</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="upload-placeholder">
@@ -604,7 +663,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 />
               </div>
             )}
-            {fields.includes('height') && !stepConfig.hide_height && (
+            {fields.includes('height') && !stepConfig.hide_height && 
+             !serviceName.toLowerCase().includes('كلك بوليستر') && 
+             !serviceName.toLowerCase().includes('polyester') && (
               <div className="form-group">
                 <label>
                   {stepConfig.field_labels?.height || 'الارتفاع'} 
@@ -1289,7 +1350,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.setItem('orderFormState', JSON.stringify({
+                    const cacheKey = getCacheKey(serviceName)
+                    localStorage.setItem(cacheKey, JSON.stringify({
                       step: step, // حفظ المرحلة الحالية
                       quantity,
                       length,
@@ -1374,7 +1436,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.setItem('orderFormState', JSON.stringify({
+                    const cacheKey = getCacheKey(serviceName)
+                    localStorage.setItem(cacheKey, JSON.stringify({
                       step: step, // حفظ المرحلة الحالية
                       quantity,
                       length,
@@ -1833,8 +1896,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           {deliveryType === 'delivery' && !addressConfirmed && (
             <button
               type="button"
-              onClick={() => {
-                localStorage.setItem('orderFormState', JSON.stringify({
+                onClick={() => {
+                const cacheKey = getCacheKey(serviceName)
+                localStorage.setItem(cacheKey, JSON.stringify({
                   step: step,
                   quantity,
                   length,
@@ -1859,7 +1923,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   paperType,
                   serviceName,
                   timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
-                  uploadedFiles: uploadedFiles.map(f => ({ 
+                  uploadedFiles: uploadedFiles.map(f => ({
                     name: f.name, 
                     size: f.size, 
                     type: f.type 
@@ -1911,27 +1975,63 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   className="hidden"
                 />
                 {image && imagePreviewUrl ? (
-                  <div className="uploaded-file">
+                  <>
+                    <div className="uploaded-file">
+                      <button
+                        type="button"
+                        className="remove-file-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setImage(null)
+                          setUploadedFiles([])
+                          setTotalPages(0)
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = ''
+                          }
+                        }}
+                        title="حذف الملف"
+                        style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}
+                      >
+                        <X size={18} />
+                      </button>
+                      <img src={imagePreviewUrl} alt="Preview" />
+                      <p>{image.name}</p>
+                    </div>
+                    {/* زر رفع ملف إضافي */}
                     <button
                       type="button"
-                      className="remove-file-btn"
+                      className="add-more-files-btn"
                       onClick={(e) => {
                         e.stopPropagation()
-                        setImage(null)
-                        setUploadedFiles([])
-                        setTotalPages(0)
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = ''
-                        }
+                        fileInputRef.current?.click()
                       }}
-                      title="حذف الملف"
-                      style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}
+                      style={{
+                        marginTop: '12px',
+                        padding: '10px 16px',
+                        background: '#f0f9ff',
+                        border: '2px dashed #3b82f6',
+                        borderRadius: '8px',
+                        color: '#3b82f6',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                        width: '100%'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#dbeafe'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#f0f9ff'
+                      }}
                     >
-                      <X size={18} />
+                      <span>+</span>
+                      <span>رفع ملف إضافي</span>
                     </button>
-                    <img src={imagePreviewUrl} alt="Preview" />
-                    <p>{image.name}</p>
-                  </div>
+                  </>
                 ) : (
                   <div className="upload-placeholder">
                     <p>{isPosterPrinting || isBannerPrinting ? 'اضغط لرفع التصميم' : 'اضغط لتحديد العرض'}</p>
@@ -2347,7 +2447,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           // إذا لم يكن هناك shouldReopen flag، يعني أننا نفتح خدمة جديدة
           console.log('🧹 Clearing cache - opening new service')
         }
-        localStorage.removeItem('orderFormState')
+        const cacheKey = getCacheKey(serviceName)
+        localStorage.removeItem(cacheKey)
         localStorage.removeItem('shouldReopenOrderModal')
         localStorage.removeItem('orderModalService')
         // إعادة تعيين hasRestoredState عند فتح خدمة جديدة
@@ -2356,7 +2457,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       
       if (shouldRestore) {
         // Restore form state if exists and we're returning from location picker
-        const savedFormState = localStorage.getItem('orderFormState')
+        const cacheKey = getCacheKey(serviceName)
+        const savedFormState = localStorage.getItem(cacheKey)
         if (savedFormState) {
           try {
             const formState = JSON.parse(savedFormState)
@@ -2428,7 +2530,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               addressToastShown.current = true
             }
             // Only update shopName if it's not already set from formState
-            const formStateStr = localStorage.getItem('orderFormState')
+            const cacheKey = getCacheKey(serviceName)
+            const formStateStr = localStorage.getItem(cacheKey)
             if (formStateStr) {
               const formState = JSON.parse(formStateStr)
               if (!formState.shopName && (address.street || address.neighborhood)) {
@@ -2670,7 +2773,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       addressToastShown.current = false
       // Save current form state including current step and all fields
       // IMPORTANT: Save the CURRENT step number so we return to the same step
-      localStorage.setItem('orderFormState', JSON.stringify({
+      const cacheKey = getCacheKey(serviceName)
+      localStorage.setItem(cacheKey, JSON.stringify({
         step: step, // حفظ المرحلة الحالية
         quantity,
         length,
@@ -2777,8 +2881,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             showError('يرجى إدخال العرض بشكل صحيح قبل المتابعة')
             return
           }
-          // التحقق من الارتفاع إذا كان مطلوباً ولم يكن مخفياً
-          if (fields.includes('height') && !stepConfig.hide_height && (!heightValue || heightValue <= 0)) {
+          // التحقق من الارتفاع إذا كان مطلوباً ولم يكن مخفياً وليست خدمة كلك بوليستر
+          if (fields.includes('height') && 
+              !stepConfig.hide_height && 
+              !serviceName.toLowerCase().includes('كلك بوليستر') && 
+              !serviceName.toLowerCase().includes('polyester') &&
+              (!heightValue || heightValue <= 0)) {
             showError('يرجى إدخال الارتفاع بشكل صحيح قبل المتابعة')
             return
           }
@@ -3215,7 +3323,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         console.log(`✅ Order created successfully: ${orderNumber} (ID: ${orderId})`)
         setSuccessInfo({ orderNumber })
         // Clear saved form state and delivery address
-        localStorage.removeItem('orderFormState')
+        const cacheKey = getCacheKey(serviceName)
+        localStorage.removeItem(cacheKey)
         localStorage.removeItem('deliveryAddress')
         localStorage.removeItem('shouldReopenOrderModal')
         localStorage.removeItem('orderModalService')

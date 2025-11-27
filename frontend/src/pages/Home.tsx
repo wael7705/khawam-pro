@@ -26,7 +26,18 @@ export default function Home() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
         >
-          <div className="placeholder-image">
+          <img 
+            src="/logo.jpg" 
+            alt="خوام - Khawam Printing" 
+            className="hero-logo"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const placeholder = target.nextElementSibling as HTMLElement;
+              if (placeholder) placeholder.style.display = 'flex';
+            }}
+          />
+          <div className="placeholder-image" style={{ display: 'none' }}>
             <span>خوام</span>
           </div>
         </motion.div>

@@ -65,7 +65,7 @@ export default function OrdersManagement() {
   
   // نظام الإشعارات
   const knownOrderIdsRef = useRef<Set<number>>(new Set())
-  const { notifications, isConnected } = useOrderNotifications({
+  const { notifications, isConnected, notificationPermission } = useOrderNotifications({
     onNotificationClick: (orderId) => {
       navigate(`/dashboard/orders/${orderId}`)
       loadOrders(true)
@@ -737,26 +737,34 @@ export default function OrdersManagement() {
   return (
     <div className="orders-management">
       {/* مؤشر الاتصال بالإشعارات */}
-      {isConnected && (
-        <div className="notification-status" style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          background: '#10B981',
-          color: 'white',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          zIndex: 1000,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-        }}>
-          <Bell size={16} />
-          <span>الإشعارات نشطة</span>
-        </div>
-      )}
+      <div className="notification-status" style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        background: isConnected ? '#10B981' : '#EF4444',
+        color: 'white',
+        padding: '8px 16px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        zIndex: 1000,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        cursor: 'pointer'
+      }}
+      onClick={() => {
+        console.log('WebSocket Status:', {
+          isConnected,
+          notifications: notifications.length,
+          permission: notificationPermission
+        })
+      }}
+      title={isConnected ? 'الإشعارات نشطة' : 'الإشعارات غير متصلة - جاري إعادة الاتصال...'}
+      >
+        <Bell size={16} />
+        <span>{isConnected ? 'الإشعارات نشطة' : 'غير متصل'}</span>
+      </div>
       <div className="section-header">
         <div>
           <h1>إدارة الطلبات</h1>

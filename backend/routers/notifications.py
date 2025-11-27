@@ -7,6 +7,17 @@ from .auth import SECRET_KEY, ALGORITHM, CUSTOM_TOKENS, is_valid_phone, is_valid
 
 router = APIRouter()
 
+@router.get("/ws/status")
+async def get_websocket_status():
+    """الحصول على حالة اتصالات WebSocket"""
+    from notifications import order_notifications
+    connection_count = order_notifications.get_connection_count()
+    return {
+        "success": True,
+        "active_connections": connection_count,
+        "status": "active" if connection_count > 0 else "no_connections"
+    }
+
 
 async def _validate_staff_token(token: str) -> Optional[int]:
     """التحقق من أن التوكن صالح وأن المستخدم موظف أو مدير - مع دعم Token مخصص"""

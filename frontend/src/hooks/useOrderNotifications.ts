@@ -142,11 +142,25 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
     }
 
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.host
-      const wsUrl = `${protocol}//${host}/api/ws/orders?token=${encodeURIComponent(token)}`
+      // استخدام API URL من environment أو من window.location
+      const apiBaseUrl = import.meta.env.VITE_API_URL || window.location.origin
+      
+      // بناء WebSocket URL
+      let wsUrl: string
+      if (apiBaseUrl.startsWith('https://')) {
+        wsUrl = apiBaseUrl.replace('https://', 'wss://') + '/api/ws/orders'
+      } else if (apiBaseUrl.startsWith('http://')) {
+        wsUrl = apiBaseUrl.replace('http://', 'ws://') + '/api/ws/orders'
+      } else {
+        // Fallback: استخدام window.location
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl = `${protocol}//${window.location.host}/api/ws/orders`
+      }
+      
+      // إضافة token
+      wsUrl += `?token=${encodeURIComponent(token)}`
 
-      console.log('🔌 Connecting to WebSocket...')
+      console.log('🔌 Connecting to WebSocket...', wsUrl.replace(token, 'TOKEN_HIDDEN'))
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
@@ -163,6 +177,13 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
           const data = JSON.parse(event.data)
           console.log('📨 WebSocket message received:', data)
 
+          // معالجة رسائل ping/pong
+          if (data.type === 'ping') {
+            ws.send(JSON.stringify({ type: 'pong' }))
+            return
+          }
+
+          // معالجة إشعارات الطلبات الجديدة
           if (data.event === 'order_created' && data.data) {
             handleNewOrder(data as OrderNotification)
           }
@@ -176,15 +197,19 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
         setIsConnected(false)
       }
 
-      ws.onclose = () => {
-        console.log('⚠️ WebSocket disconnected')
+      ws.onclose = (event) => {
+        console.log(`⚠️ WebSocket disconnected (code: ${event.code}, reason: ${event.reason || 'none'})`)
         setIsConnected(false)
 
-        // إعادة الاتصال بعد 3 ثوان
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('🔄 Reconnecting WebSocket...')
-          connectWebSocket()
-        }, 3000)
+        // إعادة الاتصال فقط إذا لم يكن الإغلاق متعمداً (code 1000 = normal closure)
+        if (event.code !== 1000 && event.code !== 1001) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('🔄 Reconnecting WebSocket...')
+            connectWebSocket()
+          }, 3000)
+        } else {
+          console.log('✅ WebSocket closed normally, not reconnecting')
+        }
       }
 
       wsRef.current = ws

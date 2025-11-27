@@ -965,7 +965,7 @@ try:
     app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(init_pricing.router, prefix="/api/pricing", tags=["Pricing"])
     app.include_router(file_analysis.router, prefix="/api/files", tags=["File Analysis"])
-    app.include_router(notifications.router, tags=["Notifications"])
+    app.include_router(notifications.router, prefix="/api", tags=["Notifications"])
 except ImportError as e:
     print(f"Warning: Error importing main routers: {e}")
 

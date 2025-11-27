@@ -143,14 +143,18 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
 
     try {
       // استخدام API URL من environment أو من window.location
-      const apiBaseUrl = import.meta.env.VITE_API_URL || window.location.origin
+      // استخدام نفس baseURL المستخدم في api.ts
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'
+      
+      // إزالة /api من النهاية إذا كان موجوداً (لأننا سنضيفه لاحقاً)
+      const baseUrl = apiBaseUrl.replace(/\/api\/?$/, '')
       
       // بناء WebSocket URL
       let wsUrl: string
-      if (apiBaseUrl.startsWith('https://')) {
-        wsUrl = apiBaseUrl.replace('https://', 'wss://') + '/api/ws/orders'
-      } else if (apiBaseUrl.startsWith('http://')) {
-        wsUrl = apiBaseUrl.replace('http://', 'ws://') + '/api/ws/orders'
+      if (baseUrl.startsWith('https://')) {
+        wsUrl = baseUrl.replace('https://', 'wss://') + '/api/ws/orders'
+      } else if (baseUrl.startsWith('http://')) {
+        wsUrl = baseUrl.replace('http://', 'ws://') + '/api/ws/orders'
       } else {
         // Fallback: استخدام window.location
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'

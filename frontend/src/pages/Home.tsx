@@ -84,10 +84,26 @@ function ServicesShowcaseSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
+            {/* 
+              خيارات للمحتوى المتحرك:
+              1. GIF من Giphy/Tenor: استبدل URL أدناه
+              2. فيديو محلي: استخدم <video> بدلاً من <img>
+              3. فيديو YouTube: استخدم <iframe>
+              
+              روابط GIF مقترحة للطباعة:
+              - Giphy: https://giphy.com/search/printing-machine
+              - Tenor: https://tenor.com/search/printing-gifs
+            */}
             <motion.img 
-              src="/logo.jpg"
-              alt="خدمات الطباعة الحديثة والمتقنة"
+              src="/services-showcase.png"
+              alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
+              onError={(e) => {
+                // Fallback إلى لوغو محلي إذا فشل تحميل الصورة
+                const target = e.target as HTMLImageElement;
+                target.src = "/logo.jpg";
+                console.warn('⚠️ Failed to load services showcase image, using logo fallback');
+              }}
               animate={{
                 y: [0, -10, 0],
               }}

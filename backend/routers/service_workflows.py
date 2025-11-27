@@ -662,3 +662,117 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
 
+ 
+ @router.post("/remove-poster-colors-step")
+async def remove_poster_colors_step(db: Session = Depends(get_db)):
+    """حذف مرحلة اختيار الألوان من خدمة طباعة البوسترات وإعادة ترقيم الخطوات"""
+    print("=" * 80)
+    print("🔧 [REMOVE_COLORS] Starting removal of colors step from poster printing service...")
+    print("=" * 80)
+    
+    try:
+        # 1. البحث عن خدمة طباعة البوسترات
+        print("🔍 [REMOVE_COLORS] Searching for poster printing service...")
+        service_result = db.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%طباعة البوسترات%' OR name_ar LIKE '%بوستر%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if not service_result:
+            print("❌ [REMOVE_COLORS] Poster printing service not found!")
+            return {
+                "success": False,
+                "message": "خدمة طباعة البوسترات غير موجودة"
+            }
+        
+        service_id = service_result[0]
+        service_name = service_result[1]
+        print(f"✅ [REMOVE_COLORS] Found service: ID={service_id}, Name={service_name}")
+        
+        # 2. البحث عن مرحلة اختيار الألوان
+        print("🔍 [REMOVE_COLORS] Searching for colors step...")
+        colors_step = db.execute(text("""
+            SELECT id, step_number, step_name_ar 
+            FROM service_workflows 
+            WHERE service_id = :service_id AND step_type = 'colors' AND is_active = true
+        """), {"service_id": service_id}).fetchone()
+        
+        if not colors_step:
+            print("⚠️ [REMOVE_COLORS] Colors step not found - may already be removed")
+            return {
+                "success": True,
+                "message": "مرحلة اختيار الألوان غير موجودة (قد تم حذفها مسبقاً)"
+            }
+        
+        colors_step_id = colors_step[0]
+        colors_step_number = colors_step[1]
+        print(f"✅ [REMOVE_COLORS] Found colors step: ID={colors_step_id}, Step Number={colors_step_number}")
+        
+        # 3. حذف مرحلة الألوان
+        print(f"🗑️ [REMOVE_COLORS] Deleting colors step (ID: {colors_step_id})...")
+        db.execute(text("""
+            DELETE FROM service_workflows 
+            WHERE id = :step_id
+        """), {"step_id": colors_step_id})
+        db.commit()
+        print(f"✅ [REMOVE_COLORS] Colors step deleted successfully")
+        
+        # 4. إعادة ترقيم الخطوات المتبقية
+        print("🔄 [REMOVE_COLORS] Renumbering remaining steps...")
+        remaining_steps = db.execute(text("""
+            SELECT id, step_number 
+            FROM service_workflows 
+            WHERE service_id = :service_id AND is_active = true
+            ORDER BY step_number ASC
+        """), {"service_id": service_id}).fetchall()
+        
+        new_step_number = 1
+        for step in remaining_steps:
+            step_id, old_step_number = step
+            if old_step_number != new_step_number:
+                db.execute(text("""
+                    UPDATE service_workflows 
+                    SET step_number = :new_step, updated_at = NOW()
+                    WHERE id = :step_id
+                """), {
+                    "step_id": step_id,
+                    "new_step": new_step_number
+                })
+                print(f"  ✅ Step {old_step_number} → {new_step_number}")
+            new_step_number += 1
+        
+        db.commit()
+        print(f"✅ [REMOVE_COLORS] Renumbered {len(remaining_steps)} steps")
+        
+        # 5. التحقق من النتيجة
+        final_steps = db.execute(text("""
+            SELECT step_number, step_name_ar, step_type 
+            FROM service_workflows 
+            WHERE service_id = :service_id AND is_active = true
+            ORDER BY step_number ASC
+        """), {"service_id": service_id}).fetchall()
+        
+        print("=" * 80)
+        print(f"✅ [REMOVE_COLORS] Final workflow steps for poster printing:")
+        for step in final_steps:
+            print(f"  Step {step[0]}: {step[1]} (type: {step[2]})")
+        print("=" * 80)
+        
+        return {
+            "success": True,
+            "message": "تم حذف مرحلة اختيار الألوان بنجاح",
+            "service_id": service_id,
+            "remaining_steps": len(final_steps),
+            "steps": [{"step_number": s[0], "name": s[1], "type": s[2]} for s in final_steps]
+        }
+        
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ [REMOVE_COLORS] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف مرحلة الألوان: {str(e)}")
+

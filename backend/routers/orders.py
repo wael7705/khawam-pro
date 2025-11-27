@@ -952,7 +952,7 @@ async def create_order(
                 "design_files": design_files_json,
                 "status": "pending"
             })
-            
+        
             print(f"✅ Order item {item_index + 1} inserted for order {order_number} (not committed yet)")
         
         # الآن نقوم بـ commit لكل شيء معاً - transaction واحدة آمنة

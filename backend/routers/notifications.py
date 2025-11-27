@@ -135,10 +135,38 @@ async def orders_notifications(websocket: WebSocket):
     print(f"✅ WebSocket: Connection established for user {user_id}")
 
     try:
+        # إرسال رسالة ping كل 30 ثانية للحفاظ على الاتصال
+        import asyncio
+        ping_task = None
+        
+        async def send_ping():
+            while True:
+                await asyncio.sleep(30)
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except:
+                    break
+        
+        ping_task = asyncio.create_task(send_ping())
+        
         while True:
-            # نحافظ على الاتصال مفتوحاً عبر استقبال أي رسائل (مثل ping) من العميل
-            await websocket.receive_text()
+            # نحافظ على الاتصال مفتوحاً عبر استقبال أي رسائل (مثل ping/pong) من العميل
+            try:
+                message = await websocket.receive_text()
+                # معالجة رسائل pong من العميل
+                try:
+                    import json
+                    data = json.loads(message)
+                    if data.get("type") == "pong":
+                        continue
+                except:
+                    pass
+            except Exception as recv_error:
+                print(f"⚠️ WebSocket receive error: {recv_error}")
+                break
     except WebSocketDisconnect:
+        if ping_task:
+            ping_task.cancel()
         print(f"⚠️ WebSocket: Disconnected for user {user_id}")
         await order_notifications.disconnect(websocket)
     except Exception as e:

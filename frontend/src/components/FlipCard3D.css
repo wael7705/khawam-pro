@@ -146,7 +146,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
   z-index: 2;
 }
 
@@ -248,12 +248,12 @@
 
 .flip-card-size-option:hover {
   border-color: #F97316;
-  background: rgba(249, 115, 22, 0.05);
+  background: rgba(220, 38, 38, 0.05);
 }
 
 .flip-card-size-option.selected {
   border-color: #F97316;
-  background: rgba(249, 115, 22, 0.1);
+  background: rgba(220, 38, 38, 0.1);
   color: #F97316;
   font-weight: 600;
 }
@@ -285,7 +285,7 @@
 .flip-card-select-btn:hover:not(:disabled) {
   background: #ea580c;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .flip-card-select-btn:disabled {

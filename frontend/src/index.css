@@ -1,10 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap');
 
 :root {
-  --primary: #ff6b35;
-  --primary-dark: #e85a2a;
-  --secondary: #7048e8;
-  --secondary-dark: #5f3dc4;
+  /* ألوان مستوحاة من لوغو خوام - أحمر قوي مع تدرجات */
+  --primary: #DC2626;
+  --primary-dark: #991B1B;
+  --secondary: #EF4444;
+  --secondary-dark: #B91C1C;
   --bg-light: #ffffff;
   --bg-dark: #1a1a1a;
   --text-light: #333333;

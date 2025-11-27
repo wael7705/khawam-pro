@@ -1,7 +1,7 @@
 /* Location Picker Page Styles */
 .location-picker-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.05), rgba(112, 72, 232, 0.05));
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05), rgba(239, 68, 68, 0.05));
   padding-bottom: 40px;
 }
 
@@ -90,13 +90,13 @@
   border-radius: 20px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-  border: 1px solid rgba(255, 107, 53, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.1);
 }
 
 .map-header {
   padding: 20px 24px;
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.08), rgba(112, 72, 232, 0.08));
-  border-bottom: 2px solid rgba(255, 107, 53, 0.1);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.08), rgba(239, 68, 68, 0.08));
+  border-bottom: 2px solid rgba(220, 38, 38, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -283,12 +283,12 @@
   align-items: center;
   gap: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
 }
 
 .locate-me-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
 }
 
 /* تم نقل .location-info و .map-container-wrapper إلى الأعلى لتجنب التكرار */
@@ -305,7 +305,7 @@
   border-radius: 20px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   padding: 32px;
-  border: 1px solid rgba(255, 107, 53, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.1);
 }
 
 .form-title {
@@ -429,7 +429,7 @@
 .form-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
   background: #fffaf8;
 }
 
@@ -450,7 +450,7 @@
 .form-textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
   background: #fffaf8;
 }
 
@@ -489,7 +489,7 @@
 
 .image-upload-button:hover {
   border-color: var(--primary);
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.05), rgba(112, 72, 232, 0.05));
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05), rgba(239, 68, 68, 0.05));
   transform: translateY(-2px);
 }
 
@@ -589,12 +589,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
 }
 
 .submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
 }
 
 .submit-btn:disabled {

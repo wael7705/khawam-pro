@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 80px 20px;
-  background: linear-gradient(135deg, rgba(112, 72, 232, 0.1), rgba(255, 107, 53, 0.1));
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.1));
   position: relative;
   overflow: hidden;
 }
@@ -68,8 +68,8 @@
   color: #ffffff;
   text-shadow:
     0 0 18px rgba(255, 255, 255, 0.5),
-    0 0 42px rgba(249, 115, 22, 0.55),
-    0 0 64px rgba(56, 189, 248, 0.35);
+    0 0 42px rgba(220, 38, 38, 0.6),
+    0 0 64px rgba(239, 68, 68, 0.4);
   padding: 0 12px;
 }
 
@@ -104,7 +104,7 @@
   gap: 8px;
   padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.18);
+  background: rgba(220, 38, 38, 0.18);
   color: var(--secondary);
   font-weight: 600;
   margin-bottom: 18px;
@@ -139,8 +139,8 @@
 }
 
 .services-promo__stats div:last-of-type {
-  background: rgba(56, 189, 248, 0.18);
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: rgba(220, 38, 38, 0.18);
+  border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 .services-promo__actions {

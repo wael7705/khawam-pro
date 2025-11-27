@@ -97,7 +97,7 @@
 
 .user-info {
   padding: 20px;
-  background: linear-gradient(135deg, rgba(112, 72, 232, 0.1), rgba(255, 107, 53, 0.1));
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.1));
 }
 
 .user-avatar-large {
@@ -169,7 +169,7 @@
 
 .menu-item.primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .menu-item.secondary {

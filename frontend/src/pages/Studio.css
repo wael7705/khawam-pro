@@ -132,12 +132,12 @@
 
 .upload-zone:hover {
   border-color: var(--primary);
-  background: rgba(255, 107, 53, 0.05);
+  background: rgba(220, 38, 38, 0.05);
 }
 
 .upload-zone.dragging {
   border-color: var(--primary);
-  background: rgba(255, 107, 53, 0.15);
+  background: rgba(220, 38, 38, 0.15);
   border-width: 4px;
   transform: scale(1.02);
 }

@@ -85,7 +85,7 @@
 
 .thumbnail-item.active {
   border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .thumbnail-item img {

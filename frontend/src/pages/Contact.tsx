@@ -48,8 +48,13 @@ export default function Contact() {
                   <h3>البريد الإلكتروني</h3>
                   <p>استفسارات الشركات والشراكات والتوظيف.</p>
                 </div>
-                <a className="contact-card__action" href="mailto:eyadmrx@gmail.com">
-                  eyadmrx@gmail.com
+                <a 
+                  className="contact-card__action" 
+                  href="mailto:eyadmrx@gmail.com?subject=استفسار من موقع خوام&body=مرحباً،%0D%0A%0D%0A"
+                  style={{ cursor: 'pointer' }}
+                >
+                  إرسال بريد إلكتروني
+                  <span>eyadmrx@gmail.com</span>
                 </a>
               </article>
             </div>

@@ -90,6 +90,10 @@
   text-decoration: none;
   width: fit-content;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
 }
 
 .contact-card__action span {

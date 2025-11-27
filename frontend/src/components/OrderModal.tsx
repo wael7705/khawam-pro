@@ -520,7 +520,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   accept={stepConfig.accept || ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript"}
                   onChange={handleImageUpload}
                   className="hidden"
-                  multiple={stepConfig.multiple || false}
+                  multiple={stepConfig.multiple === true || stepConfig.multiple === 'true' || stepConfig.multiple === 1}
                 />
                 {uploadedFiles.length > 0 ? (
                   <div className="uploaded-files-list">
@@ -2578,21 +2578,42 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     if (!files || files.length === 0) return
 
     const fileArray = Array.from(files)
+    console.log('📁 Files selected:', fileArray.length, 'files')
+    console.log('📁 File names:', fileArray.map(f => f.name))
+    
     setImage(fileArray[0]) // Keep first file for image preview
     
     // Check if multiple files are allowed and if PDFs
-    const workflowStep = workflowSteps.find(s => s.step_type === 'files')
+    // البحث في workflowSteps الحالية أو في step الحالي
+    const currentStep = workflowSteps.find(s => s.step_number === step)
+    const workflowStep = currentStep?.step_type === 'files' ? currentStep : workflowSteps.find(s => s.step_type === 'files')
     const stepConfig = workflowStep?.step_config || {}
     
-    if (stepConfig.multiple) {
+    console.log('📋 Current step:', step)
+    console.log('📋 Workflow step found:', !!workflowStep)
+    console.log('📋 Step config:', stepConfig)
+    console.log('📋 Multiple enabled:', stepConfig.multiple)
+    
+    // التحقق من multiple - يمكن أن يكون true أو 'true' أو 1
+    const isMultiple = stepConfig.multiple === true || stepConfig.multiple === 'true' || stepConfig.multiple === 1
+    
+    if (isMultiple) {
+      console.log('✅ Multiple files mode - appending files')
       // Handle multiple files - append to existing files
       setUploadedFiles(prev => {
+        console.log('📦 Previous files count:', prev.length)
         // تجنب إضافة ملفات مكررة (نفس الاسم والحجم)
         const existingSignatures = new Set(prev.map(f => `${f.name}-${f.size}-${f.lastModified}`))
         const newFiles = fileArray.filter(f => {
           const signature = `${f.name}-${f.size}-${f.lastModified}`
-          return !existingSignatures.has(signature)
+          const isDuplicate = existingSignatures.has(signature)
+          if (isDuplicate) {
+            console.log('⚠️ Duplicate file skipped:', f.name)
+          }
+          return !isDuplicate
         })
+        console.log('📦 New files to add:', newFiles.length)
+        console.log('📦 Total files after add:', prev.length + newFiles.length)
         return [...prev, ...newFiles]
       })
       
@@ -2607,6 +2628,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         }
       }
     } else {
+      console.log('📄 Single file mode - replacing files')
       // Single file - replace existing files
       setUploadedFiles([fileArray[0]])
       if (fileArray[0].type === 'application/pdf') {
@@ -2624,7 +2646,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
     
     // Reset file input to allow selecting the same file again
-    if (fileInputRef.current) {
+    // لكن فقط إذا كان multiple مفعّل - حتى يمكن رفع ملفات إضافية
+    if (fileInputRef.current && isMultiple) {
+      // لا نمسح value في وضع multiple حتى يمكن رفع ملفات إضافية
+      // لكن يمكن إعادة تعيينه بعد معالجة الملفات
+      setTimeout(() => {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+      }, 100)
+    } else if (fileInputRef.current && !isMultiple) {
       fileInputRef.current.value = ''
     }
   }

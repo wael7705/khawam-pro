@@ -28,13 +28,15 @@ async def lifespan(app: FastAPI):
     # بدء المهام في الخلفية - لا ننتظرها ولا نمنع بدء التطبيق
     import asyncio
     try:
-        # استخدام create_task مباشرة - ستعمل في الخلفية
-        asyncio.create_task(_init_pricing_table())
-        asyncio.create_task(_setup_lecture_printing_service())
-        asyncio.create_task(_setup_clothing_printing_service())
-        asyncio.create_task(_setup_flier_printing_service())
-        asyncio.create_task(_ensure_default_services())
-        asyncio.create_task(_ensure_portfolio_images_column())
+        # الحصول على event loop الحالي
+        loop = asyncio.get_event_loop()
+        # استخدام create_task بشكل صحيح - ستعمل في الخلفية
+        loop.create_task(_init_pricing_table())
+        loop.create_task(_setup_lecture_printing_service())
+        loop.create_task(_setup_clothing_printing_service())
+        loop.create_task(_setup_flier_printing_service())
+        loop.create_task(_ensure_default_services())
+        loop.create_task(_ensure_portfolio_images_column())
         print("✅ Startup tasks initiated in background")
     except Exception as e:
         print(f"⚠️ Warning: Failed to create startup tasks: {str(e)[:200]}")
@@ -968,6 +970,8 @@ try:
     app.include_router(notifications.router, prefix="/api", tags=["Notifications"])
 except ImportError as e:
     print(f"Warning: Error importing main routers: {e}")
+    import traceback
+    traceback.print_exc()
 
 # إضافة router النظام الهرمي
 try:

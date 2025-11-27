@@ -662,8 +662,7 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
 
- 
- @router.post("/remove-poster-colors-step")
+@router.post("/remove-poster-colors-step")
 async def remove_poster_colors_step(db: Session = Depends(get_db)):
     """حذف مرحلة اختيار الألوان من خدمة طباعة البوسترات وإعادة ترقيم الخطوات"""
     print("=" * 80)

@@ -503,6 +503,17 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                         <FileText size={20} />
                         <span>{file.name}</span>
                         <span className="file-size">({(file.size / 1024).toFixed(1)} KB)</span>
+                        <button
+                          type="button"
+                          className="remove-file-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemoveFile(idx)
+                          }}
+                          title="حذف الملف"
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
                     ))}
                     {stepConfig.analyze_pages && (
@@ -1601,10 +1612,21 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                           <span className="invoice-file-name">{file.name}</span>
                           <span className="invoice-file-size">{(file.size / 1024).toFixed(1)} KB</span>
                         </div>
-                        <button type="button" className="file-action-btn" onClick={() => handlePreviewFile(file)}>
-                          <ExternalLink size={14} />
-                          <span>عرض</span>
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="button" className="file-action-btn" onClick={() => handlePreviewFile(file)}>
+                            <ExternalLink size={14} />
+                            <span>عرض</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="file-action-btn"
+                            onClick={() => handleRemoveFile(idx)}
+                            title="حذف الملف"
+                            style={{ color: '#ff4444' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1890,6 +1912,23 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 />
                 {image && imagePreviewUrl ? (
                   <div className="uploaded-file">
+                    <button
+                      type="button"
+                      className="remove-file-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setImage(null)
+                        setUploadedFiles([])
+                        setTotalPages(0)
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = ''
+                        }
+                      }}
+                      title="حذف الملف"
+                      style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}
+                    >
+                      <X size={18} />
+                    </button>
                     <img src={imagePreviewUrl} alt="Preview" />
                     <p>{image.name}</p>
                   </div>
@@ -2362,8 +2401,15 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 setDeliveryType('delivery')
               }
               
+              // لا نستورد الملفات المرفوعة من الكاش - يجب رفعها من جديد لكل خدمة
+              // لأن File objects لا يمكن serialize، والملفات يجب أن تكون خاصة بكل خدمة
+              setUploadedFiles([])
+              setImage(null)
+              setTotalPages(0)
+              
               hasRestoredState.current = true
               console.log('✅ Form state restored successfully, step:', formState.step)
+              console.log('🧹 Cleared uploaded files - must be re-uploaded for this service')
             }
           } catch (error) {
             console.error('❌ Error loading form state:', error)
@@ -2424,11 +2470,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     const stepConfig = workflowStep?.step_config || {}
     
     if (stepConfig.multiple && stepConfig.analyze_pages) {
-      // Handle multiple PDF files
-      setUploadedFiles(fileArray)
+      // Handle multiple PDF files - append to existing files
+      setUploadedFiles(prev => [...prev, ...fileArray])
       analyzePDFPages(fileArray)
     } else {
-      // Single file
+      // Single file - replace existing files
       setUploadedFiles([fileArray[0]])
       if (fileArray[0].type === 'application/pdf') {
         analyzePDFPages([fileArray[0]])
@@ -2442,6 +2488,36 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         // استخراج الألوان من الصور
         extractColorsFromImages(imageFiles)
       }
+    }
+    
+    // Reset file input to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // دالة لحذف ملف من القائمة
+  const handleRemoveFile = (index: number) => {
+    const newFiles = uploadedFiles.filter((_, idx) => idx !== index)
+    setUploadedFiles(newFiles)
+    
+    // إذا كان الملف المحذوف هو الصورة الرئيسية، امسحها أيضاً
+    if (index === 0 && image && uploadedFiles[0] === image) {
+      setImage(newFiles[0] || null)
+    } else if (uploadedFiles[index] === image) {
+      setImage(null)
+    }
+    
+    // إعادة حساب عدد الصفحات إذا كان هناك تحليل
+    if (newFiles.length > 0) {
+      const pdfFiles = newFiles.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+      if (pdfFiles.length > 0) {
+        analyzePDFPages(pdfFiles)
+      } else {
+        setTotalPages(0)
+      }
+    } else {
+      setTotalPages(0)
     }
   }
   
@@ -2677,18 +2753,37 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
     }
 
-    if ((isPosterPrinting || isBannerPrinting || isFlexPrinting) && step === 2) {
-      const lengthValue = parseFloat(length)
-      const widthValue = parseFloat(width)
-      if (!lengthValue || lengthValue <= 0 || !widthValue || widthValue <= 0) {
-        showError('يرجى إدخال الطول والعرض بشكل صحيح قبل المتابعة')
-        return
-      }
-    }
-
     // التحقق من skip_invoice - إذا كان true وstep الحالي هو customer_info، أرسل الطلب مباشرة
     if (workflowSteps.length > 0) {
       const currentStep = workflowSteps.find((s) => s.step_number === step)
+      
+      // التحقق من المقاسات - إذا كان step_type === 'dimensions' وكان required
+      if (currentStep?.step_type === 'dimensions') {
+        const stepConfig = currentStep.step_config || {}
+        const isRequired = stepConfig.required !== false // افتراضي required إذا لم يُحدد
+        
+        if (isRequired) {
+          const fields = stepConfig.fields || ['length', 'width', 'height']
+          const lengthValue = parseFloat(length)
+          const widthValue = parseFloat(width)
+          const heightValue = parseFloat(height)
+          
+          // التحقق من الطول والعرض (مطلوبان دائماً)
+          if (fields.includes('length') && (!lengthValue || lengthValue <= 0)) {
+            showError('يرجى إدخال الطول بشكل صحيح قبل المتابعة')
+            return
+          }
+          if (fields.includes('width') && (!widthValue || widthValue <= 0)) {
+            showError('يرجى إدخال العرض بشكل صحيح قبل المتابعة')
+            return
+          }
+          // التحقق من الارتفاع إذا كان مطلوباً ولم يكن مخفياً
+          if (fields.includes('height') && !stepConfig.hide_height && (!heightValue || heightValue <= 0)) {
+            showError('يرجى إدخال الارتفاع بشكل صحيح قبل المتابعة')
+            return
+          }
+        }
+      }
       if (currentStep?.step_type === 'customer_info' && currentStep?.step_config?.skip_invoice) {
         // التحقق من البيانات المطلوبة قبل الإرسال
         if (!customerName.trim()) {

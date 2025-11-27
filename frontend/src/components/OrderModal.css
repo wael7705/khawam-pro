@@ -237,6 +237,7 @@
   background: #f9fafb;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+  position: relative;
 }
 
 .uploaded-file-item svg {
@@ -253,6 +254,31 @@
 .file-size {
   color: #6b7280;
   font-size: 0.9em;
+}
+
+.remove-file-btn {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.remove-file-btn:hover {
+  background: #fecaca;
+  border-color: #f87171;
+  color: #b91c1c;
+}
+
+.remove-file-btn:active {
+  transform: scale(0.95);
 }
 
 .pages-analysis {

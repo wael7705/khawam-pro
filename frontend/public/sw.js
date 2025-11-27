@@ -41,8 +41,51 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request)
+        // Return cached version if available
+        if (response) {
+          return response
+        }
+        
+        // Try to fetch from network with error handling
+        return fetch(event.request)
+          .then((networkResponse) => {
+            // Cache successful responses for future use
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone()
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, responseToCache)
+              })
+            }
+            return networkResponse
+          })
+          .catch((error) => {
+            // If fetch fails, return a basic response instead of throwing
+            console.warn('⚠️ Service Worker: Fetch failed for', event.request.url, error)
+            
+            // For navigation requests, return cached index.html if available
+            if (event.request.mode === 'navigate') {
+              return caches.match('/index.html')
+            }
+            
+            // For other requests, return a basic error response
+            return new Response('Resource not available', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: new Headers({
+                'Content-Type': 'text/plain'
+              })
+            })
+          })
+      })
+      .catch((error) => {
+        console.error('❌ Service Worker: Cache match failed', error)
+        // Fallback: try network fetch
+        return fetch(event.request).catch(() => {
+          return new Response('Resource not available', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          })
+        })
       })
   )
 })

@@ -4,7 +4,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './GoogleMap.css'
 
-const COORDINATES: [number, number] = [33.509361, 36.287889]
+const COORDINATES: [number, number] = [33.509361, 36.287889] // 33°30'33.7"N 36°17'16.4"E
 const [LAT, LNG] = COORDINATES as [number, number]
 
 const MARKER_ICON = new L.Icon({

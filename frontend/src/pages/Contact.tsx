@@ -1,7 +1,7 @@
 import GoogleMap from '../components/GoogleMap'
 import './Contact.css'
 
-const CONTACT_COORDINATES = { lat: 33.509361, lng: 36.287889 }
+const CONTACT_COORDINATES = { lat: 33.509361, lng: 36.287889 } // 33°30'33.7"N 36°17'16.4"E
 const WHATSAPP_NUMBER = '+963112134640'
 const WHATSAPP_LINK = `https://wa.me/963112134640?text=${encodeURIComponent('مرحباً، أرغب بمتابعة طلبي لدى شركة خوام.')}`
 

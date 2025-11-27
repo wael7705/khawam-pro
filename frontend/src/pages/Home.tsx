@@ -63,30 +63,61 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Services Section */}
-      <section className="section services-section">
-        <div className="container">
-          <h2 className="section-title">خدماتنا</h2>
-          <div className="services-grid">
-            {['طباعة البوسترات', 'طباعة الفليكس', 'البانرات الإعلانية', 'الكروت الشخصية', 'الملصقات', 'التصميم الجرافيكي'].map((service, i) => (
-              <motion.div 
-                key={service}
-                className="service-card"
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-              >
-                <div className="service-icon">📄</div>
-                <h3>{service}</h3>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Services Showcase Section */}
+      <ServicesShowcaseSection />
 
       {/* Featured Works Section */}
       <FeaturedWorksSection />
     </div>
+  )
+}
+
+function ServicesShowcaseSection() {
+  return (
+    <section className="section services-showcase-section">
+      <div className="container">
+        <div className="services-showcase-content">
+          <motion.div 
+            className="services-showcase-image-wrapper"
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+          >
+            <motion.img 
+              src="/logo.jpg"
+              alt="خدمات الطباعة الحديثة والمتقنة"
+              className="services-showcase-image"
+              animate={{
+                y: [0, -10, 0],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            />
+          </motion.div>
+          
+          <motion.div 
+            className="services-showcase-text"
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+          >
+            <h2 className="services-showcase-title">خدماتنا</h2>
+            <p className="services-showcase-description">
+              نقدم لكم أفضل الخدمات التي تبرز فيها الجودة والاتقان والحداثة لنضع بين أيديكم جودة فريدة في عالم الطباعة مع تقديم اسعار تقريبية لنوفر لكم دراسة لأفضل سعر يمكن ان نقدمه لكم
+            </p>
+            <Link to="/services" className="explore-services-btn">
+              <span className="btn-text">استكشف خدماتنا</span>
+              <span className="btn-shimmer"></span>
+            </Link>
+          </motion.div>
+        </div>
+      </div>
+    </section>
   )
 }
 

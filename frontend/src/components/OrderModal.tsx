@@ -2453,6 +2453,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         localStorage.removeItem('orderModalService')
         // إعادة تعيين hasRestoredState عند فتح خدمة جديدة
         hasRestoredState.current = false
+        // مسح الملفات المرفوعة عند فتح خدمة جديدة
+        setUploadedFiles([])
+        setImage(null)
+        setImagePreviewUrl(null)
+        setTotalPages(0)
+        console.log('🧹 Cleared uploaded files - opening new service')
       }
       
       if (shouldRestore) {
@@ -2558,6 +2564,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     // Reset restoration flag when modal closes
     if (!isOpen) {
       hasRestoredState.current = false
+      // مسح الملفات عند إغلاق الـ modal
+      setUploadedFiles([])
+      setImage(null)
+      setImagePreviewUrl(null)
+      setTotalPages(0)
+      console.log('🧹 Cleared uploaded files - modal closed')
     }
   }, [isOpen, serviceName])
 
@@ -2922,6 +2934,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }
 
   const handleSubmit = async () => {
+    // منع الإرسال المتكرر
+    if (isSubmitting) {
+      console.log('⚠️ Already submitting, ignoring duplicate request')
+      return
+    }
+    
     // Validation
     if (!customerName.trim()) {
       showError('يرجى إدخال اسم العميل')
@@ -3397,6 +3415,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       
       showError(`خطأ: ${errorMessage}`)
     } finally {
+      // التأكد من إعادة تعيين isSubmitting حتى في حالة الخطأ
       setIsSubmitting(false)
     }
   }

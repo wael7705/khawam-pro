@@ -1,8 +1,14 @@
-import { StrictMode } from 'react'
+import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
+
+// Ensure React is available globally for libraries that expect it (like recharts)
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  window.React = React
+}
 
 // تسجيل Service Worker
 if ('serviceWorker' in navigator) {

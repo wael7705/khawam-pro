@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
 import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard } from 'lucide-react'
-import DashboardHome from './Dashboard/DashboardHome'
+const DashboardHome = lazy(() => import('./Dashboard/DashboardHome'))
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
 
@@ -190,7 +190,16 @@ export default function Dashboard() {
         {/* Main Content */}
         <main className="dashboard-main">
           <Routes>
-            {isAdmin() && <Route path="/" element={<DashboardHome />} />}
+            {isAdmin() && (
+              <Route 
+                path="/" 
+                element={
+                  <Suspense fallback={<div className="loading" style={{ padding: '40px', textAlign: 'center' }}>جاري تحميل لوحة التحكم...</div>}>
+                    <DashboardHome />
+                  </Suspense>
+                } 
+              />
+            )}
             {isEmployee() && <Route path="/" element={<OrdersManagement />} />}
             {isEmployee() && <Route path="/orders" element={<OrdersManagement />} />}
             {isEmployee() && <Route path="/orders/:id" element={<OrderDetail />} />}

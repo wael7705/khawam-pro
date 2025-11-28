@@ -46,5 +46,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
+    exclude: ['recharts'], // Exclude recharts from pre-bundling to avoid React 19 compatibility issues
   },
 })

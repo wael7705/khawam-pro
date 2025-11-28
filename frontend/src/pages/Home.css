@@ -9,6 +9,11 @@
   overflow: hidden;
 }
 
+/* في الوضع الليلي، استخدم لون خلفية بني رمادي */
+[data-theme="dark"] .hero {
+  background: #2d2424; /* نفس لون الخلفية في الوضع الليلي */
+}
+
 .hero-content {
   flex: 1;
   max-width: 600px;

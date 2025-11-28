@@ -1,12 +1,6 @@
 .services-page {
   padding: 80px 20px;
   min-height: 100vh;
-  background-color: var(--bg);
-}
-
-/* في الوضع الليلي، استخدم نفس لون الخلفية */
-[data-theme="dark"] .services-page {
-  background-color: var(--bg-dark);
 }
 
 .page-title {

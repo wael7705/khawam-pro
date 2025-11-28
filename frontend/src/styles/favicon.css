@@ -1,0 +1,11 @@
+/* Rounded favicon styling - Note: CSS can't style favicon directly */
+/* For a truly rounded favicon, you need to create a rounded .ico file */
+/* But we can ensure the logo image itself is rounded where it appears */
+
+.favicon-rounded,
+.hero-logo,
+.logo-icon {
+  border-radius: 50% !important;
+  object-fit: cover;
+}
+

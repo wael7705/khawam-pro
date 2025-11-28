@@ -624,71 +624,72 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         )
 
       case 'dimensions':
-        const fields = stepConfig.fields || ['length', 'width', 'height']
+        // فقط العرض والارتفاع - لا نعرض الطول
         return (
           <div className="modal-body">
             <h3>{workflowStep.step_name_ar}</h3>
             {workflowStep.step_description_ar && (
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
-            {fields.includes('length') && (
-              <div className="form-group">
-                <label>
-                  {stepConfig.field_labels?.length || stepConfig.field_labels?.length === 'الارتفاع' ? 'الارتفاع' : 'الطول'} 
-                  {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}
-                </label>
+            <div className="form-group">
+              <label>
+                {stepConfig.field_labels?.width || 'العرض'} 
+                {stepConfig.required ? <span className="required">*</span> : ''}
+              </label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
                   type="number"
-                  value={length}
-                  onChange={(e) => setLength(e.target.value)}
-                  className="form-input"
-                  placeholder="0"
-                  required={stepConfig.required}
-                />
-              </div>
-            )}
-            {fields.includes('width') && (
-              <div className="form-group">
-                <label>
-                  {stepConfig.field_labels?.width || 'العرض'} 
-                  {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}
-                </label>
-                <input
-                  type="number"
+                  min="0"
+                  step="0.01"
                   value={width}
                   onChange={(e) => setWidth(e.target.value)}
                   className="form-input"
                   placeholder="0"
                   required={stepConfig.required}
+                  style={{ flex: 1 }}
                 />
+                <select 
+                  value={unit} 
+                  onChange={(e) => setUnit(e.target.value)} 
+                  className="form-input"
+                  style={{ width: '100px' }}
+                >
+                  <option value="cm">سم (cm)</option>
+                  <option value="mm">ملم (mm)</option>
+                  <option value="in">إنش (in)</option>
+                  <option value="m">متر (m)</option>
+                </select>
               </div>
-            )}
-            {fields.includes('height') && !stepConfig.hide_height && 
-             !serviceName.toLowerCase().includes('كلك بوليستر') && 
-             !serviceName.toLowerCase().includes('polyester') && (
-              <div className="form-group">
-                <label>
-                  {stepConfig.field_labels?.height || 'الارتفاع'} 
-                  {stepConfig.required ? <span className="required">*</span> : <span className="optional">(اختياري)</span>}
-                </label>
+            </div>
+            <div className="form-group">
+              <label>
+                {stepConfig.field_labels?.height || 'الارتفاع'} 
+                {stepConfig.required ? <span className="required">*</span> : ''}
+              </label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
                   type="number"
+                  min="0"
+                  step="0.01"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
                   className="form-input"
                   placeholder="0"
                   required={stepConfig.required}
+                  style={{ flex: 1 }}
                 />
+                <select 
+                  value={unit} 
+                  onChange={(e) => setUnit(e.target.value)} 
+                  className="form-input"
+                  style={{ width: '100px' }}
+                >
+                  <option value="cm">سم (cm)</option>
+                  <option value="mm">ملم (mm)</option>
+                  <option value="in">إنش (in)</option>
+                  <option value="m">متر (m)</option>
+                </select>
               </div>
-            )}
-            <div className="form-group">
-              <label>وحدة القياس {stepConfig.required ? <span className="required">*</span> : ''}</label>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input" required={stepConfig.required}>
-                <option value="cm">سم (cm)</option>
-                <option value="mm">ملم (mm)</option>
-                <option value="in">إنش (in)</option>
-                <option value="m">متر (m)</option>
-              </select>
             </div>
             {/* إخفاء عدد الصفحات ونوع الطباعة إذا كان hide_pages أو hide_print_type = true */}
             {!stepConfig.hide_pages && (
@@ -1158,36 +1159,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             })()}
             
             {/* إخفاء الأبعاد إذا كان hide_dimensions = true أو إذا كان القياس ليس "custom" */}
+            {/* فقط العرض والارتفاع - لا نعرض الطول */}
             {!stepConfig.hide_dimensions && (paperSize === 'custom' || (!stepConfig.paper_sizes && !stepConfig.paper_size)) && (
               <>
                 <div className="form-group">
-                  <label>الطول {stepConfig.required ? <span className="required">*</span> : ''}</label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={length}
-                      onChange={(e) => setLength(e.target.value)}
-                      className="form-input"
-                      placeholder="0"
-                      required={stepConfig.required}
-                      style={{ flex: 1 }}
-                    />
-                    <select 
-                      value={unit} 
-                      onChange={(e) => setUnit(e.target.value)} 
-                      className="form-input"
-                      style={{ width: '80px' }}
-                    >
-                      <option value="cm">سم (cm)</option>
-                      <option value="m">متر (m)</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group">
                   <label>العرض {stepConfig.required ? <span className="required">*</span> : ''}</label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input
                       type="number"
                       min="0"
@@ -1203,9 +1180,38 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       value={unit} 
                       onChange={(e) => setUnit(e.target.value)} 
                       className="form-input"
-                      style={{ width: '80px' }}
+                      style={{ width: '100px' }}
                     >
                       <option value="cm">سم (cm)</option>
+                      <option value="mm">ملم (mm)</option>
+                      <option value="in">إنش (in)</option>
+                      <option value="m">متر (m)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>الارتفاع {stepConfig.required ? <span className="required">*</span> : ''}</label>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      className="form-input"
+                      placeholder="0"
+                      required={stepConfig.required}
+                      style={{ flex: 1 }}
+                    />
+                    <select 
+                      value={unit} 
+                      onChange={(e) => setUnit(e.target.value)} 
+                      className="form-input"
+                      style={{ width: '100px' }}
+                    >
+                      <option value="cm">سم (cm)</option>
+                      <option value="mm">ملم (mm)</option>
+                      <option value="in">إنش (in)</option>
                       <option value="m">متر (m)</option>
                     </select>
                   </div>
@@ -2047,52 +2053,68 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             <h3>المرحلة 2: الأبعاد</h3>
             <div className="form-group">
               <label>
-                الطول{' '}
-                {isPosterPrinting || isBannerPrinting || isFlexPrinting ? (
+                العرض{' '}
+                {(isPosterPrinting || isBannerPrinting || isFlexPrinting) && (
                   <span className="required">*</span>
-                ) : (
-                  <span className="optional">(اختياري)</span>
                 )}
               </label>
-              <input
-                type="number"
-                value={length}
-                onChange={(e) => setLength(e.target.value)}
-                className="form-input"
-                placeholder="0"
-                required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
-              />
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={width}
+                  onChange={(e) => setWidth(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                  required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
+                  style={{ flex: 1 }}
+                />
+                <select 
+                  value={unit} 
+                  onChange={(e) => setUnit(e.target.value)} 
+                  className="form-input"
+                  style={{ width: '100px' }}
+                >
+                  <option value="cm">سم (cm)</option>
+                  <option value="mm">ملم (mm)</option>
+                  <option value="in">إنش (in)</option>
+                  <option value="m">متر (m)</option>
+                </select>
+              </div>
             </div>
             <div className="form-group">
               <label>
-                العرض{' '}
-                {isPosterPrinting || isBannerPrinting || isFlexPrinting ? (
+                الارتفاع{' '}
+                {(isPosterPrinting || isBannerPrinting || isFlexPrinting) && (
                   <span className="required">*</span>
-                ) : (
-                  <span className="optional">(اختياري)</span>
                 )}
               </label>
-              <input
-                type="number"
-                value={width}
-                onChange={(e) => setWidth(e.target.value)}
-                className="form-input"
-                placeholder="0"
-                required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
-              />
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={height}
+                  onChange={(e) => setHeight(e.target.value)}
+                  className="form-input"
+                  placeholder="0"
+                  required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
+                  style={{ flex: 1 }}
+                />
+                <select 
+                  value={unit} 
+                  onChange={(e) => setUnit(e.target.value)} 
+                  className="form-input"
+                  style={{ width: '100px' }}
+                >
+                  <option value="cm">سم (cm)</option>
+                  <option value="mm">ملم (mm)</option>
+                  <option value="in">إنش (in)</option>
+                  <option value="m">متر (m)</option>
+                </select>
+              </div>
             </div>
-            {!isPosterPrinting && !isBannerPrinting && (
-            <div className="form-group">
-              <label>الارتفاع <span className="optional">(اختياري)</span></label>
-              <input
-                type="number"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                className="form-input"
-                placeholder="0"
-              />
-            </div>
-            )}
             <div className="form-group">
               <label>وحدة القياس</label>
               <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
@@ -2933,13 +2955,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           const widthValue = parseFloat(width)
           const heightValue = parseFloat(height)
           
-          // التحقق من الطول والعرض (مطلوبان دائماً)
-          if (fields.includes('length') && (!lengthValue || lengthValue <= 0)) {
-            showError('يرجى إدخال الطول بشكل صحيح قبل المتابعة')
-            return
-          }
+          // التحقق من العرض والارتفاع فقط (مطلوبان دائماً)
           if (fields.includes('width') && (!widthValue || widthValue <= 0)) {
             showError('يرجى إدخال العرض بشكل صحيح قبل المتابعة')
+            return
+          }
+          if (fields.includes('height') && (!heightValue || heightValue <= 0)) {
+            showError('يرجى إدخال الارتفاع بشكل صحيح قبل المتابعة')
             return
           }
           // التحقق من الارتفاع إذا كان مطلوباً ولم يكن مخفياً وليست خدمة كلك بوليستر

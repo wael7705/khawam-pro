@@ -112,7 +112,8 @@ function ServicesShowcaseSection() {
               src="/services-showcase.png"
               alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
-              loading="eager"
+              loading="lazy"
+              decoding="async"
               onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                 // Fallback إلى لوغو محلي إذا فشل تحميل الصورة
                 const target = e.target as HTMLImageElement;
@@ -164,13 +165,16 @@ function FeaturedWorksSection() {
 
   const loadFeaturedWorks = async () => {
     try {
-      const response = await portfolioAPI.getFeatured()
-      const data = response.data
-      if (Array.isArray(data)) {
-        setWorks(data)
-      } else {
-        setWorks([])
-      }
+      const { fetchWithCache } = await import('../utils/dataCache')
+      const data = await fetchWithCache<Work[]>(
+        'portfolio:featured',
+        async () => {
+          const response = await portfolioAPI.getFeatured()
+          return Array.isArray(response.data) ? response.data : []
+        },
+        15 * 60 * 1000 // Cache for 15 minutes
+      )
+      setWorks(Array.isArray(data) ? data : [])
     } catch (error: any) {
       // Silently fail - don't show error for featured works
       console.error('Error loading featured works:', error)
@@ -218,6 +222,8 @@ function FeaturedWorksSection() {
                                 : `https://khawam-pro-production.up.railway.app${work.image_url.startsWith('/') ? work.image_url : '/' + work.image_url}`
                             }
                             alt={work.title_ar || work.title}
+                            loading="lazy"
+                            decoding="async"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.style.display = 'none';

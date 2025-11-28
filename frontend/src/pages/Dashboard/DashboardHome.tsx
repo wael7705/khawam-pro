@@ -1,17 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Package, ShoppingCart, DollarSign, AlertTriangle, RefreshCw } from 'lucide-react'
-// Dynamic import for recharts to avoid React 19 compatibility issues
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts'
 import { adminAPI } from '../../lib/api'
 import DashboardStats from '../../components/DashboardStats'
-import { RechartsWrapper } from '../../components/RechartsWrapper'
+import { SimplePieChart, SimpleBarChart } from '../../components/SimpleChart'
 import './DashboardHome.css'
-
-// Ensure React is available globally for recharts
-if (typeof window !== 'undefined') {
-  // @ts-ignore
-  window.React = React
-}
 
 interface DashboardStats {
   low_stock: number
@@ -279,31 +271,17 @@ export default function DashboardHome() {
             <h3>الخدمات الأكثر طلباً</h3>
           </div>
           {topServices.length > 0 ? (
-            <RechartsWrapper>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={serviceChartData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {serviceChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => [`${value} طلب`, 'عدد الطلبات']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+            <div className="chart-container">
+              <SimplePieChart data={serviceChartData} />
+              <div style={{ marginTop: '20px', display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
+                {serviceChartData.map((entry, index) => (
+                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ width: '12px', height: '12px', backgroundColor: COLORS[index % COLORS.length], borderRadius: '2px' }}></div>
+                    <span style={{ fontSize: '12px', color: '#666' }}>{entry.name}: {entry.value} طلب</span>
+                  </div>
+                ))}
               </div>
-            </RechartsWrapper>
+            </div>
           ) : (
             <div className="chart-placeholder">
               <p>لا توجد بيانات متاحة</p>
@@ -336,40 +314,9 @@ export default function DashboardHome() {
             </div>
           </div>
           {salesData.length > 0 ? (
-            <RechartsWrapper>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={salesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}ك`}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [`${value.toLocaleString()} ل.س`, 'المبيعات']}
-                    />
-                    <Bar 
-                      dataKey="value" 
-                      fill="url(#colorGradient)"
-                      radius={[8, 8, 0, 0]}
-                    />
-                    <defs>
-                      <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#667eea" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#764ba2" stopOpacity={1} />
-                      </linearGradient>
-                    </defs>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </RechartsWrapper>
+            <div className="chart-container">
+              <SimpleBarChart data={salesData} />
+            </div>
           ) : (
             <div className="chart-placeholder">
               <p>لا توجد بيانات متاحة</p>

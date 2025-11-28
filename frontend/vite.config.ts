@@ -23,10 +23,7 @@ export default defineConfig({
           if (id.includes('framer-motion') || id.includes('lucide-react')) {
             return 'ui-vendor'
           }
-          // Chart libraries
-          if (id.includes('recharts')) {
-            return 'chart-vendor'
-          }
+          // Chart libraries removed - using custom simple charts
           // PDF libraries
           if (id.includes('jspdf') || id.includes('html2canvas')) {
             return 'pdf-vendor'
@@ -46,6 +43,5 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
-    exclude: ['recharts'], // Exclude recharts from pre-bundling to avoid React 19 compatibility issues
   },
 })

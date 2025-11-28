@@ -11,73 +11,69 @@ if (typeof window !== 'undefined') {
 }
 
 // تنظيف الكاش القديم وإلغاء تسجيل Service Worker القديم
-async function cleanupOldCaches() {
-  if ('caches' in window) {
+async function cleanupOldServiceWorkers() {
+  if ('serviceWorker' in navigator) {
     try {
-      const cacheNames = await caches.keys()
-      console.log('🧹 Cleaning up old caches...', cacheNames)
+      // إلغاء تسجيل جميع Service Workers القديمة
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      for (const registration of registrations) {
+        console.log('🗑️ Unregistering old service worker:', registration.scope)
+        await registration.unregister()
+      }
       
       // حذف جميع الكاشات القديمة
-      await Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName.startsWith('khawam-pro-') && cacheName !== 'khawam-pro-v2') {
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        for (const cacheName of cacheNames) {
+          if (cacheName.startsWith('khawam-pro-')) {
             console.log('🗑️ Deleting old cache:', cacheName)
-            return caches.delete(cacheName)
+            await caches.delete(cacheName)
           }
-          return Promise.resolve()
-        })
-      )
-      console.log('✅ Cache cleanup completed')
+        }
+      }
+      
+      console.log('✅ Old service workers and caches cleaned up')
     } catch (error) {
-      console.warn('⚠️ Cache cleanup failed:', error)
+      console.warn('⚠️ Cleanup failed:', error)
     }
   }
 }
 
-// تسجيل Service Worker مع تنظيف الكاش
+// Register Service Worker
 if ('serviceWorker' in navigator) {
-  // تنظيف الكاش القديم أولاً
-  cleanupOldCaches()
-  
-  // إلغاء تسجيل جميع Service Workers القديمة
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(registration => {
-      console.log('🗑️ Unregistering old service worker:', registration.scope)
-      registration.unregister()
-    })
+  window.addEventListener('load', async () => {
+    // تنظيف القديم أولاً
+    await cleanupOldServiceWorkers()
     
-    // بعد إلغاء التسجيل، انتظر قليلاً ثم سجل الجديد
+    // انتظر قليلاً ثم سجل الجديد
     setTimeout(() => {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('/sw.js', { updateViaCache: 'none' })
-          .then((registration) => {
-            console.log('✅ Service Worker registered:', registration.scope)
-            
-            // التحقق من التحديثات وإجبار تحديث فوري
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing
-              if (newWorker) {
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('🔄 New service worker available, reloading...')
-                    // تحديث الصفحة تلقائياً عند وجود تحديث جديد
-                    window.location.reload()
-                  }
-                })
-              }
-            })
-            
-            // التحقق من التحديثات كل 60 ثانية
-            setInterval(() => {
-              registration.update()
-            }, 60000)
+      navigator.serviceWorker
+        .register('/sw.js', { updateViaCache: 'none' })
+        .then((registration) => {
+          console.log('✅ Service Worker registered:', registration.scope)
+          
+          // التحقق من التحديثات
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('🔄 New service worker available, reloading...')
+                  window.location.reload()
+                }
+              })
+            }
           })
-          .catch((error) => {
-            console.warn('⚠️ Service Worker registration failed:', error)
-          })
-      })
-    }, 1000)
+          
+          // التحقق من التحديثات كل 60 ثانية
+          setInterval(() => {
+            registration.update()
+          }, 60000)
+        })
+        .catch((error) => {
+          console.warn('⚠️ Service Worker registration failed:', error)
+        })
+    }, 500)
   })
 }
 

@@ -28,7 +28,7 @@ export default function Portfolio() {
       const works = await fetchWithCache<Work[]>(
         'portfolio:all',
         async () => {
-          const response = await portfolioAPI.getAll()
+      const response = await portfolioAPI.getAll()
           return response.data
         },
         15 * 60 * 1000 // Cache for 15 minutes
@@ -45,18 +45,18 @@ export default function Portfolio() {
           throw new Error('No cache available')
         }
       } catch {
-        // Fallback data
-        setWorks([
-          {
-            id: 1,
-            title_ar: 'بوستر احترافي',
-            title: 'Professional Poster',
-            description_ar: 'تصميم بوستر احترافي لحدث',
-            image_url: '/placeholder-work.jpg',
-            category_ar: 'البوسترات',
-            is_featured: true,
-          },
-        ])
+      // Fallback data
+      setWorks([
+        {
+          id: 1,
+          title_ar: 'بوستر احترافي',
+          title: 'Professional Poster',
+          description_ar: 'تصميم بوستر احترافي لحدث',
+          image_url: '/placeholder-work.jpg',
+          category_ar: 'البوسترات',
+          is_featured: true,
+        },
+      ])
       }
     } finally {
       setLoading(false)

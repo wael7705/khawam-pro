@@ -631,11 +631,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             {workflowStep.step_description_ar && (
               <p className="step-description">{workflowStep.step_description_ar}</p>
             )}
-            <div className="form-group">
-              <label>
-                {stepConfig.field_labels?.width || 'العرض'} 
+              <div className="form-group">
+                <label>
+                  {stepConfig.field_labels?.width || 'العرض'} 
                 {stepConfig.required ? <span className="required">*</span> : ''}
-              </label>
+                </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
                   type="number"
@@ -661,11 +661,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 </select>
               </div>
             </div>
-            <div className="form-group">
-              <label>
-                {stepConfig.field_labels?.height || 'الارتفاع'} 
+              <div className="form-group">
+                <label>
+                  {stepConfig.field_labels?.height || 'الارتفاع'} 
                 {stepConfig.required ? <span className="required">*</span> : ''}
-              </label>
+                </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
                   type="number"
@@ -684,11 +684,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   className="form-input"
                   style={{ width: '100px' }}
                 >
-                  <option value="cm">سم (cm)</option>
-                  <option value="mm">ملم (mm)</option>
-                  <option value="in">إنش (in)</option>
-                  <option value="m">متر (m)</option>
-                </select>
+                <option value="cm">سم (cm)</option>
+                <option value="mm">ملم (mm)</option>
+                <option value="in">إنش (in)</option>
+                <option value="m">متر (m)</option>
+              </select>
               </div>
             </div>
             {/* إخفاء عدد الصفحات ونوع الطباعة إذا كان hide_pages أو hide_print_type = true */}
@@ -2059,17 +2059,17 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 )}
               </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <input
-                  type="number"
+              <input
+                type="number"
                   min="0"
                   step="0.01"
                   value={width}
                   onChange={(e) => setWidth(e.target.value)}
-                  className="form-input"
-                  placeholder="0"
-                  required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
+                className="form-input"
+                placeholder="0"
+                required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
                   style={{ flex: 1 }}
-                />
+              />
                 <select 
                   value={unit} 
                   onChange={(e) => setUnit(e.target.value)} 
@@ -2091,14 +2091,14 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 )}
               </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <input
-                  type="number"
+              <input
+                type="number"
                   min="0"
                   step="0.01"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  className="form-input"
-                  placeholder="0"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="form-input"
+                placeholder="0"
                   required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
                   style={{ flex: 1 }}
                 />
@@ -2113,7 +2113,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <option value="in">إنش (in)</option>
                   <option value="m">متر (m)</option>
                 </select>
-              </div>
+            </div>
             </div>
             <div className="form-group">
               <label>وحدة القياس</label>

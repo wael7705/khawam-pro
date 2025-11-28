@@ -45,7 +45,7 @@ export default function Services() {
       const services = await fetchWithCache<Service[]>(
         'services:all',
         async () => {
-          const response = await servicesAPI.getAll()
+      const response = await servicesAPI.getAll()
           return response.data
         },
         15 * 60 * 1000 // Cache for 15 minutes
@@ -62,11 +62,11 @@ export default function Services() {
           throw new Error('No cache available')
         }
       } catch {
-        setServices([
-          { id: 1, name_ar: 'طباعة البوسترات', name_en: 'Poster Printing', base_price: 0 },
-          { id: 2, name_ar: 'طباعة الفليكس', name_en: 'Flex Printing', base_price: 0 },
-          { id: 3, name_ar: 'البانرات الإعلانية', name_en: 'Advertising Banners', base_price: 0 },
-        ])
+      setServices([
+        { id: 1, name_ar: 'طباعة البوسترات', name_en: 'Poster Printing', base_price: 0 },
+        { id: 2, name_ar: 'طباعة الفليكس', name_en: 'Flex Printing', base_price: 0 },
+        { id: 3, name_ar: 'البانرات الإعلانية', name_en: 'Advertising Banners', base_price: 0 },
+      ])
       }
     } finally {
       setLoading(false)

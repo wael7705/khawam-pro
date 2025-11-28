@@ -169,7 +169,7 @@ function FeaturedWorksSection() {
       const data = await fetchWithCache<Work[]>(
         'portfolio:featured',
         async () => {
-          const response = await portfolioAPI.getFeatured()
+      const response = await portfolioAPI.getFeatured()
           return Array.isArray(response.data) ? response.data : []
         },
         15 * 60 * 1000 // Cache for 15 minutes

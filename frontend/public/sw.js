@@ -1,6 +1,6 @@
 // Service Worker for Khawam Pro
 // Updated cache version to force cache refresh
-const CACHE_NAME = 'khawam-pro-v3'
+const CACHE_NAME = 'khawam-pro-v4'
 const DYNAMIC_CACHE_PREFIX = 'khawam-pro-dynamic-'
 
 // URLs that should be cached (static assets only)
@@ -23,9 +23,48 @@ function shouldCache(url) {
   return true
 }
 
+// Check if request should be intercepted by Service Worker at all
+function shouldIntercept(url) {
+  const urlLower = url.toLowerCase()
+  
+  // NEVER intercept dynamic assets (JS, CSS with hash in filename)
+  if (urlLower.includes('/assets/')) {
+    // Check if it's a dynamic asset (has hash in filename)
+    const assetsMatch = urlLower.match(/\/assets\/[^\/]+\.(js|css)/)
+    if (assetsMatch) {
+      // Check if filename contains hash (typically 8+ characters before extension)
+      const filename = assetsMatch[0]
+      // If filename has a hash pattern (like index-XXXXXXXX.js), don't intercept
+      const hashPattern = /-[a-zA-Z0-9]{8,}\.(js|css)$/
+      if (hashPattern.test(filename)) {
+        return false // Don't intercept dynamic assets
+      }
+    }
+  }
+  
+  // NEVER intercept API requests
+  if (urlLower.includes('/api/') || urlLower.includes('railway.app/api/')) {
+    return false
+  }
+  
+  // Never intercept external domains (except same origin)
+  try {
+    const urlObj = new URL(url)
+    // Allow same origin only
+    if (urlObj.origin !== self.location.origin) {
+      // Exception: allow static assets from CDN if needed, but not dynamic JS/CSS
+      return false
+    }
+  } catch (e) {
+    // Invalid URL, skip
+  }
+  
+  return true
+}
+
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('🔄 Service Worker: Installing...')
+  console.log('🔄 Service Worker: Installing v4...')
   // Force activation of new service worker immediately
   self.skipWaiting()
   
@@ -44,12 +83,12 @@ self.addEventListener('install', (event) => {
 
 // Activate event - delete ALL old caches
 self.addEventListener('activate', (event) => {
-  console.log('🔄 Service Worker: Activating...')
+  console.log('🔄 Service Worker: Activating v4...')
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Delete ALL old caches (including v1, v2 and any dynamic caches)
+          // Delete ALL old caches (including v1, v2, v3 and any dynamic caches)
           if (cacheName !== CACHE_NAME && (cacheName.startsWith('khawam-pro-') || cacheName.startsWith(DYNAMIC_CACHE_PREFIX))) {
             console.log('🗑️ Service Worker: Deleting old cache', cacheName)
             return caches.delete(cacheName)
@@ -63,88 +102,71 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// Fetch event - Network first strategy for dynamic assets
+// Fetch event - DO NOT intercept dynamic assets or API requests
 self.addEventListener('fetch', (event) => {
   const urlString = event.request.url
   
-  // CRITICAL: Never intercept API requests - let them pass through directly to network without any service worker interference
-  if (urlString.includes('/api/')) {
-    return // Don't call event.respondWith - this lets the request bypass service worker completely
+  // CRITICAL: Check if we should intercept this request at all
+  if (!shouldIntercept(urlString)) {
+    return // Don't call event.respondWith - let the request bypass service worker completely
   }
   
-  // Don't intercept external API domains (like Railway)
-  try {
-    const url = new URL(urlString)
-    if (url.pathname.startsWith('/api/') || url.hostname.includes('railway.app')) {
-      return // Let all API requests bypass service worker
-    }
-  } catch (e) {
-    // Invalid URL, skip
-  }
-  
-  // Always fetch from network first for dynamic assets (JS, CSS with hash)
-  if (!shouldCache(urlString)) {
+  // For static assets only, use cache-first strategy
+  if (shouldCache(urlString)) {
     event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
-        .catch((error) => {
-          console.warn('⚠️ Service Worker: Network fetch failed for', urlString, error)
-          // Return a basic error response for dynamic assets
-          return new Response('Resource not available', {
-            status: 503,
-            statusText: 'Service Unavailable'
-          })
-        })
-    )
-    return
-  }
-  
-  // For static assets, use cache-first strategy
-  event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        // Try network first for non-cached or navigation requests
-        const fetchPromise = fetch(event.request, { cache: 'reload' })
-          .then((networkResponse) => {
-            // Only cache successful static responses
-            if (networkResponse && networkResponse.status === 200 && shouldCache(urlString)) {
-              const responseToCache = networkResponse.clone()
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseToCache)
+      caches.match(event.request)
+        .then((cachedResponse) => {
+          // Try network first for non-cached or navigation requests
+          const fetchPromise = fetch(event.request, { cache: 'reload' })
+            .then((networkResponse) => {
+              // Only cache successful static responses
+              if (networkResponse && networkResponse.status === 200 && shouldCache(urlString)) {
+                const responseToCache = networkResponse.clone()
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(event.request, responseToCache)
+                })
+              }
+              return networkResponse
+            })
+            .catch((error) => {
+              console.warn('⚠️ Service Worker: Fetch failed for static asset', urlString, error)
+              // Return cached version if network fails
+              if (cachedResponse) {
+                return cachedResponse
+              }
+              
+              // For navigation requests, return index.html
+              if (event.request.mode === 'navigate') {
+                return caches.match('/index.html')
+              }
+              
+              // Fallback: try to fetch directly
+              return fetch(event.request).catch(() => {
+                return new Response('Resource not available', {
+                  status: 503,
+                  statusText: 'Service Unavailable'
+                })
               })
-            }
-            return networkResponse
-          })
-          .catch((error) => {
-            console.warn('⚠️ Service Worker: Fetch failed for', urlString, error)
-            // Return cached version if network fails
-            if (cachedResponse) {
-              return cachedResponse
-            }
-            
-            // For navigation requests, return index.html
-            if (event.request.mode === 'navigate') {
-              return caches.match('/index.html')
-            }
-            
+            })
+          
+          // Return cached version immediately if available, otherwise wait for network
+          return cachedResponse || fetchPromise
+        })
+        .catch((error) => {
+          console.error('❌ Service Worker: Error', error)
+          // Fallback: try to fetch directly
+          return fetch(event.request).catch(() => {
             return new Response('Resource not available', {
               status: 503,
               statusText: 'Service Unavailable'
             })
           })
-        
-        // Return cached version immediately if available, otherwise wait for network
-        return cachedResponse || fetchPromise
-      })
-      .catch((error) => {
-        console.error('❌ Service Worker: Error', error)
-        return fetch(event.request).catch(() => {
-          return new Response('Resource not available', {
-            status: 503,
-            statusText: 'Service Unavailable'
-          })
         })
-      })
-  )
+    )
+  } else {
+    // For non-cacheable assets, just let them pass through (shouldn't reach here due to shouldIntercept check)
+    return
+  }
 })
 
 // Push notifications

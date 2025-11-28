@@ -9,9 +9,9 @@
   overflow: hidden;
 }
 
-/* في الوضع الليلي، استخدم لون خلفية بني رمادي */
+/* في الوضع الليلي، استخدم لون خلفية بني محمر */
 [data-theme="dark"] .hero {
-  background: #2d2424; /* نفس لون الخلفية في الوضع الليلي */
+  background: #991B1B; /* نفس لون الخلفية في الوضع الليلي */
 }
 
 .hero-content {
@@ -82,6 +82,11 @@
   background: var(--gray);
   padding: 70px 0;
   color: var(--text);
+}
+
+/* في الوضع الليلي، استخدم نفس لون الخلفية */
+[data-theme="dark"] .services-promo {
+  background: var(--bg-dark);
 }
 
 .services-promo__content {
@@ -160,6 +165,11 @@
   padding: 100px 0;
   position: relative;
   overflow: hidden;
+}
+
+/* في الوضع الليلي، استخدم نفس لون الخلفية */
+[data-theme="dark"] .services-showcase-section {
+  background: #991B1B;
 }
 
 .services-showcase-content {
@@ -526,6 +536,11 @@
   margin-top: 80px;
   padding: 60px 0;
   background: var(--gray);
+}
+
+/* في الوضع الليلي، استخدم نفس لون الخلفية */
+[data-theme="dark"] .featured-works-section {
+  background: var(--bg-dark);
 }
 
 .works-grid {

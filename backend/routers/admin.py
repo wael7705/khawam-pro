@@ -2818,34 +2818,74 @@ async def get_top_products(db: Session = Depends(get_db)):
 
 @router.get("/dashboard/top-services")
 async def get_top_services(db: Session = Depends(get_db)):
-    """Get top ordered services"""
+    """Get top ordered services - based on actual service names from order items"""
     try:
-        from sqlalchemy import func
+        from sqlalchemy import func, text
         from datetime import datetime, timedelta
+        import json
         
         thirty_days_ago = datetime.now() - timedelta(days=30)
         
-        # Get services ordered by count of orders
-        top_services = db.query(
-            Order.shop_name,
-            func.count(Order.id).label('total_orders'),
-            func.sum(Order.final_amount).label('total_revenue')
-        ).filter(
-            Order.created_at >= thirty_days_ago,
-            Order.status == 'completed',
-            Order.shop_name.isnot(None),
-            Order.shop_name != ''
-        ).group_by(Order.shop_name).order_by(
-            func.count(Order.id).desc()
-        ).limit(5).all()
+        # Get service names from order items specifications
+        # استخراج أسماء الخدمات من specifications في order_items
+        query = text("""
+            SELECT 
+                oi.specifications->>'service_name' as service_name,
+                COUNT(DISTINCT oi.order_id) as total_orders,
+                SUM(o.final_amount) as total_revenue
+            FROM order_items oi
+            INNER JOIN orders o ON oi.order_id = o.id
+            WHERE o.created_at >= :start_date
+                AND o.status = 'completed'
+                AND oi.specifications IS NOT NULL
+                AND oi.specifications->>'service_name' IS NOT NULL
+                AND oi.specifications->>'service_name' != ''
+            GROUP BY oi.specifications->>'service_name'
+            ORDER BY total_orders DESC
+            LIMIT 5
+        """)
+        
+        result = db.execute(query, {"start_date": thirty_days_ago}).fetchall()
         
         services = []
-        for svc in top_services:
-            services.append({
-                "name": svc.shop_name,
-                "orders": int(svc.total_orders),
-                "revenue": float(svc.total_revenue) if svc.total_revenue else 0
-            })
+        for row in result:
+            service_name = row[0]
+            total_orders = row[1] or 0
+            total_revenue = float(row[2]) if row[2] else 0.0
+            
+            if service_name:  # تأكد من وجود اسم الخدمة
+                services.append({
+                    "name": service_name,
+                    "orders": int(total_orders),
+                    "revenue": total_revenue
+                })
+        
+        # إذا لم تكن هناك خدمات من order_items، جرب البحث من جدول services مباشرة
+        if not services:
+            # الحصول على جميع الخدمات مع عدد الطلبات
+            all_services_query = text("""
+                SELECT 
+                    s.name_ar,
+                    COUNT(DISTINCT oi.order_id) as order_count,
+                    SUM(o.final_amount) as revenue_sum
+                FROM services s
+                LEFT JOIN order_items oi ON oi.specifications->>'service_name' = s.name_ar
+                LEFT JOIN orders o ON oi.order_id = o.id
+                WHERE o.created_at >= :start_date OR o.created_at IS NULL
+                    AND (o.status = 'completed' OR o.status IS NULL)
+                GROUP BY s.name_ar
+                HAVING COUNT(DISTINCT oi.order_id) > 0
+                ORDER BY order_count DESC
+                LIMIT 5
+            """)
+            
+            result = db.execute(all_services_query, {"start_date": thirty_days_ago}).fetchall()
+            for row in result:
+                services.append({
+                    "name": row[0] or "خدمة غير محددة",
+                    "orders": int(row[1] or 0),
+                    "revenue": float(row[2]) if row[2] else 0.0
+                })
         
         return {
             "success": True,
@@ -2864,52 +2904,120 @@ async def get_top_services(db: Session = Depends(get_db)):
 async def get_sales_overview(period: str = "month", db: Session = Depends(get_db)):
     """Get sales overview for charts"""
     try:
-        from sqlalchemy import func, extract
+        from sqlalchemy import func, extract, text
         from datetime import datetime, timedelta
         
-        if period == "week":
-            days = 7
-            start_date = datetime.now() - timedelta(days=days)
-            query = db.query(
-                func.date(Order.created_at).label('date'),
-                func.sum(Order.final_amount).label('total')
-            ).filter(
-                Order.created_at >= start_date,
-                Order.status == 'completed'
-            ).group_by(func.date(Order.created_at)).order_by('date').all()
-        elif period == "month":
-            days = 30
-            start_date = datetime.now() - timedelta(days=days)
-            query = db.query(
-                func.date(Order.created_at).label('date'),
-                func.sum(Order.final_amount).label('total')
-            ).filter(
-                Order.created_at >= start_date,
-                Order.status == 'completed'
-            ).group_by(func.date(Order.created_at)).order_by('date').all()
-        else:  # year
-            days = 365
-            start_date = datetime.now() - timedelta(days=days)
-            query = db.query(
-                extract('month', Order.created_at).label('month'),
-                func.sum(Order.final_amount).label('total')
-            ).filter(
-                Order.created_at >= start_date,
-                Order.status == 'completed'
-            ).group_by(extract('month', Order.created_at)).order_by('month').all()
-        
         data = []
-        for row in query:
-            if period == "year":
-                data.append({
-                    "label": f"شهر {int(row.month)}",
-                    "value": float(row.total) if row.total else 0
-                })
-            else:
-                date_str = row.date.isoformat() if hasattr(row.date, 'isoformat') else str(row.date)
+        
+        if period == "week":
+            # Generate all days for the week
+            end_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
+            start_date = (end_date - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # Create date range for all 7 days
+            date_range = []
+            current_date = start_date
+            while current_date <= end_date:
+                date_range.append(current_date.date())
+                current_date += timedelta(days=1)
+            
+            # Query sales for this period
+            query = text("""
+                SELECT 
+                    DATE(created_at) as date,
+                    COALESCE(SUM(final_amount), 0) as total
+                FROM orders
+                WHERE created_at >= :start_date
+                    AND created_at <= :end_date
+                    AND status = 'completed'
+                GROUP BY DATE(created_at)
+                ORDER BY date ASC
+            """)
+            
+            result = db.execute(query, {
+                "start_date": start_date,
+                "end_date": end_date
+            }).fetchall()
+            
+            # Create a map of dates to totals
+            sales_map = {}
+            for row in result:
+                date_key = row[0]
+                sales_map[date_key] = float(row[1] or 0)
+            
+            # Fill all dates with sales data (0 if no sales)
+            for date in date_range:
+                date_str = date.isoformat()
                 data.append({
                     "label": date_str,
-                    "value": float(row.total) if row.total else 0
+                    "value": sales_map.get(date, 0.0)
+                })
+                
+        elif period == "month":
+            # Generate all days for the last 30 days
+            end_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
+            start_date = (end_date - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            query = text("""
+                SELECT 
+                    DATE(created_at) as date,
+                    COALESCE(SUM(final_amount), 0) as total
+                FROM orders
+                WHERE created_at >= :start_date
+                    AND created_at <= :end_date
+                    AND status = 'completed'
+                GROUP BY DATE(created_at)
+                ORDER BY date ASC
+            """)
+            
+            result = db.execute(query, {
+                "start_date": start_date,
+                "end_date": end_date
+            }).fetchall()
+            
+            # Create a map of dates to totals
+            sales_map = {}
+            for row in result:
+                date_key = row[0]
+                sales_map[date_key] = float(row[1] or 0)
+            
+            # Fill all dates with sales data
+            current_date = start_date
+            while current_date <= end_date:
+                date_str = current_date.date().isoformat()
+                data.append({
+                    "label": date_str,
+                    "value": sales_map.get(current_date.date(), 0.0)
+                })
+                current_date += timedelta(days=1)
+                
+        else:  # year
+            start_date = (datetime.now() - timedelta(days=365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+            query = text("""
+                SELECT 
+                    EXTRACT(MONTH FROM created_at)::INTEGER as month,
+                    COALESCE(SUM(final_amount), 0) as total
+                FROM orders
+                WHERE created_at >= :start_date
+                    AND status = 'completed'
+                GROUP BY EXTRACT(MONTH FROM created_at)
+                ORDER BY month ASC
+            """)
+            
+            result = db.execute(query, {"start_date": start_date}).fetchall()
+            
+            # Create a map of months to totals
+            sales_map = {}
+            for row in result:
+                month_key = int(row[0])
+                sales_map[month_key] = float(row[1] or 0)
+            
+            # Fill all 12 months
+            for month in range(1, 13):
+                data.append({
+                    "label": f"شهر {month}",
+                    "value": sales_map.get(month, 0.0)
                 })
         
         return {
@@ -2932,6 +3040,8 @@ async def get_recent_orders(limit: int = 10, db: Session = Depends(get_db)):
     """Get recent orders for dashboard"""
     try:
         from datetime import datetime
+        from models import OrderItem
+        import json
         
         orders = db.query(Order).order_by(Order.created_at.desc()).limit(limit).all()
         
@@ -2947,6 +3057,21 @@ async def get_recent_orders(limit: int = 10, db: Session = Depends(get_db)):
             except:
                 final_amount = 0
             
+            # Get service name from order items
+            service_name = None
+            try:
+                items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+                for item in items:
+                    if item.specifications:
+                        specs = item.specifications
+                        if isinstance(specs, str):
+                            specs = json.loads(specs)
+                        if isinstance(specs, dict) and 'service_name' in specs:
+                            service_name = specs.get('service_name')
+                            break
+            except:
+                pass
+            
             # Format time
             created_at = order.created_at if order.created_at else datetime.now()
             time_str = created_at.strftime('%I:%M %p') if isinstance(created_at, datetime) else 'الآن'
@@ -2958,6 +3083,7 @@ async def get_recent_orders(limit: int = 10, db: Session = Depends(get_db)):
                 "amount": final_amount,
                 "status": getattr(order, 'status', 'pending'),
                 "time": time_str,
+                "service_name": service_name,
                 "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None
             })
         

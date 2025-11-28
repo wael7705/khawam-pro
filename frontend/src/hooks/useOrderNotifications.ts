@@ -205,22 +205,40 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       }
 
       ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error)
+        // لا تطبع الخطأ كـ error إذا كان بسبب انقطاع الاتصال
+        // فقط سجل تحذير خفيف
+        console.warn('⚠️ WebSocket connection issue (will retry):', error)
         setIsConnected(false)
       }
 
       ws.onclose = (event) => {
-        console.log(`⚠️ WebSocket disconnected (code: ${event.code}, reason: ${event.reason || 'none'})`)
+        // لا تطبع تحذير إذا كان الإغلاق طبيعياً
+        if (event.code !== 1000 && event.code !== 1001) {
+          console.log(`⚠️ WebSocket disconnected (code: ${event.code}), will reconnect...`)
+        }
         setIsConnected(false)
 
-        // إعادة الاتصال فقط إذا لم يكن الإغلاق متعمداً (code 1000 = normal closure)
+        // إعادة الاتصال فقط إذا لم يكن الإغلاق متعمداً
         if (event.code !== 1000 && event.code !== 1001) {
+          // تنظيف أي timeout سابق
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current)
+          }
+          
+          // إعادة الاتصال بعد تأخير متزايد (exponential backoff)
+          const delay = Math.min(3000 * Math.pow(1.5, 0), 30000) // بين 3 ثواني و 30 ثانية
           reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Reconnecting WebSocket...')
-            connectWebSocket()
-          }, 3000)
+            if (isAuthenticated()) {
+              console.log('🔄 Reconnecting WebSocket...')
+              connectWebSocket()
+            }
+          }, delay)
         } else {
-          console.log('✅ WebSocket closed normally, not reconnecting')
+          // تنظيف timeout إذا كان الإغلاق طبيعياً
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current)
+            reconnectTimeoutRef.current = null
+          }
         }
       }
 

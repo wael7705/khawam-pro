@@ -4,6 +4,74 @@
   background: linear-gradient(135deg, rgba(220, 38, 38, 0.03) 0%, rgba(239, 68, 68, 0.03) 100%);
 }
 
+/* Dark mode support */
+[data-theme="dark"] .dashboard-home {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05) 0%, rgba(239, 68, 68, 0.05) 100%);
+}
+
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .chart-card,
+[data-theme="dark"] .activity-card {
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .stat-label,
+[data-theme="dark"] .stat-subtitle,
+[data-theme="dark"] .loading-container p {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .stat-value-group h3,
+[data-theme="dark"] .chart-card h3,
+[data-theme="dark"] .activity-card-header h3,
+[data-theme="dark"] .legend-name,
+[data-theme="dark"] .service-name,
+[data-theme="dark"] .activity-info p,
+[data-theme="dark"] .amount-value {
+  color: #f3f4f6;
+  background: none;
+  -webkit-text-fill-color: #f3f4f6;
+}
+
+[data-theme="dark"] .legend-stats,
+[data-theme="dark"] .activity-info span,
+[data-theme="dark"] .metric {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .activity-item,
+[data-theme="dark"] .service-analytics-item,
+[data-theme="dark"] .legend-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .activity-item:hover,
+[data-theme="dark"] .service-analytics-item:hover,
+[data-theme="dark"] .legend-item:hover {
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="dark"] .period-selector button {
+  background: #1f2937;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .period-selector button:hover {
+  border-color: #DC2626;
+  color: #DC2626;
+}
+
+[data-theme="dark"] .chart-placeholder,
+[data-theme="dark"] .empty-state {
+  background: rgba(255, 255, 255, 0.03);
+  color: #9ca3af;
+}
+
 .dashboard-header {
   display: flex;
   justify-content: space-between;

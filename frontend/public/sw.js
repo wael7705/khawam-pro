@@ -1,6 +1,6 @@
 // Service Worker for Khawam Pro
 // Updated cache version to force cache refresh
-const CACHE_NAME = 'khawam-pro-v2'
+const CACHE_NAME = 'khawam-pro-v3'
 const DYNAMIC_CACHE_PREFIX = 'khawam-pro-dynamic-'
 
 // URLs that should be cached (static assets only)
@@ -9,9 +9,6 @@ const urlsToCache = [
   '/logo.jpg',
 ]
 
-// File extensions that should NOT be cached (dynamic assets)
-const NO_CACHE_EXTENSIONS = ['.js', '.css', '.json']
-
 // Check if URL should be cached
 function shouldCache(url) {
   const urlLower = url.toLowerCase()
@@ -19,7 +16,7 @@ function shouldCache(url) {
   if (urlLower.includes('/assets/') && (urlLower.endsWith('.js') || urlLower.endsWith('.css'))) {
     return false
   }
-  // Don't cache API requests
+  // Don't cache API requests - let them pass through without interception
   if (urlLower.includes('/api/')) {
     return false
   }
@@ -52,7 +49,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Delete ALL old caches (including v1 and any dynamic caches)
+          // Delete ALL old caches (including v1, v2 and any dynamic caches)
           if (cacheName !== CACHE_NAME && (cacheName.startsWith('khawam-pro-') || cacheName.startsWith(DYNAMIC_CACHE_PREFIX))) {
             console.log('🗑️ Service Worker: Deleting old cache', cacheName)
             return caches.delete(cacheName)
@@ -68,14 +65,29 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - Network first strategy for dynamic assets
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url)
+  const urlString = event.request.url
+  
+  // CRITICAL: Never intercept API requests - let them pass through directly to network without any service worker interference
+  if (urlString.includes('/api/')) {
+    return // Don't call event.respondWith - this lets the request bypass service worker completely
+  }
+  
+  // Don't intercept external API domains (like Railway)
+  try {
+    const url = new URL(urlString)
+    if (url.pathname.startsWith('/api/') || url.hostname.includes('railway.app')) {
+      return // Let all API requests bypass service worker
+    }
+  } catch (e) {
+    // Invalid URL, skip
+  }
   
   // Always fetch from network first for dynamic assets (JS, CSS with hash)
-  if (!shouldCache(event.request.url)) {
+  if (!shouldCache(urlString)) {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' })
         .catch((error) => {
-          console.warn('⚠️ Service Worker: Network fetch failed for', event.request.url, error)
+          console.warn('⚠️ Service Worker: Network fetch failed for', urlString, error)
           // Return a basic error response for dynamic assets
           return new Response('Resource not available', {
             status: 503,
@@ -94,7 +106,7 @@ self.addEventListener('fetch', (event) => {
         const fetchPromise = fetch(event.request, { cache: 'reload' })
           .then((networkResponse) => {
             // Only cache successful static responses
-            if (networkResponse && networkResponse.status === 200 && shouldCache(event.request.url)) {
+            if (networkResponse && networkResponse.status === 200 && shouldCache(urlString)) {
               const responseToCache = networkResponse.clone()
               caches.open(CACHE_NAME).then((cache) => {
                 cache.put(event.request, responseToCache)
@@ -103,7 +115,7 @@ self.addEventListener('fetch', (event) => {
             return networkResponse
           })
           .catch((error) => {
-            console.warn('⚠️ Service Worker: Fetch failed for', event.request.url, error)
+            console.warn('⚠️ Service Worker: Fetch failed for', urlString, error)
             // Return cached version if network fails
             if (cachedResponse) {
               return cachedResponse

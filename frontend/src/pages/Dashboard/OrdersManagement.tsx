@@ -176,8 +176,8 @@ export default function OrdersManagement() {
           try {
             const notification = new Notification('🆕 طلب جديد', {
               body: `طلب ${order.order_number} من ${order.customer_name}`,
-              icon: order.image_url || '/logo.png',
-              badge: '/logo.png',
+              icon: order.image_url || '/logo.jpg',
+              badge: '/logo.jpg',
               tag: `order-${order.id}`,
               requireInteraction: false,
             })

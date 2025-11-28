@@ -1,9 +1,9 @@
 import { CalendarClock, MapPin, Phone, ShoppingBag, X } from 'lucide-react'
-import { OrderNotification } from '../hooks/useOrderNotifications'
+import type { OrderNotificationDisplay } from '../types/notifications'
 import './OrderNotificationBanner.css'
 
 interface OrderNotificationBannerProps {
-  notifications: OrderNotification[]
+  notifications: OrderNotificationDisplay[]
   onDismiss: (id: string) => void
   onViewOrder?: (orderId: number) => void
 }

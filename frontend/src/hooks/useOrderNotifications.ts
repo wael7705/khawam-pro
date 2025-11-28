@@ -1,22 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { isAuthenticated } from '../lib/auth'
+import type { OrderNotification, OrderNotificationDisplay } from '../types/notifications'
 
-interface OrderNotification {
-  event: string
-  data: {
-    order_id: number
-    order_number: string
-    customer_name: string
-    customer_phone: string
-    total_amount: number
-    final_amount: number
-    delivery_type: string
-    service_name?: string
-    items_count: number
-    created_at: string
-    image_url?: string
-  }
-}
+// Re-export types for backwards compatibility
+export type { OrderNotification, OrderNotificationDisplay }
 
 interface UseOrderNotificationsOptions {
   onNotificationClick?: (orderId: number) => void
@@ -31,7 +18,7 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
     enableSoundNotifications = true,
   } = options
 
-  const [notifications, setNotifications] = useState<OrderNotification[]>([])
+  const [notifications, setNotifications] = useState<OrderNotificationDisplay[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -85,8 +72,8 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       try {
         const browserNotification = new Notification('🆕 طلب جديد', {
           body: `طلب ${order_number} من ${customer_name} - ${service_name || 'خدمة'}`,
-          icon: '/logo.png',
-          badge: '/logo.png',
+          icon: '/logo.jpg',
+          badge: '/logo.jpg',
           tag: `order-${notification.data.order_id}`,
           requireInteraction: false,
           data: {
@@ -108,6 +95,24 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
     [enableDesktopNotifications, notificationPermission, onNotificationClick]
   )
 
+  // تحويل OrderNotification إلى OrderNotificationDisplay
+  const convertToDisplayNotification = useCallback((notification: OrderNotification): OrderNotificationDisplay => {
+    return {
+      id: `order-${notification.data.order_id}-${Date.now()}`,
+      orderId: notification.data.order_id,
+      orderNumber: notification.data.order_number,
+      customerName: notification.data.customer_name,
+      customerPhone: notification.data.customer_phone,
+      totalAmount: notification.data.total_amount,
+      finalAmount: notification.data.final_amount,
+      deliveryType: notification.data.delivery_type,
+      serviceName: notification.data.service_name,
+      itemsCount: notification.data.items_count,
+      createdAt: notification.data.created_at,
+      imageUrl: notification.data.image_url,
+    }
+  }, [])
+
   // معالجة إشعار جديد
   const handleNewOrder = useCallback(
     (notification: OrderNotification) => {
@@ -120,7 +125,10 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       }
 
       knownOrderIdsRef.current.add(orderId)
-      setNotifications((prev) => [notification, ...prev])
+      
+      // تحويل إلى البنية المسطحة
+      const displayNotification = convertToDisplayNotification(notification)
+      setNotifications((prev) => [displayNotification, ...prev])
 
       // تشغيل صوت التنبيه
       playNotificationSound()
@@ -130,7 +138,7 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
 
       console.log(`✅ New order notification: ${notification.data.order_number}`)
     },
-    [playNotificationSound, showBrowserNotification]
+    [playNotificationSound, showBrowserNotification, convertToDisplayNotification]
   )
 
   // الاتصال بـ WebSocket
@@ -251,8 +259,8 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
     return () => window.removeEventListener('storage', handleStorageChange)
   }, [connectWebSocket])
 
-  const dismissNotification = useCallback((index: number) => {
-    setNotifications((prev) => prev.filter((_, i) => i !== index))
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
   }, [])
 
   return {

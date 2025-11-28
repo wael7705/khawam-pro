@@ -2714,33 +2714,59 @@ async def get_performance_stats(db: Session = Depends(get_db)):
             total_orders = 0
             total_orders_change = 0.0
         
-        # 4. Monthly Profits (الأرباح الشهرية)
+        # 4. Monthly Profits (الأرباح الشهرية) - إجمالي إيرادات الشهر الحالي
         try:
             start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            monthly_profits = db.execute(text("""
+            end_of_month = (start_of_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            end_of_month = end_of_month.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            monthly_profits_result = db.execute(text("""
                 SELECT COALESCE(SUM(final_amount), 0) 
                 FROM orders 
                 WHERE status = 'completed' 
                 AND created_at >= :start_of_month
-            """), {"start_of_month": start_of_month}).scalar() or 0
-            monthly_profits = float(monthly_profits)
+                AND created_at <= :end_of_month
+            """), {
+                "start_of_month": start_of_month,
+                "end_of_month": end_of_month
+            }).scalar()
+            monthly_profits = float(monthly_profits_result) if monthly_profits_result else 0.0
             
             # مقارنة مع الشهر الماضي
-            last_month_start = (start_of_month - timedelta(days=1)).replace(day=1)
-            last_month_profits = db.execute(text("""
+            if start_of_month.month == 1:
+                last_month_start = datetime(start_of_month.year - 1, 12, 1).replace(hour=0, minute=0, second=0, microsecond=0)
+                last_month_end = datetime(start_of_month.year - 1, 12, 31).replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:
+                last_month_start = datetime(start_of_month.year, start_of_month.month - 1, 1).replace(hour=0, minute=0, second=0, microsecond=0)
+                # حساب آخر يوم في الشهر السابق
+                if start_of_month.month - 1 in [1, 3, 5, 7, 8, 10, 12]:
+                    last_day = 31
+                elif start_of_month.month - 1 in [4, 6, 9, 11]:
+                    last_day = 30
+                else:  # فبراير
+                    last_day = 29 if start_of_month.year % 4 == 0 else 28
+                last_month_end = datetime(start_of_month.year, start_of_month.month - 1, last_day).replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            last_month_profits_result = db.execute(text("""
                 SELECT COALESCE(SUM(final_amount), 0) 
                 FROM orders 
                 WHERE status = 'completed' 
-                AND created_at >= :last_month_start AND created_at < :start_of_month
-            """), {"last_month_start": last_month_start, "start_of_month": start_of_month}).scalar() or 0
-            last_month_profits = float(last_month_profits) if last_month_profits else 0.0
+                AND created_at >= :last_month_start 
+                AND created_at <= :last_month_end
+            """), {
+                "last_month_start": last_month_start,
+                "last_month_end": last_month_end
+            }).scalar()
+            last_month_profits = float(last_month_profits_result) if last_month_profits_result else 0.0
             
             if last_month_profits > 0:
                 monthly_profits_change = round(((monthly_profits - last_month_profits) / last_month_profits) * 100, 1)
             else:
-                monthly_profits_change = 0.0
+                monthly_profits_change = 100.0 if monthly_profits > 0 else 0.0
         except Exception as e:
             print(f"Error calculating monthly profits: {e}")
+            import traceback
+            traceback.print_exc()
             monthly_profits = 0.0
             monthly_profits_change = 0.0
         
@@ -2828,19 +2854,34 @@ async def get_top_services(db: Session = Depends(get_db)):
         
         # Get service names from order items specifications
         # استخراج أسماء الخدمات من specifications في order_items
+        # محاولة استخراج service_name من عدة أماكن محتملة
         query = text("""
+            WITH service_data AS (
+                SELECT 
+                    COALESCE(
+                        NULLIF(oi.specifications->>'service_name', ''),
+                        NULLIF(oi.specifications->>'name', ''),
+                        NULLIF(oi.product_name, '')
+                    ) as service_name,
+                    oi.order_id,
+                    o.final_amount
+                FROM order_items oi
+                INNER JOIN orders o ON oi.order_id = o.id
+                WHERE o.created_at >= :start_date
+                    AND o.status = 'completed'
+                    AND (
+                        (oi.specifications IS NOT NULL AND oi.specifications->>'service_name' IS NOT NULL)
+                        OR oi.product_name IS NOT NULL
+                    )
+            )
             SELECT 
-                oi.specifications->>'service_name' as service_name,
-                COUNT(DISTINCT oi.order_id) as total_orders,
-                SUM(o.final_amount) as total_revenue
-            FROM order_items oi
-            INNER JOIN orders o ON oi.order_id = o.id
-            WHERE o.created_at >= :start_date
-                AND o.status = 'completed'
-                AND oi.specifications IS NOT NULL
-                AND oi.specifications->>'service_name' IS NOT NULL
-                AND oi.specifications->>'service_name' != ''
-            GROUP BY oi.specifications->>'service_name'
+                service_name,
+                COUNT(DISTINCT order_id) as total_orders,
+                COALESCE(SUM(final_amount), 0) as total_revenue
+            FROM service_data
+            WHERE service_name IS NOT NULL 
+                AND service_name != ''
+            GROUP BY service_name
             ORDER BY total_orders DESC
             LIMIT 5
         """)
@@ -2853,26 +2894,31 @@ async def get_top_services(db: Session = Depends(get_db)):
             total_orders = row[1] or 0
             total_revenue = float(row[2]) if row[2] else 0.0
             
-            if service_name:  # تأكد من وجود اسم الخدمة
+            if service_name and service_name.strip():  # تأكد من وجود اسم الخدمة
                 services.append({
-                    "name": service_name,
+                    "name": service_name.strip(),
                     "orders": int(total_orders),
                     "revenue": total_revenue
                 })
         
         # إذا لم تكن هناك خدمات من order_items، جرب البحث من جدول services مباشرة
         if not services:
-            # الحصول على جميع الخدمات مع عدد الطلبات
+            # الحصول على جميع الخدمات من جدول services
             all_services_query = text("""
                 SELECT 
                     s.name_ar,
                     COUNT(DISTINCT oi.order_id) as order_count,
-                    SUM(o.final_amount) as revenue_sum
+                    COALESCE(SUM(o.final_amount), 0) as revenue_sum
                 FROM services s
-                LEFT JOIN order_items oi ON oi.specifications->>'service_name' = s.name_ar
-                LEFT JOIN orders o ON oi.order_id = o.id
-                WHERE o.created_at >= :start_date OR o.created_at IS NULL
-                    AND (o.status = 'completed' OR o.status IS NULL)
+                LEFT JOIN order_items oi ON (
+                    oi.specifications->>'service_name' = s.name_ar
+                    OR oi.specifications->>'name' = s.name_ar
+                    OR oi.product_name = s.name_ar
+                )
+                LEFT JOIN orders o ON oi.order_id = o.id 
+                    AND o.created_at >= :start_date
+                    AND o.status = 'completed'
+                WHERE s.is_active = true AND s.is_visible = true
                 GROUP BY s.name_ar
                 HAVING COUNT(DISTINCT oi.order_id) > 0
                 ORDER BY order_count DESC
@@ -2881,11 +2927,12 @@ async def get_top_services(db: Session = Depends(get_db)):
             
             result = db.execute(all_services_query, {"start_date": thirty_days_ago}).fetchall()
             for row in result:
-                services.append({
-                    "name": row[0] or "خدمة غير محددة",
-                    "orders": int(row[1] or 0),
-                    "revenue": float(row[2]) if row[2] else 0.0
-                })
+                if row[0] and row[1] and row[1] > 0:  # تأكد من وجود بيانات صحيحة
+                    services.append({
+                        "name": row[0] or "خدمة غير محددة",
+                        "orders": int(row[1] or 0),
+                        "revenue": float(row[2]) if row[2] else 0.0
+                    })
         
         return {
             "success": True,
@@ -2954,42 +3001,51 @@ async def get_sales_overview(period: str = "month", db: Session = Depends(get_db
                 })
                 
         elif period == "month":
-            # Generate all days for the last 30 days
-            end_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=0)
-            start_date = (end_date - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+            # تقسيم الشهر الحالي إلى 4 أسابيع
+            start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             
-            query = text("""
-                SELECT 
-                    DATE(created_at) as date,
-                    COALESCE(SUM(final_amount), 0) as total
-                FROM orders
-                WHERE created_at >= :start_date
-                    AND created_at <= :end_date
-                    AND status = 'completed'
-                GROUP BY DATE(created_at)
-                ORDER BY date ASC
-            """)
+            # تحديد عدد أيام الشهر الحالي
+            if start_of_month.month == 12:
+                next_month_start = datetime(start_of_month.year + 1, 1, 1)
+            else:
+                next_month_start = datetime(start_of_month.year, start_of_month.month + 1, 1)
             
-            result = db.execute(query, {
-                "start_date": start_date,
-                "end_date": end_date
-            }).fetchall()
+            days_in_month = (next_month_start - start_of_month).days
+            days_per_week = days_in_month / 4  # تقسيم الشهر إلى 4 أسابيع
             
-            # Create a map of dates to totals
-            sales_map = {}
-            for row in result:
-                date_key = row[0]
-                sales_map[date_key] = float(row[1] or 0)
-            
-            # Fill all dates with sales data
-            current_date = start_date
-            while current_date <= end_date:
-                date_str = current_date.date().isoformat()
+            # إنشاء 4 أسابيع
+            for week_num in range(4):
+                week_start = start_of_month + timedelta(days=int(week_num * days_per_week))
+                if week_num == 3:
+                    week_end = next_month_start - timedelta(days=1)
+                else:
+                    week_end = start_of_month + timedelta(days=int((week_num + 1) * days_per_week) - 1)
+                
+                week_end = week_end.replace(hour=23, minute=59, second=59, microsecond=999999)
+                
+                # استعلام المبيعات لهذا الأسبوع
+                week_query = text("""
+                    SELECT COALESCE(SUM(final_amount), 0) as total
+                    FROM orders
+                    WHERE created_at >= :week_start
+                        AND created_at <= :week_end
+                        AND status = 'completed'
+                """)
+                
+                week_result = db.execute(week_query, {
+                    "week_start": week_start,
+                    "week_end": week_end
+                }).scalar()
+                
+                week_total = float(week_result) if week_result else 0.0
+                
+                # تسمية الأسبوع
+                week_label = f"الأسبوع {week_num + 1}"
+                
                 data.append({
-                    "label": date_str,
-                    "value": sales_map.get(current_date.date(), 0.0)
+                    "label": week_label,
+                    "value": week_total
                 })
-                current_date += timedelta(days=1)
                 
         else:  # year
             start_date = (datetime.now() - timedelta(days=365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)

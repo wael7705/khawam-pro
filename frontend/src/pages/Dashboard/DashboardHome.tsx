@@ -133,14 +133,16 @@ export default function DashboardHome() {
           // Calculate growth rate (simulated - can be improved with historical data)
           const growthRate = index === 0 ? 15.5 : index === 1 ? 12.3 : index === 2 ? 8.7 : 5.2
           return {
-            name: svc.name,
-            orders: svc.orders,
-            revenue: svc.revenue,
+            name: svc.name || 'خدمة غير محددة',
+            orders: svc.orders || 0,
+            revenue: svc.revenue || 0,
             avg_order_value: Math.round(avgOrderValue),
             growth_rate: growthRate
           }
         })
         setTopServices(enhancedServices)
+      } else {
+        setTopServices([])
       }
 
       if (salesRes.data.success) {
@@ -351,6 +353,7 @@ export default function DashboardHome() {
               <div className="services-legend">
                 {serviceChartData.map((entry, index) => {
                   const service = topServices[index]
+                  if (!service) return null
                   return (
                     <div key={index} className="legend-item">
                       <div 
@@ -358,9 +361,9 @@ export default function DashboardHome() {
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       ></div>
                       <div className="legend-info">
-                        <span className="legend-name">{entry.name}</span>
+                        <span className="legend-name">{entry.name || 'خدمة غير محددة'}</span>
                         <span className="legend-stats">
-                          {entry.value} طلب • {service.revenue.toLocaleString()} ل.س
+                          {entry.value || 0} طلب • {(service.revenue || 0).toLocaleString()} ل.س
                         </span>
                       </div>
                       {service.growth_rate > 0 && (
@@ -376,7 +379,10 @@ export default function DashboardHome() {
             </div>
           ) : (
             <div className="chart-placeholder">
-              <p>لا توجد بيانات متاحة</p>
+              <p>لا توجد بيانات متاحة للخدمات</p>
+              <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.7 }}>
+                سيتم عرض الخدمات الأكثر طلباً عند وجود طلبات مكتملة
+              </p>
             </div>
           )}
         </div>
@@ -462,6 +468,9 @@ export default function DashboardHome() {
           ) : (
             <div className="empty-state">
               <p>لا توجد بيانات خدمات متاحة</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                سيظهر تحليل أداء الخدمات عند وجود طلبات مكتملة للخدمات
+              </p>
             </div>
           )}
         </div>

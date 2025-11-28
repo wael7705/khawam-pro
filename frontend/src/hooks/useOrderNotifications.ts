@@ -205,17 +205,15 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       }
 
       ws.onerror = (error) => {
-        // لا تطبع الخطأ كـ error إذا كان بسبب انقطاع الاتصال
-        // فقط سجل تحذير خفيف
-        console.warn('⚠️ WebSocket connection issue (will retry):', error)
+        // لا تطبع الخطأ - WebSocket errors عادية عند انقطاع الاتصال
+        // فقط تحديث الحالة
         setIsConnected(false)
       }
 
       ws.onclose = (event) => {
-        // لا تطبع تحذير إذا كان الإغلاق طبيعياً
-        if (event.code !== 1000 && event.code !== 1001) {
-          console.log(`⚠️ WebSocket disconnected (code: ${event.code}), will reconnect...`)
-        }
+        // WebSocket code 1006 يعني انقطاع الاتصال (connection reset)
+        // هذا طبيعي عند مشاكل الشبكة وسيعاد الاتصال تلقائياً
+        // لا حاجة لطباعة تحذيرات في Console
         setIsConnected(false)
 
         // إعادة الاتصال فقط إذا لم يكن الإغلاق متعمداً

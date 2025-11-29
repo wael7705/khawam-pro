@@ -8,7 +8,11 @@
     "dev:frontend": "cd frontend && pnpm run dev",
     "dev:backend": "cd backend && python main.py",
     "build": "cd frontend && pnpm run build",
-    "setup": "pnpm install && cd backend && pip install -r requirements.txt"
+    "setup": "pnpm install && cd backend && pip install -r requirements.txt",
+    "deploy": "echo \"🚀 Starting deployment process...\" && git add . && git commit -m \"Deploy: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')\" && git push && echo \"✅ Code pushed to GitHub. Railway will automatically deploy.\" && echo \"📊 Monitor deployment at: https://railway.app\"",
+    "deploy:check": "echo \"📊 Checking Railway deployment status...\" && railway status || echo \"⚠️ Railway CLI not installed. Install it with: npm i -g @railway/cli\"",
+    "deploy:logs": "echo \"📋 Fetching Railway logs...\" && railway logs || echo \"⚠️ Railway CLI not installed. Install it with: npm i -g @railway/cli\"",
+    "deploy:monitor": "echo \"👀 Monitoring Railway deployment...\" && railway logs --follow || echo \"⚠️ Railway CLI not installed. Install it with: npm i -g @railway/cli\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

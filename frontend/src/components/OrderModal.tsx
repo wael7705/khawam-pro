@@ -117,6 +117,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [paperSize, setPaperSize] = useState<string>('A4')
   const [printQuality, setPrintQuality] = useState<PrintQuality>('standard')
   const [paperType, setPaperType] = useState<string>('')
+  const [lamination, setLamination] = useState<boolean>(false)  // خيار التسليك
+  const [flexType, setFlexType] = useState<'normal' | 'lighted'>('normal')  // نوع الفليكس (عادي/مضاء)
+  const [rollupSource, setRollupSource] = useState<'ours' | 'yours'>('ours')  // Roll up من عندنا/من عندك
+  const [printTypeChoice, setPrintTypeChoice] = useState<'flex' | 'pvc'>('flex')  // نوع الطباعة (فليكس/PVC)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   
@@ -1144,38 +1148,140 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 return null
               }
               
+              // إذا كان show_print_sides = true و print_sides_options موجودة، استخدمها
+              const shouldShowPrintSides = stepConfig.show_print_sides === true || stepConfig.show_print_sides === 'true' || stepConfig.show_print_sides === 1
+              const printSidesOptions = stepConfig.print_sides_options
+              
               return (
                 <div className="form-group">
                   <label>عدد الوجوه <span className="required">*</span></label>
                   <div className="delivery-options">
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printSides"
-                        value="single"
-                        checked={printSides === 'single'}
-                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                      />
-                      <span>وجه واحد</span>
-                    </label>
-                    <label className="radio-option">
-                      <input
-                        type="radio"
-                        name="printSides"
-                        value="double"
-                        checked={printSides === 'double'}
-                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                      />
-                      <span>وجهين</span>
-                    </label>
+                    {shouldShowPrintSides && printSidesOptions ? (
+                      // استخدام print_sides_options المخصصة
+                      Object.entries(printSidesOptions).map(([value, label]: [string, any]) => (
+                        <label key={value} className="radio-option">
+                          <input
+                            type="radio"
+                            name="printSides"
+                            value={value}
+                            checked={printSides === value}
+                            onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))
+                    ) : (
+                      // الخيارات الافتراضية
+                      <>
+                        <label className="radio-option">
+                          <input
+                            type="radio"
+                            name="printSides"
+                            value="single"
+                            checked={printSides === 'single'}
+                            onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                          />
+                          <span>وجه واحد</span>
+                        </label>
+                        <label className="radio-option">
+                          <input
+                            type="radio"
+                            name="printSides"
+                            value="double"
+                            checked={printSides === 'double'}
+                            onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                          />
+                          <span>وجهين</span>
+                        </label>
+                      </>
+                    )}
                   </div>
                 </div>
               )
             })()}
             
+            {/* خيار التسليك - إذا كان show_lamination = true */}
+            {stepConfig.show_lamination && (
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={lamination}
+                    onChange={(e) => setLamination(e.target.checked)}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                  />
+                  <span>تسليك (Lamination)</span>
+                </label>
+              </div>
+            )}
+            
+            {/* نوع الفليكس - إذا كان show_flex_type = true */}
+            {stepConfig.show_flex_type && stepConfig.flex_types && (
+              <div className="form-group">
+                <label>نوع الفليكس <span className="required">*</span></label>
+                <div className="delivery-options">
+                  {Object.entries(stepConfig.flex_types).map(([value, label]: [string, any]) => (
+                    <label key={value} className="radio-option">
+                      <input
+                        type="radio"
+                        name="flexType"
+                        value={value}
+                        checked={flexType === value}
+                        onChange={(e) => setFlexType(e.target.value as 'normal' | 'lighted')}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* نوع الطباعة (فليكس/PVC) - إذا كان show_print_type_choice = true */}
+            {stepConfig.show_print_type_choice && stepConfig.print_type_options && (
+              <div className="form-group">
+                <label>نوع الطباعة <span className="required">*</span></label>
+                <div className="delivery-options">
+                  {Object.entries(stepConfig.print_type_options).map(([value, label]: [string, any]) => (
+                    <label key={value} className="radio-option">
+                      <input
+                        type="radio"
+                        name="printTypeChoice"
+                        value={value}
+                        checked={printTypeChoice === value}
+                        onChange={(e) => setPrintTypeChoice(e.target.value as 'flex' | 'pvc')}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Roll up source - إذا كان show_rollup_source = true */}
+            {stepConfig.show_rollup_source && stepConfig.rollup_source_options && (
+              <div className="form-group">
+                <label>هل ال Roll up من عندنا أم من عندك؟ <span className="required">*</span></label>
+                <div className="delivery-options">
+                  {Object.entries(stepConfig.rollup_source_options).map(([value, label]: [string, any]) => (
+                    <label key={value} className="radio-option">
+                      <input
+                        type="radio"
+                        name="rollupSource"
+                        value={value}
+                        checked={rollupSource === value}
+                        onChange={(e) => setRollupSource(e.target.value as 'ours' | 'yours')}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             {/* إخفاء الأبعاد إذا كان hide_dimensions = true أو إذا كان القياس ليس "custom" */}
             {/* فقط العرض والارتفاع - لا نعرض الطول */}
-            {!stepConfig.hide_dimensions && (paperSize === 'custom' || (!stepConfig.paper_sizes && !stepConfig.paper_size)) && (
+            {/* إظهار الأبعاد عند اختيار custom أو إذا كان show_custom_dimensions = true */}
+            {(!stepConfig.hide_dimensions && (paperSize === 'custom' || stepConfig.show_custom_dimensions) || (!stepConfig.paper_sizes && !stepConfig.paper_size)) && (
               <>
                 <div className="form-group">
                   <label>العرض {stepConfig.required ? <span className="required">*</span> : ''}</label>
@@ -1396,6 +1502,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       numberOfPages,
                       totalPages,
                       paperType,
+                      lamination,
+                      flexType,
+                      printTypeChoice,
+                      rollupSource,
                       serviceName,
                       timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
                       uploadedFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
@@ -1600,6 +1710,30 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <div className="invoice-item">
                     <span>نوع الورق:</span>
                     <span>{formatPaperType(paperType)}</span>
+                  </div>
+                )}
+                {lamination && (
+                  <div className="invoice-item">
+                    <span>التسليك:</span>
+                    <span>نعم</span>
+                  </div>
+                )}
+                {flexType && (
+                  <div className="invoice-item">
+                    <span>نوع الفليكس:</span>
+                    <span>{flexType === 'lighted' ? 'مضاء' : 'عادي'}</span>
+                  </div>
+                )}
+                {printTypeChoice && (
+                  <div className="invoice-item">
+                    <span>نوع الطباعة:</span>
+                    <span>{printTypeChoice === 'pvc' ? 'PVC' : 'فليكس'}</span>
+                  </div>
+                )}
+                {rollupSource && (
+                  <div className="invoice-item">
+                    <span>Roll up:</span>
+                    <span>{rollupSource === 'ours' ? 'من عندنا' : 'من عندك'}</span>
                   </div>
                 )}
                 <div className="invoice-item invoice-item-column">
@@ -1945,6 +2079,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   numberOfPages,
                   totalPages,
                   paperType,
+                  lamination,
+                  flexType,
+                  printTypeChoice,
+                  rollupSource,
                   serviceName,
                   timestamp: Date.now(), // إضافة timestamp للتحقق من الصلاحية
                   uploadedFiles: uploadedFiles.map(f => ({
@@ -2510,7 +2648,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 setStep(formState.step)
               }
               
-              // Restore all form fields
+              // Restore all form fields including new fields
+              if (formState.lamination !== undefined) setLamination(formState.lamination)
+              if (formState.flexType) setFlexType(formState.flexType)
+              if (formState.printTypeChoice) setPrintTypeChoice(formState.printTypeChoice)
+              if (formState.rollupSource) setRollupSource(formState.rollupSource)
               if (formState.quantity !== undefined) setQuantity(formState.quantity)
               if (formState.length !== undefined) setLength(formState.length)
               if (formState.width !== undefined) setWidth(formState.width)
@@ -3269,7 +3411,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           clothingColorLabel,
           clothingSize,
           clothingSizeLabel,
-          clothingDesigns
+          clothingDesigns,
+          paperType,
+          lamination,
+          flexType,
+          printTypeChoice,
+          rollupSource
         }
         
         orderData = serviceHandler.prepareOrderData(serviceData, baseOrderData)
@@ -3305,7 +3452,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 number_of_pages: totalPages || numberOfPages,
                 paper_size: paperSize || 'A4',
                 total_pages: totalPages,
-                files_count: uploadedFiles.length
+                files_count: uploadedFiles.length,
+                paper_type: paperType || undefined,
+                lamination: lamination || undefined,
+                flex_type: flexType || undefined,
+                print_type_choice: printTypeChoice || undefined,
+                rollup_source: rollupSource || undefined
               },
               dimensions: {
                 length: length || null,

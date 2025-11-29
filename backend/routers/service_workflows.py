@@ -360,7 +360,8 @@ async def setup_lecture_printing_service(db: Session = Depends(get_db)):
                             "laser": "دقة عالية (ليزرية)"
                         }
                     },
-                    "hide_dimensions": True  # إخفاء الأبعاد
+                    "hide_dimensions": True,  # إخفاء الأبعاد
+                    "show_lamination": True  # إظهار خيار التسليك
                 }
             },
             {
@@ -543,9 +544,9 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
             },
             {
                 "step_number": 3,
-                "step_name_ar": "نوع الطباعة",
-                "step_name_en": "Print Type",
-                "step_description_ar": "اختر نوع الطباعة وجودتها",
+                "step_name_ar": "نوع الطباعة والفليكس",
+                "step_name_en": "Print Type and Flex Type",
+                "step_description_ar": "اختر نوع الطباعة وجودتها ونوع الفليكس",
                 "step_type": "print_options",
                 "step_config": {
                     "required": True,
@@ -556,23 +557,16 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                     },
                     "hide_paper_size": True,
                     "hide_print_sides": True,
-                    "hide_print_color_choice": True
+                    "hide_print_color_choice": True,
+                    "show_flex_type": True,  # إظهار خيار نوع الفليكس (مضاء/عادي)
+                    "flex_types": {
+                        "normal": "عادي",
+                        "lighted": "مضاء"
+                    }
                 }
             },
             {
                 "step_number": 4,
-                "step_name_ar": "اختيار الألوان",
-                "step_name_en": "Color Selection",
-                "step_description_ar": "اختر الألوان المطلوبة للتصميم",
-                "step_type": "colors",
-                "step_config": {
-                    "required": False,
-                    "maxColors": 6,
-                    "enable_image_color_analysis": True
-                }
-            },
-            {
-                "step_number": 5,
                 "step_name_ar": "ملاحظات إضافية",
                 "step_name_en": "Additional Notes",
                 "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
@@ -583,7 +577,7 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                 }
             },
             {
-                "step_number": 6,
+                "step_number": 5,
                 "step_name_ar": "معلومات العميل والاستلام",
                 "step_name_en": "Customer Info and Delivery",
                 "step_description_ar": "معلوماتك واختيار نوع الاستلام",
@@ -594,7 +588,7 @@ async def setup_flex_printing_service(db: Session = Depends(get_db)):
                 }
             },
             {
-                "step_number": 7,
+                "step_number": 6,
                 "step_name_ar": "الفاتورة والملخص",
                 "step_name_en": "Invoice and Summary",
                 "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
@@ -775,3 +769,767 @@ async def remove_poster_colors_step(db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ في حذف مرحلة الألوان: {str(e)}")
 
+@router.post("/setup-business-cards")
+async def setup_business_cards_service(db: Session = Depends(get_db)):
+    """إعداد خدمة طباعة الكروت الشخصية مع مراحلها"""
+    print("=" * 80)
+    print("🔧 [SETUP] Starting business cards service setup...")
+    print("=" * 80)
+    
+    try:
+        import json
+        
+        # 1. التحقق من وجود الخدمة أو إنشائها
+        print("🔍 [SETUP] Searching for existing business cards service...")
+        existing_service = db.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%كروت%' OR name_ar LIKE '%business%card%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            service_name = existing_service[1] if len(existing_service) > 1 else "N/A"
+            print(f"✅ [SETUP] Found existing service: ID={service_id}, Name={service_name}")
+            
+            # حذف المراحل القديمة
+            deleted_count = db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                      {"service_id": service_id}).rowcount
+            db.commit()
+            print(f"🗑️ [SETUP] Deleted {deleted_count} old workflows")
+        else:
+            print("📝 [SETUP] Service not found, creating new service...")
+            # إنشاء الخدمة الجديدة
+            result = db.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "الكروت الشخصية",
+                "name_en": "Business Cards",
+                "description_ar": "طباعة الكروت الشخصية مع خيارات متعددة",
+                "icon": "💳",
+                "base_price": 0.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 10
+            })
+            service_id = result.scalar()
+            db.commit()
+            print(f"✅ [SETUP] Created new service with ID: {service_id}")
+        
+        # 2. إضافة المراحل المخصصة لخدمة الكروت الشخصية
+        print(f"📋 [SETUP] Adding workflows for service_id={service_id}...")
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملفات",
+                "step_name_en": "Upload Files",
+                "step_description_ar": "قم برفع ملفات التصميم (AI, PDF, PSD, PNG, JPG)",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript",
+                    "analyze_pages": False,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "إعدادات الطباعة",
+                "step_name_en": "Print Settings",
+                "step_description_ar": "اختر نوع الورق وعدد الوجوه",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "hide_paper_size": True,
+                    "hide_dimensions": True,
+                    "hide_print_color_choice": True,
+                    "hide_quality_options": True,
+                    "show_paper_type": True,
+                    "paper_types": [
+                        {"value": "mujann", "label": "معجن"},
+                        {"value": "mashsh", "label": "مقشش"},
+                        {"value": "carton", "label": "كرتون"}
+                    ],
+                    "show_print_sides": True,  # إظهار خيار وجه/وجهين
+                    "print_sides_options": {
+                        "single": "وجه واحد",
+                        "double": "وجهين"
+                    }
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False,
+                    "hide_work_type": False
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional"]
+                }
+            },
+            {
+                "step_number": 5,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                step_config_json = json.dumps(workflow["step_config"])
+                db.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
+            except Exception as step_error:
+                print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        db.commit()
+        print(f"✅ [SETUP] Committed {len(workflows)} workflows to database")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify_count = db.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"🔍 [SETUP] Verification: {verify_count} workflows found in database for service_id={service_id}")
+        
+        print("=" * 80)
+        print(f"✅ [SETUP] Setup completed successfully! Service ID: {service_id}, Workflows: {verify_count}")
+        print("=" * 80)
+        
+        return {
+            "success": True,
+            "message": "تم إعداد خدمة الكروت الشخصية بنجاح",
+            "service_id": service_id,
+            "workflows_count": verify_count
+        }
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ [SETUP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
+
+@router.post("/setup-glossy-poster")
+async def setup_glossy_poster_service(db: Session = Depends(get_db)):
+    """إعداد خدمة طباعة كلك بولستر مع مراحلها"""
+    print("=" * 80)
+    print("🔧 [SETUP] Starting glossy poster service setup...")
+    print("=" * 80)
+    
+    try:
+        import json
+        
+        # 1. التحقق من وجود الخدمة أو إنشائها
+        print("🔍 [SETUP] Searching for existing glossy poster service...")
+        existing_service = db.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%كلك%بولستر%' OR name_ar LIKE '%glossy%poster%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            service_name = existing_service[1] if len(existing_service) > 1 else "N/A"
+            print(f"✅ [SETUP] Found existing service: ID={service_id}, Name={service_name}")
+            
+            # حذف المراحل القديمة
+            deleted_count = db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                      {"service_id": service_id}).rowcount
+            db.commit()
+            print(f"🗑️ [SETUP] Deleted {deleted_count} old workflows")
+        else:
+            print("📝 [SETUP] Service not found, creating new service...")
+            # إنشاء الخدمة الجديدة
+            result = db.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "طباعة كلك بولستر",
+                "name_en": "Glossy Poster",
+                "description_ar": "طباعة كلك بولستر عالية الجودة",
+                "icon": "🖼️",
+                "base_price": 0.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 11
+            })
+            service_id = result.scalar()
+            db.commit()
+            print(f"✅ [SETUP] Created new service with ID: {service_id}")
+        
+        # 2. إضافة المراحل المخصصة لخدمة كلك بولستر
+        print(f"📋 [SETUP] Adding workflows for service_id={service_id}...")
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملفات",
+                "step_name_en": "Upload Files",
+                "step_description_ar": "قم برفع ملفات التصميم (AI, PDF, PSD, PNG, JPG)",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript",
+                    "analyze_pages": False,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "الأبعاد",
+                "step_name_en": "Dimensions",
+                "step_description_ar": "حدد أبعاد الطباعة ووحدة القياس",
+                "step_type": "dimensions",
+                "step_config": {
+                    "required": True,
+                    "fields": ["width", "height"],
+                    "hide_pages": True,  # إزالة عدد الصفحات
+                    "hide_print_type": True,
+                    "field_labels": {
+                        "width": "العرض",
+                        "height": "الارتفاع"
+                    }
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "إعدادات الطباعة",
+                "step_name_en": "Print Settings",
+                "step_description_ar": "اختر نوع الطباعة وجودتها",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "hide_paper_size": True,
+                    "hide_dimensions": True,
+                    "hide_print_sides": True,  # إزالة خيار وجه/وجهين
+                    "hide_print_color_choice": True,
+                    "quality_options": {
+                        "standard": "عادية",
+                        "laser": "عالية (ليزرية)"
+                    },
+                    "force_color": True
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False,
+                    "hide_work_type": False
+                }
+            },
+            {
+                "step_number": 5,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional"]
+                }
+            },
+            {
+                "step_number": 6,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                step_config_json = json.dumps(workflow["step_config"])
+                db.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
+            except Exception as step_error:
+                print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        db.commit()
+        print(f"✅ [SETUP] Committed {len(workflows)} workflows to database")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify_count = db.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"🔍 [SETUP] Verification: {verify_count} workflows found in database for service_id={service_id}")
+        
+        print("=" * 80)
+        print(f"✅ [SETUP] Setup completed successfully! Service ID: {service_id}, Workflows: {verify_count}")
+        print("=" * 80)
+        
+        return {
+            "success": True,
+            "message": "تم إعداد خدمة كلك بولستر بنجاح",
+            "service_id": service_id,
+            "workflows_count": verify_count
+        }
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ [SETUP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
+
+@router.post("/setup-brochures")
+async def setup_brochures_service(db: Session = Depends(get_db)):
+    """إعداد خدمة طباعة البروشورات مع مراحلها"""
+    print("=" * 80)
+    print("🔧 [SETUP] Starting brochures service setup...")
+    print("=" * 80)
+    
+    try:
+        import json
+        
+        # 1. التحقق من وجود الخدمة أو إنشائها
+        print("🔍 [SETUP] Searching for existing brochures service...")
+        existing_service = db.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%بروشورات%' OR name_ar LIKE '%brochure%' OR name_ar LIKE '%فلير%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            service_name = existing_service[1] if len(existing_service) > 1 else "N/A"
+            print(f"✅ [SETUP] Found existing service: ID={service_id}, Name={service_name}")
+            
+            # حذف المراحل القديمة
+            deleted_count = db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                      {"service_id": service_id}).rowcount
+            db.commit()
+            print(f"🗑️ [SETUP] Deleted {deleted_count} old workflows")
+        else:
+            print("📝 [SETUP] Service not found, creating new service...")
+            # إنشاء الخدمة الجديدة
+            result = db.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "طباعة بروشورات",
+                "name_en": "Brochure Printing",
+                "description_ar": "خدمة طباعة البروشورات الورقية مع خيارات متعددة",
+                "icon": "📋",
+                "base_price": 0.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 8
+            })
+            service_id = result.scalar()
+            db.commit()
+            print(f"✅ [SETUP] Created new service with ID: {service_id}")
+        
+        # 2. إضافة المراحل المخصصة لخدمة البروشورات
+        print(f"📋 [SETUP] Adding workflows for service_id={service_id}...")
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "الكمية ورفع الملف أو الصورة",
+                "step_name_en": "Quantity and File Upload",
+                "step_description_ar": "قم برفع الملف أو الصورة وحدد الكمية المطلوبة",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": "image/*,.pdf,.jpg,.jpeg,.png",
+                    "analyze_pages": False,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "تحديد نوع الورق والقياس والدقة",
+                "step_name_en": "Paper Type, Size and Quality",
+                "step_description_ar": "اختر نوع الورق، القياس، ونوع الدقة",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "paper_sizes": ["A5", "A4", "custom"],
+                    "paper_size": "A4",
+                    "show_paper_type": True,
+                    "paper_types": [
+                        {"value": "glasse_170", "label": "Glasse 170"},
+                        {"value": "glasse_210", "label": "Glasse 210"},
+                        {"value": "glasse_250", "label": "Glasse 250"},
+                        {"value": "bristol_170", "label": "Bristol 170"},
+                        {"value": "bristol_240", "label": "Bristol 240"},
+                        {"value": "mashsh_170", "label": "مقشش 170غ"},
+                        {"value": "mashsh_250", "label": "مقشش 250غ"},
+                        {"value": "mujann", "label": "معجن"},
+                        {"value": "normal", "label": "ورق عادي"}
+                    ],
+                    "quality_options": {
+                        "standard": "عادية",
+                        "laser": "عالية (ليزرية)"
+                    },
+                    "force_color": True,
+                    "hide_print_sides": True,
+                    "hide_dimensions": False,  # إظهار الأبعاد للقياس المخصص
+                    "show_custom_dimensions": True,  # إظهار حقول الأبعاد عند اختيار custom
+                    "show_lamination": True,  # إظهار خيار التسليك
+                    "show_notes_in_print_options": True
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional", "load_from_account"],
+                    "skip_invoice": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                step_config_json = json.dumps(workflow["step_config"], ensure_ascii=False)
+                db.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
+            except Exception as step_error:
+                print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        db.commit()
+        print(f"✅ [SETUP] Committed {len(workflows)} workflows to database")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify_count = db.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"🔍 [SETUP] Verification: {verify_count} workflows found in database for service_id={service_id}")
+        
+        print("=" * 80)
+        print(f"✅ [SETUP] Setup completed successfully! Service ID: {service_id}, Workflows: {verify_count}")
+        print("=" * 80)
+        
+        return {
+            "success": True,
+            "message": "تم إعداد خدمة البروشورات بنجاح",
+            "service_id": service_id,
+            "workflows_count": verify_count
+        }
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ [SETUP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")
+
+@router.post("/setup-banners")
+async def setup_banners_service(db: Session = Depends(get_db)):
+    """إعداد خدمة طباعة البانرات مع مراحلها"""
+    print("=" * 80)
+    print("🔧 [SETUP] Starting banners service setup...")
+    print("=" * 80)
+    
+    try:
+        import json
+        
+        # 1. التحقق من وجود الخدمة أو إنشائها
+        print("🔍 [SETUP] Searching for existing banners service...")
+        existing_service = db.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%بانرات%' OR name_ar LIKE '%banner%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            service_name = existing_service[1] if len(existing_service) > 1 else "N/A"
+            print(f"✅ [SETUP] Found existing service: ID={service_id}, Name={service_name}")
+            
+            # تحديث اسم الخدمة لإضافة (Roll up)
+            db.execute(text("""
+                UPDATE services 
+                SET name_ar = :name_ar
+                WHERE id = :service_id
+            """), {
+                "service_id": service_id,
+                "name_ar": "البانرات الإعلانية (Roll up)"
+            })
+            db.commit()
+            print(f"✅ [SETUP] Updated service name to include (Roll up)")
+            
+            # حذف المراحل القديمة
+            deleted_count = db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
+                      {"service_id": service_id}).rowcount
+            db.commit()
+            print(f"🗑️ [SETUP] Deleted {deleted_count} old workflows")
+        else:
+            print("📝 [SETUP] Service not found, creating new service...")
+            # إنشاء الخدمة الجديدة
+            result = db.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "البانرات الإعلانية (Roll up)",
+                "name_en": "Advertising Banners (Roll up)",
+                "description_ar": "طباعة بانرات إعلانية بجميع المقاسات",
+                "icon": "📢",
+                "base_price": 0.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 3
+            })
+            service_id = result.scalar()
+            db.commit()
+            print(f"✅ [SETUP] Created new service with ID: {service_id}")
+        
+        # 2. إضافة المراحل المخصصة لخدمة البانرات
+        print(f"📋 [SETUP] Adding workflows for service_id={service_id}...")
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملفات",
+                "step_name_en": "Upload Files",
+                "step_description_ar": "قم برفع ملفات التصميم (AI, PDF, PSD, PNG, JPG)",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript",
+                    "analyze_pages": False,
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "الأبعاد",
+                "step_name_en": "Dimensions",
+                "step_description_ar": "حدد أبعاد الطباعة ووحدة القياس",
+                "step_type": "dimensions",
+                "step_config": {
+                    "required": True,
+                    "fields": ["width", "height"],
+                    "hide_pages": True,
+                    "hide_print_type": True,
+                    "field_labels": {
+                        "width": "العرض",
+                        "height": "الارتفاع"
+                    }
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "نوع الطباعة و Roll up",
+                "step_name_en": "Print Type and Roll up",
+                "step_description_ar": "اختر نوع الطباعة ومصدر Roll up",
+                "step_type": "print_options",
+                "step_config": {
+                    "required": True,
+                    "hide_paper_size": True,
+                    "hide_dimensions": True,
+                    "hide_print_sides": True,
+                    "hide_print_color_choice": True,
+                    "hide_quality_options": True,
+                    "show_print_type_choice": True,  # إظهار خيار نوع الطباعة (فليكس/PVC)
+                    "print_type_options": {
+                        "flex": "فليكس",
+                        "pvc": "PVC"
+                    },
+                    "show_rollup_source": True,  # إظهار سؤال Roll up من عندنا/من عندك
+                    "rollup_source_options": {
+                        "ours": "من عندنا",
+                        "yours": "من عندك"
+                    }
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "ملاحظات إضافية",
+                "step_name_en": "Additional Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False,
+                    "hide_work_type": False
+                }
+            },
+            {
+                "step_number": 5,
+                "step_name_ar": "معلومات العميل والاستلام",
+                "step_name_en": "Customer Info and Delivery",
+                "step_description_ar": "معلوماتك واختيار نوع الاستلام",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["whatsapp_optional"]
+                }
+            },
+            {
+                "step_number": 6,
+                "step_name_ar": "الفاتورة والملخص",
+                "step_name_en": "Invoice and Summary",
+                "step_description_ar": "راجع تفاصيل طلبك وأكد الإرسال",
+                "step_type": "invoice",
+                "step_config": {
+                    "required": True
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                print(f"  ➕ [SETUP] Adding step {workflow['step_number']}: {workflow['step_name_ar']} (type: {workflow['step_type']})")
+                step_config_json = json.dumps(workflow["step_config"])
+                db.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ [SETUP] Step {workflow['step_number']} added successfully")
+            except Exception as step_error:
+                print(f"  ❌ [SETUP] Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+                raise
+        
+        db.commit()
+        print(f"✅ [SETUP] Committed {len(workflows)} workflows to database")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify_count = db.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"🔍 [SETUP] Verification: {verify_count} workflows found in database for service_id={service_id}")
+        
+        print("=" * 80)
+        print(f"✅ [SETUP] Setup completed successfully! Service ID: {service_id}, Workflows: {verify_count}")
+        print("=" * 80)
+        
+        return {
+            "success": True,
+            "message": "تم إعداد خدمة البانرات بنجاح",
+            "service_id": service_id,
+            "workflows_count": verify_count
+        }
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌ [SETUP] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 80)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"خطأ في إعداد الخدمة: {str(e)}")

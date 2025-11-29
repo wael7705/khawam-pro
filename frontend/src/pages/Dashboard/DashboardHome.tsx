@@ -9,6 +9,7 @@ interface DashboardStats {
   low_stock: number
   total_services: number
   active_orders: number
+  total_orders?: number  // إجمالي الطلبات (النشطة + الأرشيف)
   total_revenue: number
   this_month_revenue: number
   revenue_trend: number
@@ -52,6 +53,7 @@ export default function DashboardHome() {
     low_stock: 0,
     total_services: 0,
     active_orders: 0,
+    total_orders: 0,
     total_revenue: 0,
     this_month_revenue: 0,
     revenue_trend: 0,
@@ -120,7 +122,8 @@ export default function DashboardHome() {
         // Convert total_products to total_services
         setStats({
           ...statsData,
-          total_services: statsData.total_products || statsData.total_services || 0,
+          total_services: statsData.total_services || statsData.total_products || 0,
+          total_orders: statsData.total_orders || 0,
           low_stock: 0 // Not applicable for services
         })
       }
@@ -288,6 +291,11 @@ export default function DashboardHome() {
             <p className="stat-label">الطلبات النشطة</p>
             <div className="stat-value-group">
               <h3>{stats.active_orders}</h3>
+              {stats.total_orders !== undefined && stats.total_orders > 0 && (
+                <span className="stat-subtitle">
+                  {stats.total_orders} إجمالي الطلبات
+                </span>
+              )}
               {stats.orders_trend !== 0 && (
                 <span className={`stat-trend ${stats.orders_trend > 0 ? 'positive' : 'negative'}`}>
                   {stats.orders_trend > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}

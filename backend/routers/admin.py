@@ -2502,19 +2502,36 @@ async def get_dashboard_stats(db: Session = Depends(get_db), response: Response 
         from datetime import datetime, timedelta
         
         # التحقق من وجود الأعمدة المطلوبة أولاً
-        # Get total products
+        # Get total services (من جدول services وليس products)
         try:
-            total_products = db.query(Product).filter(Product.is_visible == True).count()
+            total_services_result = db.execute(text("""
+                SELECT COUNT(*) 
+                FROM services 
+                WHERE is_visible = true AND is_active = true
+            """)).scalar()
+            total_services = total_services_result or 0
         except Exception as e:
-            print(f"Error getting products: {e}")
-            total_products = 0
+            print(f"Error getting services: {e}")
+            total_services = 0
+        
+        # Get total orders (إجمالي الطلبات - جميع الطلبات في الأرشيف والنشطة)
+        try:
+            total_orders_result = db.execute(text("""
+                SELECT COUNT(*) 
+                FROM orders
+            """)).scalar()
+            total_orders = total_orders_result or 0
+        except Exception as e:
+            print(f"Error getting total orders: {e}")
+            total_orders = 0
         
         # Get active orders using raw SQL لتجنب مشاكل الأعمدة المفقودة
+        # الطلبات النشطة هي: pending, preparing, shipping (وليس التي في الأرشيف)
         try:
             active_orders_result = db.execute(text("""
                 SELECT COUNT(*) 
                 FROM orders 
-                WHERE status NOT IN ('completed', 'cancelled', 'rejected')
+                WHERE status IN ('pending', 'preparing', 'shipping')
             """)).scalar()
             active_orders = active_orders_result or 0
         except Exception as e:
@@ -2579,12 +2596,13 @@ async def get_dashboard_stats(db: Session = Depends(get_db), response: Response 
             revenue_trend = ((this_month_revenue - last_month_revenue) / last_month_revenue) * 100
         
         # Get active orders trend using raw SQL
+        # الطلبات النشطة هي: pending, preparing, shipping (وليس التي في الأرشيف)
         try:
             this_month_active_result = db.execute(text("""
                 SELECT COUNT(*) 
                 FROM orders 
                 WHERE created_at >= :start_date 
-                AND status NOT IN ('completed', 'cancelled', 'rejected')
+                AND status IN ('pending', 'preparing', 'shipping')
             """), {"start_date": start_of_month}).scalar()
             this_month_active = this_month_active_result or 0
         except Exception as e:
@@ -2597,7 +2615,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db), response: Response 
                 FROM orders 
                 WHERE created_at >= :last_month_start 
                 AND created_at < :start_of_month
-                AND status NOT IN ('completed', 'cancelled', 'rejected')
+                AND status IN ('pending', 'preparing', 'shipping')
             """), {
                 "last_month_start": last_month_start,
                 "start_of_month": start_of_month
@@ -2615,8 +2633,10 @@ async def get_dashboard_stats(db: Session = Depends(get_db), response: Response 
             "success": True,
             "stats": {
                 "low_stock": low_stock,
-                "total_products": total_products,
-                "active_orders": active_orders,
+                "total_products": total_services,  # للتوافق مع الكود القديم
+                "total_services": total_services,  # العدد الصحيح للخدمات
+                "total_orders": total_orders,  # إجمالي الطلبات (النشطة + الأرشيف)
+                "active_orders": active_orders,  # الطلبات النشطة فقط
                 "total_revenue": total_revenue,
                 "this_month_revenue": this_month_revenue,
                 "revenue_trend": round(revenue_trend, 1),

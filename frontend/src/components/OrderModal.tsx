@@ -215,7 +215,21 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }
 
   const applyWorkflowSteps = (steps: any[], currentServiceName: string) => {
-    setWorkflowSteps(steps)
+    // تصفية المراحل لخدمة الفليكس - حذف print_options و colors
+    let filteredSteps = steps
+    if (isFlexPrinting) {
+      filteredSteps = steps.filter((step: any) => 
+        step.step_type !== 'print_options' && step.step_type !== 'colors'
+      )
+      // إعادة ترقيم المراحل بعد الحذف
+      filteredSteps = filteredSteps.map((step: any, index: number) => ({
+        ...step,
+        step_number: index + 1
+      }))
+      console.log('✅ Filtered flex printing steps - removed print_options and colors')
+      console.log('📋 Original steps count:', steps.length, 'Filtered:', filteredSteps.length)
+    }
+    setWorkflowSteps(filteredSteps)
     let savedStep: number | null = null
 
     try {
@@ -2107,38 +2121,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   style={{ flex: 1 }}
                 />
                 <select 
-                  value={widthUnit} 
-                  onChange={(e) => setWidthUnit(e.target.value)} 
-                  className="form-input"
-                  style={{ width: '100px' }}
-                >
-                  <option value="cm">سم (cm)</option>
-                  <option value="mm">ملم (mm)</option>
-                  <option value="in">إنش (in)</option>
-                  <option value="m">متر (m)</option>
-                </select>
-            </div>
-            </div>
-            <div className="form-group">
-              <label>
-                الارتفاع{' '}
-                {(isPosterPrinting || isBannerPrinting || isFlexPrinting) && (
-                  <span className="required">*</span>
-                )}
-              </label>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <input
-                type="number"
-                  min="0"
-                  step="0.01"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                className="form-input"
-                placeholder="0"
-                  required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
-                  style={{ flex: 1 }}
-                />
-                <select 
                   value={heightUnit} 
                   onChange={(e) => setHeightUnit(e.target.value)} 
                   className="form-input"
@@ -2149,7 +2131,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <option value="in">إنش (in)</option>
                   <option value="m">متر (m)</option>
                 </select>
-            </div>
+              </div>
             </div>
             {(isLecturePrinting ||
               (!isPosterPrinting &&

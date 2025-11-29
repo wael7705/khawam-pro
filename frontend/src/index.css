@@ -32,6 +32,11 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   font-family: 'Tajawal', 'Arial', sans-serif;
   background-color: var(--bg);
@@ -39,12 +44,18 @@ body {
   direction: rtl;
   text-align: right;
   transition: background-color 0.3s, color 0.3s;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 .app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 main {

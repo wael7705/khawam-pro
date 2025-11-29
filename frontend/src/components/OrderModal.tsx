@@ -80,7 +80,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [length, setLength] = useState('')
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
-  const [unit, setUnit] = useState('cm')
+  const [widthUnit, setWidthUnit] = useState('cm')
+  const [heightUnit, setHeightUnit] = useState('cm')
   const [selectedColors, setSelectedColors] = useState<string[]>([])
   const [autoExtractedColors, setAutoExtractedColors] = useState<string[]>([]) // الألوان المستخرجة تلقائياً من الصورة
   const [workType, setWorkType] = useState('')
@@ -520,7 +521,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   accept={stepConfig.accept || ".ai,.pdf,.psd,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/postscript"}
                   onChange={handleImageUpload}
                   className="hidden"
-                  multiple={stepConfig.multiple === true || stepConfig.multiple === 'true' || stepConfig.multiple === 1}
+                  multiple={true}
                 />
                 {uploadedFiles.length > 0 ? (
                   <div className="uploaded-files-list">
@@ -649,8 +650,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   style={{ flex: 1 }}
                 />
                 <select 
-                  value={unit} 
-                  onChange={(e) => setUnit(e.target.value)} 
+                  value={widthUnit} 
+                  onChange={(e) => setWidthUnit(e.target.value)} 
                   className="form-input"
                   style={{ width: '100px' }}
                 >
@@ -679,8 +680,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   style={{ flex: 1 }}
                 />
                 <select 
-                  value={unit} 
-                  onChange={(e) => setUnit(e.target.value)} 
+                  value={heightUnit} 
+                  onChange={(e) => setHeightUnit(e.target.value)} 
                   className="form-input"
                   style={{ width: '100px' }}
                 >
@@ -1177,8 +1178,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       style={{ flex: 1 }}
                     />
                     <select 
-                      value={unit} 
-                      onChange={(e) => setUnit(e.target.value)} 
+                      value={widthUnit} 
+                      onChange={(e) => setWidthUnit(e.target.value)} 
                       className="form-input"
                       style={{ width: '100px' }}
                     >
@@ -1204,8 +1205,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       style={{ flex: 1 }}
                     />
                     <select 
-                      value={unit} 
-                      onChange={(e) => setUnit(e.target.value)} 
+                      value={heightUnit} 
+                      onChange={(e) => setHeightUnit(e.target.value)} 
                       className="form-input"
                       style={{ width: '100px' }}
                     >
@@ -1363,7 +1364,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       length,
                       width,
                       height,
-                      unit,
+                      widthUnit,
+                      heightUnit,
                       selectedColors,
                       autoExtractedColors,
                       workType,
@@ -1449,7 +1451,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                       length,
                       width,
                       height,
-                      unit,
+                      widthUnit,
+                      heightUnit,
                       selectedColors,
                       autoExtractedColors,
                       workType,
@@ -1500,9 +1503,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           (deliveryAddress && (deliveryAddress.street || deliveryAddress.description || deliveryAddress.formattedAddress || deliveryAddress.label)) || ''
         const hasCoordinates = Boolean(deliveryAddress?.latitude && deliveryAddress?.longitude)
         const measurementItems = [
-          { label: 'الطول', value: length },
-          { label: 'العرض', value: width },
-          { label: 'الارتفاع', value: height },
+          { label: 'الطول', value: length, unit: widthUnit },
+          { label: 'العرض', value: width, unit: widthUnit },
+          { label: 'الارتفاع', value: height, unit: heightUnit },
         ]
 
         return (
@@ -1588,10 +1591,10 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 <div className="invoice-item invoice-item-column">
                   <span>الأبعاد المطلوبة:</span>
                   <div className="invoice-dimensions">
-                    {measurementItems.map(({ label, value }) => (
+                    {measurementItems.map(({ label, value, unit }) => (
                       <span key={label} className="invoice-dimension-item">
                         {label}:{' '}
-                        {value && value.trim() !== '' ? `${value} ${unit}` : 'غير محدد'}
+                        {value && value.trim() !== '' ? `${value} ${unit || 'cm'}` : 'غير محدد'}
                       </span>
                     ))}
                   </div>
@@ -1910,7 +1913,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   length,
                   width,
                   height,
-                  unit,
+                  widthUnit,
+                  heightUnit,
                   selectedColors,
                   autoExtractedColors,
                   workType,
@@ -2071,8 +2075,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   style={{ flex: 1 }}
               />
                 <select 
-                  value={unit} 
-                  onChange={(e) => setUnit(e.target.value)} 
+                  value={widthUnit} 
+                  onChange={(e) => setWidthUnit(e.target.value)} 
                   className="form-input"
                   style={{ width: '100px' }}
                 >
@@ -2103,8 +2107,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   style={{ flex: 1 }}
                 />
                 <select 
-                  value={unit} 
-                  onChange={(e) => setUnit(e.target.value)} 
+                  value={widthUnit} 
+                  onChange={(e) => setWidthUnit(e.target.value)} 
                   className="form-input"
                   style={{ width: '100px' }}
                 >
@@ -2116,13 +2120,36 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             </div>
             </div>
             <div className="form-group">
-              <label>وحدة القياس</label>
-              <select value={unit} onChange={(e) => setUnit(e.target.value)} className="form-input">
-                <option value="cm">سم (cm)</option>
-                <option value="mm">ملم (mm)</option>
-                <option value="in">إنش (in)</option>
-                <option value="m">متر (m)</option>
-              </select>
+              <label>
+                الارتفاع{' '}
+                {(isPosterPrinting || isBannerPrinting || isFlexPrinting) && (
+                  <span className="required">*</span>
+                )}
+              </label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="number"
+                  min="0"
+                  step="0.01"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="form-input"
+                placeholder="0"
+                  required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
+                  style={{ flex: 1 }}
+                />
+                <select 
+                  value={heightUnit} 
+                  onChange={(e) => setHeightUnit(e.target.value)} 
+                  className="form-input"
+                  style={{ width: '100px' }}
+                >
+                  <option value="cm">سم (cm)</option>
+                  <option value="mm">ملم (mm)</option>
+                  <option value="in">إنش (in)</option>
+                  <option value="m">متر (m)</option>
+                </select>
+            </div>
             </div>
             {(isLecturePrinting ||
               (!isPosterPrinting &&
@@ -2506,7 +2533,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               if (formState.length !== undefined) setLength(formState.length)
               if (formState.width !== undefined) setWidth(formState.width)
               if (formState.height !== undefined) setHeight(formState.height)
-              if (formState.unit !== undefined) setUnit(formState.unit)
+              if (formState.widthUnit !== undefined) setWidthUnit(formState.widthUnit)
+              if (formState.heightUnit !== undefined) setHeightUnit(formState.heightUnit)
+              // Backward compatibility: if old 'unit' exists, use it for both
+              if (formState.unit !== undefined && formState.widthUnit === undefined && formState.heightUnit === undefined) {
+                setWidthUnit(formState.unit)
+                setHeightUnit(formState.unit)
+              }
               if (formState.selectedColors !== undefined) setSelectedColors(formState.selectedColors)
               if (formState.autoExtractedColors !== undefined) setAutoExtractedColors(formState.autoExtractedColors)
               if (formState.workType !== undefined) setWorkType(formState.workType)
@@ -2617,44 +2650,36 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     console.log('📋 Multiple enabled:', stepConfig.multiple)
     
     // التحقق من multiple - يمكن أن يكون true أو 'true' أو 1
-    const isMultiple = stepConfig.multiple === true || stepConfig.multiple === 'true' || stepConfig.multiple === 1
+    // إذا لم يكن محدداً، نعتبره multiple = true افتراضياً لدعم رفع ملفات متعددة
+    const isMultiple = stepConfig.multiple === false || stepConfig.multiple === 'false' || stepConfig.multiple === 0 ? false : true
     
-    if (isMultiple) {
-      console.log('✅ Multiple files mode - appending files')
-      // Handle multiple files - append to existing files
-      setUploadedFiles(prev => {
-        console.log('📦 Previous files count:', prev.length)
-        // تجنب إضافة ملفات مكررة (نفس الاسم والحجم)
-        const existingSignatures = new Set(prev.map(f => `${f.name}-${f.size}-${f.lastModified}`))
-        const newFiles = fileArray.filter(f => {
-          const signature = `${f.name}-${f.size}-${f.lastModified}`
-          const isDuplicate = existingSignatures.has(signature)
-          if (isDuplicate) {
-            console.log('⚠️ Duplicate file skipped:', f.name)
-          }
-          return !isDuplicate
-        })
-        console.log('📦 New files to add:', newFiles.length)
-        console.log('📦 Total files after add:', prev.length + newFiles.length)
-        return [...prev, ...newFiles]
-      })
-      
-      // تحليل الصفحات إذا كان مفعّل
-      if (stepConfig.analyze_pages) {
-        analyzePDFPages(fileArray)
-      } else {
-        // تحليل PDFs فقط إذا لم يكن analyze_pages مفعّل
-        const pdfFiles = fileArray.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
-        if (pdfFiles.length > 0) {
-          analyzePDFPages(pdfFiles)
+    // دائماً نضيف الملفات بدلاً من استبدالها (حتى لو كان multiple = false، نسمح بإضافة ملفات إضافية)
+    console.log('✅ Adding files to existing list (always append mode)')
+    setUploadedFiles(prev => {
+      console.log('📦 Previous files count:', prev.length)
+      // تجنب إضافة ملفات مكررة (نفس الاسم والحجم)
+      const existingSignatures = new Set(prev.map(f => `${f.name}-${f.size}-${f.lastModified}`))
+      const newFiles = fileArray.filter(f => {
+        const signature = `${f.name}-${f.size}-${f.lastModified}`
+        const isDuplicate = existingSignatures.has(signature)
+        if (isDuplicate) {
+          console.log('⚠️ Duplicate file skipped:', f.name)
         }
-      }
+        return !isDuplicate
+      })
+      console.log('📦 New files to add:', newFiles.length)
+      console.log('📦 Total files after add:', prev.length + newFiles.length)
+      return [...prev, ...newFiles]
+    })
+    
+    // تحليل الصفحات إذا كان مفعّل
+    if (stepConfig.analyze_pages) {
+      analyzePDFPages(fileArray)
     } else {
-      console.log('📄 Single file mode - replacing files')
-      // Single file - replace existing files
-      setUploadedFiles([fileArray[0]])
-      if (fileArray[0].type === 'application/pdf') {
-        analyzePDFPages([fileArray[0]])
+      // تحليل PDFs فقط إذا لم يكن analyze_pages مفعّل
+      const pdfFiles = fileArray.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+      if (pdfFiles.length > 0) {
+        analyzePDFPages(pdfFiles)
       }
     }
     
@@ -2668,17 +2693,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     }
     
     // Reset file input to allow selecting the same file again
-    // لكن فقط إذا كان multiple مفعّل - حتى يمكن رفع ملفات إضافية
-    if (fileInputRef.current && isMultiple) {
-      // لا نمسح value في وضع multiple حتى يمكن رفع ملفات إضافية
-      // لكن يمكن إعادة تعيينه بعد معالجة الملفات
+    // دائماً نمسح value حتى يمكن رفع ملفات إضافية
+    if (fileInputRef.current) {
       setTimeout(() => {
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
       }, 100)
-    } else if (fileInputRef.current && !isMultiple) {
-      fileInputRef.current.value = ''
     }
   }
 
@@ -2863,7 +2884,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         length,
         width,
         height,
-        unit,
+        widthUnit,
+        heightUnit,
         selectedColors,
         autoExtractedColors, // حفظ الألوان المستخرجة تلقائياً
         workType,
@@ -3253,7 +3275,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           length,
           width,
           height,
-          unit,
+          widthUnit,
+          heightUnit,
           selectedColors,
           workType,
           clothingSource,
@@ -3290,7 +3313,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               unit_price: unitPrice,
               total_price: safeTotalPrice,
               specifications: {
-                dimensions: length || width || height ? { length, width, height, unit } : undefined,
+                dimensions: length || width || height ? { length, width, height, widthUnit, heightUnit } : undefined,
                 colors: selectedColors.length > 0 ? selectedColors : undefined,
                 work_type: workType || undefined,
                 notes: notes || undefined,
@@ -3306,7 +3329,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 length: length || null,
                 width: width || null,
                 height: height || null,
-                unit: unit
+                widthUnit: widthUnit,
+                heightUnit: heightUnit
               },
               colors: selectedColors,
               design_files: uploadedFiles

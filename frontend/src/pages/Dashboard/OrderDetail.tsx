@@ -1210,19 +1210,19 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
       if (!trimmed) {
         console.log('⚠️ design_files is empty string')
       } else {
-        try {
+      try {
           const parsed = JSON.parse(trimmed)
-          if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed)) {
             filesToProcess = parsed.filter(f => f !== null && f !== undefined && f !== '')
-          } else if (parsed !== null && parsed !== undefined) {
-            filesToProcess = [parsed]
-          } else {
+        } else if (parsed !== null && parsed !== undefined) {
+          filesToProcess = [parsed]
+        } else {
             // إذا كان parsed null/undefined، جرب استخدام السلسلة الأصلية
             if (trimmed.startsWith('data:') || trimmed.startsWith('http') || trimmed.startsWith('/uploads/')) {
               filesToProcess = [trimmed]
             }
-          }
-        } catch (e) {
+        }
+      } catch (e) {
           // إذا فشل التحليل، تحقق إذا كانت data URL أو رابط
           if (trimmed.startsWith('data:') || trimmed.startsWith('http') || trimmed.startsWith('/uploads/')) {
             filesToProcess = [trimmed]
@@ -1238,7 +1238,7 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
         filesToProcess = Object.values(item.design_files).filter(f => f !== null && f !== undefined && f !== '')
       } else {
         // كائن واحد
-        filesToProcess = [item.design_files]
+      filesToProcess = [item.design_files]
       }
     }
     

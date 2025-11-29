@@ -48,8 +48,70 @@ const fileToDataUrl = (file: File): Promise<string> =>
     reader.readAsDataURL(file)
   })
 
+// تحسين: ضغط الملفات الكبيرة قبل التحويل لتقليل الوقت
 const serializeFile = async (file: File): Promise<SerializedDesignFile> => {
-  const dataUrl = await fileToDataUrl(file)
+  // إذا كان الملف كبير جداً (> 5MB) وكان صورة، حاول ضغطه أولاً
+  let fileToProcess = file
+  if (file.size > 5 * 1024 * 1024 && file.type.startsWith('image/')) {
+    try {
+      // محاولة ضغط الصورة باستخدام canvas
+      const compressed = await new Promise<File>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const img = new Image()
+          img.onload = () => {
+            const canvas = document.createElement('canvas')
+            const maxWidth = 2000
+            const maxHeight = 2000
+            let width = img.width
+            let height = img.height
+            
+            if (width > maxWidth || height > maxHeight) {
+              if (width > height) {
+                height = (height * maxWidth) / width
+                width = maxWidth
+              } else {
+                width = (width * maxHeight) / height
+                height = maxHeight
+              }
+            }
+            
+            canvas.width = width
+            canvas.height = height
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height)
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const compressedFile = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() })
+                  resolve(compressedFile)
+                } else {
+                  reject(new Error('Failed to compress image'))
+                }
+              }, 'image/jpeg', 0.85)
+            } else {
+              reject(new Error('Failed to get canvas context'))
+            }
+          }
+          img.onerror = reject
+          if (typeof e.target?.result === 'string') {
+            img.src = e.target.result
+          } else {
+            reject(new Error('Failed to read file'))
+          }
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      fileToProcess = compressed
+      console.log(`✅ Compressed file from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressed.size / 1024 / 1024).toFixed(2)}MB`)
+    } catch (compressError) {
+      console.warn('⚠️ Failed to compress file, using original:', compressError)
+      // استخدم الملف الأصلي إذا فشل الضغط
+    }
+  }
+  
+  const dataUrl = await fileToDataUrl(fileToProcess)
   const key = getFileSignature(file)
   return {
     file_key: key,
@@ -105,6 +167,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [deliveryAddress, setDeliveryAddress] = useState<any>(null)
   const [addressConfirmed, setAddressConfirmed] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, message: '' })
   const hasRestoredState = useRef(false)
   const addressToastShown = useRef(false)
   const [successInfo, setSuccessInfo] = useState<{ orderNumber: string } | null>(null)
@@ -3206,15 +3269,29 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         }
       }
 
-      await Promise.all(uploadedFiles.map((file) => registerFile(file, { source: 'uploaded' })))
-      if (image) {
-        await registerFile(image, { source: 'primary' })
-      }
+      // تحسين: تحويل الملفات بشكل متوازي مع progress indicator
+      const allFilesToProcess: Array<{ file: File | null; options: { location?: string; source?: string } }> = [
+        ...uploadedFiles.map(file => ({ file, options: { source: 'uploaded' } })),
+        ...(image ? [{ file: image, options: { source: 'primary' } }] : []),
+        ...Object.entries(clothingDesigns).map(([location, file]) => ({ file, options: { location, source: 'clothing' } }))
+      ].filter(item => item.file !== null)
+      
+      const totalFiles = allFilesToProcess.length
+      setUploadProgress({ current: 0, total: totalFiles, message: 'جاري تحضير الملفات...' })
+      
+      // تحويل الملفات بشكل متوازي مع تحديث progress
       await Promise.all(
-        Object.entries(clothingDesigns).map(([location, file]) =>
-          registerFile(file, { location, source: 'clothing' })
-        )
+        allFilesToProcess.map(async (item, index) => {
+          await registerFile(item.file, item.options)
+          setUploadProgress(prev => ({ 
+            ...prev, 
+            current: prev.current + 1, 
+            message: `جاري تحضير الملفات... (${prev.current + 1}/${totalFiles})` 
+          }))
+        })
       )
+      
+      setUploadProgress({ current: totalFiles, total: totalFiles, message: 'جاري إرسال الطلب...' })
 
       const ensureSerializedEntry = async (
         entry: any,
@@ -3490,12 +3567,16 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
 
       if (Array.isArray(orderData?.items)) {
-        // معالجة جميع الملفات بشكل async
+        // معالجة جميع الملفات بشكل async مع progress
+        const totalItems = orderData.items.length
+        let processedCount = 0
+        
         const processedItems = await Promise.all(
-          orderData.items.map(async (item: any) => {
+          orderData.items.map(async (item: any, itemIndex: number) => {
             // معالجة design_files
             let processedDesignFiles: any[] = []
             if (Array.isArray(item.design_files)) {
+              const fileCount = item.design_files.length
               const processed = await Promise.all(
                 item.design_files.map(async (entry: any, idx: number) => {
                   try {
@@ -3537,6 +3618,12 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 })
               )
             }
+            
+            processedCount++
+            setUploadProgress(prev => ({ 
+              ...prev, 
+              message: `جاري تحضير البيانات... (${processedCount}/${totalItems})` 
+            }))
 
             return {
               ...item,
@@ -3547,6 +3634,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         )
         orderData.items = processedItems
       }
+      
+      setUploadProgress(prev => ({ ...prev, message: 'جاري إرسال الطلب...' }))
 
       if (orderData && typeof orderData === 'object' && 'uploadedFiles' in orderData) {
         delete orderData.uploadedFiles
@@ -3560,7 +3649,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         final_amount: orderData.final_amount
       })
       
-      const response = await ordersAPI.create(orderData)
+      // إرسال الطلب مع timeout محسّن
+      const response = await Promise.race([
+        ordersAPI.create(orderData),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: استغرق الإرسال وقتاً طويلاً. يرجى المحاولة مرة أخرى.')), 120000) // 2 دقيقة timeout
+        )
+      ]) as any
       
       console.log('📥 Order creation response:', response.data)
       
@@ -3618,7 +3713,17 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       
       // عرض تفاصيل الخطأ بشكل أفضل
       let errorMessage = 'حدث خطأ في إرسال الطلب'
-      if (error.response?.data) {
+      
+      // معالجة timeout errors
+      if (error.message && error.message.includes('Timeout')) {
+        errorMessage = error.message
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'استغرق الإرسال وقتاً طويلاً. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.'
+      } else if (error.response?.status === 413) {
+        errorMessage = 'حجم الملفات كبير جداً. يرجى تقليل حجم الملفات والمحاولة مرة أخرى.'
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'حدث خطأ في السيرفر. يرجى المحاولة مرة أخرى لاحقاً.'
+      } else if (error.response?.data) {
         if (typeof error.response.data === 'string') {
           errorMessage = error.response.data
         } else if (error.response.data.detail) {
@@ -3646,6 +3751,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     } finally {
       // التأكد من إعادة تعيين isSubmitting حتى في حالة الخطأ
       setIsSubmitting(false)
+      setUploadProgress({ current: 0, total: 0, message: '' })
     }
   }
 
@@ -3743,7 +3849,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   onClick={handleSubmit}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'جاري الإرسال...' : 'تأكيد الطلب'}
+  {isSubmitting 
+                  ? (uploadProgress.total > 0 && uploadProgress.current < uploadProgress.total
+                      ? `${uploadProgress.message} (${uploadProgress.current}/${uploadProgress.total})`
+                      : uploadProgress.message || 'جاري الإرسال...')
+                  : 'تأكيد الطلب'}
                 </button>
               )
             }
@@ -3758,7 +3868,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'جاري الإرسال...' : 'تأكيد الطلب'}
+{isSubmitting 
+                  ? (uploadProgress.total > 0 && uploadProgress.current < uploadProgress.total
+                      ? `${uploadProgress.message} (${uploadProgress.current}/${uploadProgress.total})`
+                      : uploadProgress.message || 'جاري الإرسال...')
+                  : 'تأكيد الطلب'}
               </button>
             )
           })()}

@@ -1496,26 +1496,26 @@ async def _ensure_default_services():
         
         for service in default_services:
             try:
-                existing = conn.execute(text("""
+            existing = conn.execute(text("""
                     SELECT id FROM services WHERE name_ar = :name_ar
-                """), {"name_ar": service["name_ar"]}).fetchone()
-                
+            """), {"name_ar": service["name_ar"]}).fetchone()
+            
                 if not existing:
-                    conn.execute(text("""
-                        INSERT INTO services 
-                        (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
-                        VALUES 
+                conn.execute(text("""
+                    INSERT INTO services 
+                    (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                    VALUES 
                         (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
-                    """), {
-                        "name_ar": service["name_ar"],
-                        "name_en": service["name_en"],
-                        "description_ar": service["description_ar"],
-                        "icon": service["icon"],
+                """), {
+                    "name_ar": service["name_ar"],
+                    "name_en": service["name_en"],
+                    "description_ar": service["description_ar"],
+                    "icon": service["icon"],
                         "base_price": 0.0,
                         "is_visible": True,
                         "is_active": True,
-                        "display_order": service["display_order"]
-                    })
+                    "display_order": service["display_order"]
+                })
                     print(f"✅ Created default service: {service['name_ar']}")
                 else:
                     print(f"✅ Service already exists: {service['name_ar']}")
@@ -1602,8 +1602,8 @@ if os.path.exists(static_dir):
 else:
     print("⚠️ Warning: static directory not found, frontend files will not be served")
 
-@app.get("/")
-async def root():
+    @app.get("/")
+    async def root():
     # Serve index.html for root path if static directory exists
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):

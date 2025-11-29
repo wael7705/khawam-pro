@@ -1,7 +1,7 @@
 .orders-management {
   padding: 30px;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
 }
 
 .section-header {
@@ -14,11 +14,14 @@
   font-weight: 700;
   margin-bottom: 8px;
   color: white;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .section-header p {
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   font-size: 16px;
+  font-weight: 500;
 }
 
 .orders-filters {
@@ -40,26 +43,30 @@
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid transparent;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
   font-size: 15px;
   font-weight: 600;
-  color: #1a1a1a;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: #1e40af;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .status-tab:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.25);
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .status-tab.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
   color: white;
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
 }
 
 .tab-count {
@@ -81,14 +88,20 @@
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  background: rgba(255, 255, 255, 0.95);
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.98);
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
+  transition: all 0.3s ease;
+}
+
+.search-box:focus-within {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.25);
 }
 
 .search-box svg {
-  color: #667eea;
+  color: #3b82f6;
 }
 
 .search-box input {
@@ -106,20 +119,23 @@
 
 .status-filter-select {
   padding: 14px 20px;
-  background: rgba(255, 255, 255, 0.95);
-  border: none;
-  border-radius: 12px;
-  color: #1a1a1a;
+  background: rgba(255, 255, 255, 0.98);
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
+  color: #1e40af;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
   outline: none;
   min-width: 180px;
+  transition: all 0.3s ease;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .status-filter-select:focus {
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .loading-container {
@@ -133,6 +149,8 @@
   color: white;
   font-size: 18px;
   font-weight: 600;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .empty-state {
@@ -153,11 +171,15 @@
 .empty-state h3 {
   font-size: 24px;
   margin-bottom: 12px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .empty-state p {
   font-size: 16px;
-  opacity: 0.8;
+  opacity: 0.9;
+  font-weight: 500;
 }
 
 .orders-list {
@@ -167,10 +189,11 @@
 }
 
 .order-card-horizontal {
-  background: white;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(30, 58, 138, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.1);
   transition: all 0.3s ease;
   cursor: pointer;
   display: flex;
@@ -180,8 +203,9 @@
 }
 
 .order-card-horizontal:hover {
-  transform: translateX(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  transform: translateX(-4px) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(30, 58, 138, 0.25);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .order-card-header {
@@ -385,8 +409,9 @@
 .order-number {
   font-size: 18px;
   font-weight: 700;
-  color: #667eea;
+  color: #1e40af;
   letter-spacing: 0.5px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .order-type-badge {
@@ -563,9 +588,10 @@
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+  border-radius: 16px;
   color: white;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
 }
 
 .total-label {
@@ -591,19 +617,22 @@
   justify-content: center;
   gap: 8px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .view-details-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
 }
 
 /* Cancel Modal */

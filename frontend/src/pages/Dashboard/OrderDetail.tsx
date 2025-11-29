@@ -382,13 +382,6 @@ const dedupeAttachments = (attachments: NormalizedAttachment[]) => {
   return result
 }
 
-const isEmptyValue = (value: any) => {
-  if (value === undefined || value === null) return true
-  if (typeof value === 'string') return value.trim().length === 0
-  if (Array.isArray(value)) return value.length === 0
-  if (typeof value === 'object') return Object.keys(value).length === 0
-  return false
-}
 
 const SPEC_LABELS: Record<string, string> = {
   clothing_source: 'مصدر الملابس',
@@ -1210,26 +1203,43 @@ const collectItemAttachments = (item: OrderItem): NormalizedAttachment[] => {
     
     if (Array.isArray(item.design_files)) {
       console.log(`✅ Found ${item.design_files.length} design_files in array`)
-      filesToProcess = item.design_files.filter(f => f !== null && f !== undefined)
+      filesToProcess = item.design_files.filter(f => f !== null && f !== undefined && f !== '')
     } else if (typeof item.design_files === 'string') {
       // إذا كانت سلسلة نصية، حاول تحليلها كـ JSON
-      try {
-        const parsed = JSON.parse(item.design_files)
-        if (Array.isArray(parsed)) {
-          filesToProcess = parsed.filter(f => f !== null && f !== undefined)
-        } else if (parsed !== null && parsed !== undefined) {
-          filesToProcess = [parsed]
-        } else {
-          // إذا فشل التحليل، اعتبرها ملف واحد
-          filesToProcess = [item.design_files]
+      const trimmed = item.design_files.trim()
+      if (!trimmed) {
+        console.log('⚠️ design_files is empty string')
+      } else {
+        try {
+          const parsed = JSON.parse(trimmed)
+          if (Array.isArray(parsed)) {
+            filesToProcess = parsed.filter(f => f !== null && f !== undefined && f !== '')
+          } else if (parsed !== null && parsed !== undefined) {
+            filesToProcess = [parsed]
+          } else {
+            // إذا كان parsed null/undefined، جرب استخدام السلسلة الأصلية
+            if (trimmed.startsWith('data:') || trimmed.startsWith('http') || trimmed.startsWith('/uploads/')) {
+              filesToProcess = [trimmed]
+            }
+          }
+        } catch (e) {
+          // إذا فشل التحليل، تحقق إذا كانت data URL أو رابط
+          if (trimmed.startsWith('data:') || trimmed.startsWith('http') || trimmed.startsWith('/uploads/')) {
+            filesToProcess = [trimmed]
+          } else {
+            console.warn('⚠️ Failed to parse design_files string and it does not look like a URL:', trimmed.substring(0, 50))
+          }
         }
-      } catch (e) {
-        // إذا فشل التحليل، اعتبرها ملف واحد
+      }
+    } else if (typeof item.design_files === 'object' && item.design_files !== null) {
+      // إذا كان كائناً، تحقق إذا كان مصفوفة داخلية أو كائن واحد
+      if (Array.isArray(Object.values(item.design_files))) {
+        // إذا كانت القيم مصفوفة
+        filesToProcess = Object.values(item.design_files).filter(f => f !== null && f !== undefined && f !== '')
+      } else {
+        // كائن واحد
         filesToProcess = [item.design_files]
       }
-    } else if (typeof item.design_files === 'object') {
-      // إذا كان كائناً، أضفه مباشرة
-      filesToProcess = [item.design_files]
     }
     
     console.log(`📎 Processing ${filesToProcess.length} files from design_files`)
@@ -1326,9 +1336,119 @@ const collectAttachmentNameHints = (item: OrderItem): string[] => {
   return Array.from(names)
 }
 
-const buildGenericSpecEntries = (specs: Record<string, any> | undefined) => {
+// Helper to check if a value is empty
+const isEmptyValue = (value: any): boolean => {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string' && value.trim() === '') return true
+  if (Array.isArray(value) && value.length === 0) return true
+  if (typeof value === 'object' && Object.keys(value).length === 0) return true
+  return false
+}
+
+// Helper to get allowed spec keys based on service workflow steps
+// This filters out default/irrelevant data that doesn't belong to the service
+const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): Set<string> => {
+  const allowed = new Set<string>()
+  
+  // Always allow these core fields
+  allowed.add('dimensions')
+  allowed.add('notes')
+  
+  if (!serviceName || !specs) {
+    return allowed
+  }
+  
+  // Service-specific allowed keys based on what was actually filled
+  // Only show fields that have actual values and are relevant to the service
+  
+  // For banners/roll up service
+  if (serviceName.includes('بانرات') || serviceName.includes('Roll up') || serviceName.includes('roll up')) {
+    if (specs.print_type_choice) allowed.add('print_type_choice')
+    if (specs.rollup_source) allowed.add('rollup_source')
+    if (specs.dimensions) allowed.add('dimensions')
+    // Don't show print_sides, paper_size, number_of_pages for banners
+  }
+  
+  // For flex printing
+  if (serviceName.includes('فليكس') || serviceName.includes('Flex')) {
+    if (specs.flex_type) allowed.add('flex_type')
+    if (specs.print_type_choice) allowed.add('print_type_choice')
+    if (specs.dimensions) allowed.add('dimensions')
+    // Don't show print_sides, paper_size for flex
+  }
+  
+  // For business cards
+  if (serviceName.includes('كروت') || serviceName.includes('Business Cards')) {
+    if (specs.print_sides) allowed.add('print_sides')
+    if (specs.paper_type) allowed.add('paper_type')
+    if (specs.dimensions) allowed.add('dimensions')
+    // Don't show colors, paper_size, number_of_pages
+  }
+  
+  // For glossy poster
+  if (serviceName.includes('كلك') || serviceName.includes('Glossy')) {
+    if (specs.dimensions) allowed.add('dimensions')
+    // Don't show print_sides, number_of_pages
+  }
+  
+  // For brochures
+  if (serviceName.includes('بروشور') || serviceName.includes('Brochure')) {
+    if (specs.lamination) allowed.add('lamination')
+    if (specs.dimensions) allowed.add('dimensions')
+    if (specs.paper_size) allowed.add('paper_size')
+  }
+  
+  // For lecture printing
+  if (serviceName.includes('محاضرات') || serviceName.includes('Lecture')) {
+    if (specs.lamination) allowed.add('lamination')
+    if (specs.paper_size) allowed.add('paper_size')
+    if (specs.print_color) allowed.add('print_color')
+  }
+  
+  // For clothing printing
+  if (serviceName.includes('ملابس') || serviceName.includes('Clothing')) {
+    if (specs.clothing_source) allowed.add('clothing_source')
+    if (specs.clothing_product) allowed.add('clothing_product')
+    if (specs.clothing_color) allowed.add('clothing_color')
+    if (specs.clothing_size) allowed.add('clothing_size')
+    if (specs.work_type) allowed.add('work_type')
+  }
+  
+  // Generic fields that might be relevant
+  if (specs.print_color) allowed.add('print_color')
+  if (specs.print_quality) allowed.add('print_quality')
+  if (specs.paper_size && !serviceName.includes('بانرات') && !serviceName.includes('فليكس')) {
+    allowed.add('paper_size')
+  }
+  
+  return allowed
+}
+
+const buildGenericSpecEntries = (specs: Record<string, any> | undefined, serviceName?: string) => {
   if (!specs || typeof specs !== 'object') return []
-  return Object.entries(specs).filter(([key, value]) => !SPEC_EXCLUDED_KEYS.has(key) && !isEmptyValue(value))
+  
+  // Get allowed keys based on service
+  const allowedKeys = getAllowedSpecKeys(serviceName, specs)
+  
+  return Object.entries(specs).filter(([key, value]) => {
+    // Exclude attachment keys and empty values
+    if (SPEC_EXCLUDED_KEYS.has(key)) return false
+    if (isEmptyValue(value)) return false
+    
+    // Only include keys that are allowed for this service
+    // OR keys that are not in the exclusion list and have values
+    if (allowedKeys.has(key)) return true
+    
+    // For services, only show fields that are explicitly allowed
+    // This prevents showing irrelevant default data
+    if (serviceName) {
+      // If service name exists, be strict - only show allowed fields
+      return false
+    }
+    
+    // If no service name, show all non-excluded fields (fallback)
+    return true
+  })
 }
 
 const STATUS_OPTIONS = [
@@ -2114,7 +2234,8 @@ export default function OrderDetail() {
           <div className="items-list">
               {order.items.map((item) => {
                 const specs = item.specifications || {}
-                const genericSpecEntries = buildGenericSpecEntries(specs)
+                const serviceName = item.service_name || item.product_name || ''
+                const genericSpecEntries = buildGenericSpecEntries(specs, serviceName)
                 return (
               <div key={item.id} className="order-item-card">
                 <div className="item-header">
@@ -2220,34 +2341,70 @@ export default function OrderDetail() {
                               <span>{specs.print_quality}</span>
                         </div>
                       )}
-                          {specs.print_sides && (
+                          {/* Only show print_sides if it's relevant to the service */}
+                          {specs.print_sides && 
+                           (serviceName.includes('كروت') || serviceName.includes('Business Cards') || 
+                            serviceName.includes('بروشور') || serviceName.includes('Brochure')) && (
                         <div className="spec-group">
                           <label>الوجهين:</label>
                               <span>{specs.print_sides === 'double' ? 'وجهين' : 'وجه واحد'}</span>
                             </div>
                           )}
-                          {specs.number_of_pages && (
+                          {/* Only show number_of_pages for services that use it */}
+                          {specs.number_of_pages && 
+                           (serviceName.includes('محاضرات') || serviceName.includes('Lecture') ||
+                            serviceName.includes('بروشور') || serviceName.includes('Brochure')) && (
                             <div className="spec-group">
                               <label>عدد الصفحات:</label>
                               <span>{specs.number_of_pages}</span>
                         </div>
                       )}
-                          {specs.total_pages && !specs.number_of_pages && (
+                          {specs.total_pages && !specs.number_of_pages && 
+                           (serviceName.includes('محاضرات') || serviceName.includes('Lecture') ||
+                            serviceName.includes('بروشور') || serviceName.includes('Brochure')) && (
                         <div className="spec-group">
                           <label>عدد الصفحات:</label>
                               <span>{specs.total_pages}</span>
                         </div>
                       )}
-                          {specs.paper_size && (
+                          {/* Only show paper_size for services that use it (not banners/flex) */}
+                          {specs.paper_size && 
+                           !serviceName.includes('بانرات') && !serviceName.includes('Roll up') &&
+                           !serviceName.includes('فليكس') && !serviceName.includes('Flex') && (
                         <div className="spec-group">
                           <label>حجم الورق:</label>
                               <span>{specs.paper_size}</span>
                         </div>
                       )}
-                          {specs.delivery_type && (
+                          {/* Show service-specific fields */}
+                          {specs.paper_type && (
                         <div className="spec-group">
-                          <label>نوع التوصيل:</label>
-                              <span>{specs.delivery_type === 'delivery' ? 'توصيل' : 'استلام ذاتي'}</span>
+                          <label>نوع الورق:</label>
+                              <span>{specs.paper_type === 'mujann' ? 'معجن' : specs.paper_type === 'mashsh' ? 'مقشش' : specs.paper_type === 'carton' ? 'كرتون' : specs.paper_type}</span>
+                        </div>
+                      )}
+                          {specs.lamination && (
+                        <div className="spec-group">
+                          <label>تسليك:</label>
+                              <span>{specs.lamination === true || specs.lamination === 'true' ? 'نعم' : 'لا'}</span>
+                        </div>
+                      )}
+                          {specs.flex_type && (
+                        <div className="spec-group">
+                          <label>نوع الفليكس:</label>
+                              <span>{specs.flex_type === 'lighted' ? 'مضاء' : specs.flex_type === 'normal' ? 'عادي' : specs.flex_type}</span>
+                        </div>
+                      )}
+                          {specs.print_type_choice && (
+                        <div className="spec-group">
+                          <label>نوع الطباعة:</label>
+                              <span>{specs.print_type_choice === 'pvc' ? 'PVC' : specs.print_type_choice === 'flex' ? 'فليكس' : specs.print_type_choice === 'uv' ? 'دقة عالية (UV)' : specs.print_type_choice === 'normal' ? 'عادية' : specs.print_type_choice}</span>
+                        </div>
+                      )}
+                          {specs.rollup_source && (
+                        <div className="spec-group">
+                          <label>مصدر ال Roll up:</label>
+                              <span>{specs.rollup_source === 'ours' ? 'من عندنا' : specs.rollup_source === 'yours' ? 'من عندك' : specs.rollup_source}</span>
                         </div>
                       )}
                           {specs.notes && (

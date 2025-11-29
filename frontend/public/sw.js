@@ -1,6 +1,6 @@
 // Service Worker for Khawam Pro
 // Updated cache version to force cache refresh
-const CACHE_NAME = 'khawam-pro-v4'
+const CACHE_NAME = 'khawam-pro-v5'
 const DYNAMIC_CACHE_PREFIX = 'khawam-pro-dynamic-'
 
 // URLs that should be cached (static assets only)
@@ -27,44 +27,38 @@ function shouldCache(url) {
 function shouldIntercept(url) {
   const urlLower = url.toLowerCase()
   
-  // NEVER intercept dynamic assets (JS, CSS with hash in filename)
+  // NEVER intercept ANY assets from /assets/ directory - let browser handle them directly
   if (urlLower.includes('/assets/')) {
-    // Check if it's a dynamic asset (has hash in filename)
-    const assetsMatch = urlLower.match(/\/assets\/[^\/]+\.(js|css)/)
-    if (assetsMatch) {
-      // Check if filename contains hash (typically 8+ characters before extension)
-      const filename = assetsMatch[0]
-      // If filename has a hash pattern (like index-XXXXXXXX.js), don't intercept
-      const hashPattern = /-[a-zA-Z0-9]{8,}\.(js|css)$/
-      if (hashPattern.test(filename)) {
-        return false // Don't intercept dynamic assets
-      }
-    }
+    return false // Don't intercept any assets - let them pass through normally
   }
   
   // NEVER intercept API requests
-  if (urlLower.includes('/api/') || urlLower.includes('railway.app/api/')) {
+  if (urlLower.includes('/api/') || urlLower.includes('railway.app/api/') || urlLower.includes('railway.app/')) {
     return false
   }
   
-  // Never intercept external domains (except same origin)
+  // Never intercept external domains
   try {
     const urlObj = new URL(url)
-    // Allow same origin only
+    // Only intercept same origin requests
     if (urlObj.origin !== self.location.origin) {
-      // Exception: allow static assets from CDN if needed, but not dynamic JS/CSS
       return false
     }
   } catch (e) {
-    // Invalid URL, skip
+    // Invalid URL, don't intercept
+    return false
   }
   
+  // Only intercept navigation requests (page loads) and specific static files we want to cache
+  // This means we only handle:
+  // - Navigation requests (page loads)
+  // - Specific static files like /logo.jpg, /index.html
   return true
 }
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('🔄 Service Worker: Installing v4...')
+  console.log('🔄 Service Worker: Installing v5...')
   // Force activation of new service worker immediately
   self.skipWaiting()
   
@@ -83,7 +77,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - delete ALL old caches
 self.addEventListener('activate', (event) => {
-  console.log('🔄 Service Worker: Activating v4...')
+  console.log('🔄 Service Worker: Activating v5...')
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -108,16 +102,44 @@ self.addEventListener('fetch', (event) => {
   
   // CRITICAL: Check if we should intercept this request at all
   if (!shouldIntercept(urlString)) {
-    return // Don't call event.respondWith - let the request bypass service worker completely
+    // Don't call event.respondWith - let the request bypass service worker completely
+    // This allows the browser to fetch the resource normally without service worker interference
+    return
   }
   
-  // For static assets only, use cache-first strategy
-  if (shouldCache(urlString)) {
+  // Only handle navigation requests (page loads) and specific static assets we want to cache
+  if (event.request.mode === 'navigate' || shouldCache(urlString)) {
     event.respondWith(
       caches.match(event.request)
         .then((cachedResponse) => {
-          // Try network first for non-cached or navigation requests
-          const fetchPromise = fetch(event.request, { cache: 'reload' })
+          // For navigation, try network first
+          if (event.request.mode === 'navigate') {
+            return fetch(event.request)
+              .then((networkResponse) => {
+                // Cache the HTML response
+                if (networkResponse && networkResponse.status === 200) {
+                  const responseToCache = networkResponse.clone()
+                  caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, responseToCache)
+                  })
+                }
+                return networkResponse
+              })
+              .catch(() => {
+                // If network fails, return cached version or index.html
+                return cachedResponse || caches.match('/index.html') || new Response('Page not available', {
+                  status: 503,
+                  statusText: 'Service Unavailable'
+                })
+              })
+          }
+          
+          // For static assets, return cached if available, otherwise fetch from network
+          if (cachedResponse) {
+            return cachedResponse
+          }
+          
+          return fetch(event.request)
             .then((networkResponse) => {
               // Only cache successful static responses
               if (networkResponse && networkResponse.status === 200 && shouldCache(urlString)) {
@@ -129,32 +151,17 @@ self.addEventListener('fetch', (event) => {
               return networkResponse
             })
             .catch((error) => {
-              console.warn('⚠️ Service Worker: Fetch failed for static asset', urlString, error)
-              // Return cached version if network fails
-              if (cachedResponse) {
-                return cachedResponse
-              }
-              
-              // For navigation requests, return index.html
-              if (event.request.mode === 'navigate') {
-                return caches.match('/index.html')
-              }
-              
-              // Fallback: try to fetch directly
-              return fetch(event.request).catch(() => {
-                return new Response('Resource not available', {
-                  status: 503,
-                  statusText: 'Service Unavailable'
-                })
+              console.warn('⚠️ Service Worker: Fetch failed for', urlString, error)
+              // Return error response instead of trying to fetch again
+              return new Response('Resource not available', {
+                status: 503,
+                statusText: 'Service Unavailable'
               })
             })
-          
-          // Return cached version immediately if available, otherwise wait for network
-          return cachedResponse || fetchPromise
         })
         .catch((error) => {
           console.error('❌ Service Worker: Error', error)
-          // Fallback: try to fetch directly
+          // Fallback: try to fetch directly without caching
           return fetch(event.request).catch(() => {
             return new Response('Resource not available', {
               status: 503,
@@ -163,10 +170,8 @@ self.addEventListener('fetch', (event) => {
           })
         })
     )
-  } else {
-    // For non-cacheable assets, just let them pass through (shouldn't reach here due to shouldIntercept check)
-    return
   }
+  // For all other requests (including assets), don't intercept - let browser handle normally
 })
 
 // Push notifications

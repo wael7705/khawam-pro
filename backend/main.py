@@ -104,8 +104,8 @@ async def _init_pricing_table():
                 'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
                 'description_en': "ALTER TABLE pricing_rules ADD COLUMN description_en TEXT",
                 'is_active': "ALTER TABLE pricing_rules ADD COLUMN is_active BOOLEAN DEFAULT true",
-                'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",
-                'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",
+                'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",        
+                'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",        
                 'updated_at': "ALTER TABLE pricing_rules ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
             }
 
@@ -1496,26 +1496,26 @@ async def _ensure_default_services():
         
         for service in default_services:
             try:
-                existing = conn.execute(text("""
+            existing = conn.execute(text("""
                     SELECT id FROM services WHERE name_ar = :name_ar
-                """), {"name_ar": service["name_ar"]}).fetchone()
-                
+            """), {"name_ar": service["name_ar"]}).fetchone()
+            
                 if not existing:
-                    conn.execute(text("""
-                        INSERT INTO services 
-                        (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
-                        VALUES 
+                conn.execute(text("""
+                    INSERT INTO services 
+                    (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                    VALUES 
                         (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
-                    """), {
-                        "name_ar": service["name_ar"],
-                        "name_en": service["name_en"],
-                        "description_ar": service["description_ar"],
-                        "icon": service["icon"],
+                """), {
+                    "name_ar": service["name_ar"],
+                    "name_en": service["name_en"],
+                    "description_ar": service["description_ar"],
+                    "icon": service["icon"],
                         "base_price": 0.0,
                         "is_visible": True,
                         "is_active": True,
-                        "display_order": service["display_order"]
-                    })
+                    "display_order": service["display_order"]
+                })
                     print(f"✅ Created default service: {service['name_ar']}")
                 else:
                     print(f"✅ Service already exists: {service['name_ar']}")
@@ -1565,8 +1565,49 @@ app.include_router(service_workflows.router, prefix="/api/workflows", tags=["wor
 # Static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+# Serve frontend static files (must be after API routes)
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.exists(static_dir):
+    # Serve static assets (JS, CSS, images, etc.)
+    assets_dir = os.path.join(static_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    
+    # Serve service worker
+    sw_path = os.path.join(static_dir, "sw.js")
+    if os.path.exists(sw_path):
+        @app.get("/sw.js")
+        async def serve_sw():
+            return FileResponse(sw_path, media_type="application/javascript")
+    
+    # Serve logo
+    logo_path = os.path.join(static_dir, "logo.jpg")
+    if os.path.exists(logo_path):
+        @app.get("/logo.jpg")
+        async def serve_logo():
+            return FileResponse(logo_path, media_type="image/jpeg")
+    
+    # Serve index.html for all non-API routes (SPA fallback)
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't serve API routes or uploads
+        if full_path.startswith("api/") or full_path.startswith("uploads/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Serve index.html for SPA routing
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail="Frontend not found")
+else:
+    print("⚠️ Warning: static directory not found, frontend files will not be served")
+
 @app.get("/")
 async def root():
+    # Serve index.html for root path
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {"message": "Khawam API", "version": "1.0.1"}
 
 @app.get("/health")

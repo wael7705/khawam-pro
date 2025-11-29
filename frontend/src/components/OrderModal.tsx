@@ -1173,26 +1173,26 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                     ) : (
                       // الخيارات الافتراضية
                       <>
-                        <label className="radio-option">
-                          <input
-                            type="radio"
-                            name="printSides"
-                            value="single"
-                            checked={printSides === 'single'}
-                            onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                          />
-                          <span>وجه واحد</span>
-                        </label>
-                        <label className="radio-option">
-                          <input
-                            type="radio"
-                            name="printSides"
-                            value="double"
-                            checked={printSides === 'double'}
-                            onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
-                          />
-                          <span>وجهين</span>
-                        </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="single"
+                        checked={printSides === 'single'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجه واحد</span>
+                    </label>
+                    <label className="radio-option">
+                      <input
+                        type="radio"
+                        name="printSides"
+                        value="double"
+                        checked={printSides === 'double'}
+                        onChange={(e) => setPrintSides(e.target.value as 'single' | 'double')}
+                      />
+                      <span>وجهين</span>
+                    </label>
                       </>
                     )}
                   </div>
@@ -2269,7 +2269,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <option value="in">إنش (in)</option>
                   <option value="m">متر (m)</option>
                 </select>
-              </div>
+            </div>
             </div>
             {(isLecturePrinting ||
               (!isPosterPrinting &&
@@ -2779,31 +2779,31 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     
     // دائماً نضيف الملفات بدلاً من استبدالها (حتى لو كان multiple = false، نسمح بإضافة ملفات إضافية)
     console.log('✅ Adding files to existing list (always append mode)')
-    setUploadedFiles(prev => {
-      console.log('📦 Previous files count:', prev.length)
-      // تجنب إضافة ملفات مكررة (نفس الاسم والحجم)
-      const existingSignatures = new Set(prev.map(f => `${f.name}-${f.size}-${f.lastModified}`))
-      const newFiles = fileArray.filter(f => {
-        const signature = `${f.name}-${f.size}-${f.lastModified}`
-        const isDuplicate = existingSignatures.has(signature)
-        if (isDuplicate) {
-          console.log('⚠️ Duplicate file skipped:', f.name)
-        }
-        return !isDuplicate
+      setUploadedFiles(prev => {
+        console.log('📦 Previous files count:', prev.length)
+        // تجنب إضافة ملفات مكررة (نفس الاسم والحجم)
+        const existingSignatures = new Set(prev.map(f => `${f.name}-${f.size}-${f.lastModified}`))
+        const newFiles = fileArray.filter(f => {
+          const signature = `${f.name}-${f.size}-${f.lastModified}`
+          const isDuplicate = existingSignatures.has(signature)
+          if (isDuplicate) {
+            console.log('⚠️ Duplicate file skipped:', f.name)
+          }
+          return !isDuplicate
+        })
+        console.log('📦 New files to add:', newFiles.length)
+        console.log('📦 Total files after add:', prev.length + newFiles.length)
+        return [...prev, ...newFiles]
       })
-      console.log('📦 New files to add:', newFiles.length)
-      console.log('📦 Total files after add:', prev.length + newFiles.length)
-      return [...prev, ...newFiles]
-    })
-    
-    // تحليل الصفحات إذا كان مفعّل
-    if (stepConfig.analyze_pages) {
-      analyzePDFPages(fileArray)
-    } else {
-      // تحليل PDFs فقط إذا لم يكن analyze_pages مفعّل
-      const pdfFiles = fileArray.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
-      if (pdfFiles.length > 0) {
-        analyzePDFPages(pdfFiles)
+      
+      // تحليل الصفحات إذا كان مفعّل
+      if (stepConfig.analyze_pages) {
+        analyzePDFPages(fileArray)
+      } else {
+        // تحليل PDFs فقط إذا لم يكن analyze_pages مفعّل
+        const pdfFiles = fileArray.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+        if (pdfFiles.length > 0) {
+          analyzePDFPages(pdfFiles)
       }
     }
     

@@ -1166,10 +1166,10 @@ async def get_orders(
                             print(f"✅ Orders API - Filtering by customer_id ({current_user.id}) OR customer_phone ({customer_phone_variants})")
                         else:
                             # فقط customer_id
-                            where_clause = "customer_id = :customer_id"
-                            params['customer_id'] = current_user.id
-                            params['limit'] = 100
-                            print(f"✅ Orders API - Filtering by customer_id only: {current_user.id}")
+                        where_clause = "customer_id = :customer_id"
+                        params['customer_id'] = current_user.id
+                        params['limit'] = 100
+                        print(f"✅ Orders API - Filtering by customer_id only: {current_user.id}")
                     elif current_user and current_user.phone and customer_phone_variants:
                         # إذا لم يكن هناك customer_id، استخدم customer_phone كبديل
                         # هذا مهم للطلبات التي تم إنشاؤها قبل تسجيل الدخول

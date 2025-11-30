@@ -85,6 +85,44 @@ export default function Home() {
 }
 
 function ServicesShowcaseSection() {
+  const [imageSrc, setImageSrc] = useState<string>('/خدمات خوام.png');
+  
+  useEffect(() => {
+    // محاولة تحميل الصورة العربية بطرق مختلفة
+    const img = new Image();
+    const tryLoadImage = (src: string, onSuccess: () => void, onError: () => void) => {
+      img.onload = onSuccess;
+      img.onerror = onError;
+      img.src = src;
+    };
+    
+    // محاولة 1: المسار المباشر
+    tryLoadImage(
+      '/خدمات خوام.png',
+      () => setImageSrc('/خدمات خوام.png'),
+      () => {
+        // محاولة 2: المسار المشفر
+        const encoded = encodeURI('/خدمات خوام.png');
+        tryLoadImage(
+          encoded,
+          () => setImageSrc(encoded),
+          () => {
+            // محاولة 3: استخدام encodeURIComponent
+            const encodedComponent = '/' + encodeURIComponent('خدمات خوام.png');
+            tryLoadImage(
+              encodedComponent,
+              () => setImageSrc(encodedComponent),
+              () => {
+                // Fallback: الصورة البديلة
+                setImageSrc('/services-showcase.png');
+              }
+            );
+          }
+        );
+      }
+    );
+  }, []);
+
   return (
     <section className="section services-showcase-section">
       <div className="container">
@@ -109,24 +147,11 @@ function ServicesShowcaseSection() {
             */}
             <motion.img 
               // @ts-ignore
-              src="/خدمات خوام.png"
+              src={imageSrc}
               alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
               loading="lazy"
               decoding="async"
-              onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                // Fallback إلى صورة بديلة إذا فشل تحميل الصورة
-                const target = e.target as HTMLImageElement;
-                // محاولة استخدام encodeURIComponent للجزء العربي فقط
-                const arabicFileName = encodeURIComponent("خدمات خوام.png");
-                target.src = `/${arabicFileName}`;
-                console.warn('⚠️ Failed to load services image, trying encoded path');
-                // إذا فشل مرة أخرى، استخدم الصورة البديلة
-                target.onerror = () => {
-                  target.src = "/services-showcase.png";
-                  console.warn('⚠️ Failed to load encoded services image, using fallback');
-                };
-              }}
               animate={{
                 y: [0, -10, 0],
               }}

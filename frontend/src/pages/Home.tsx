@@ -109,16 +109,16 @@ function ServicesShowcaseSection() {
             */}
             <motion.img 
               // @ts-ignore
-              src="/services-showcase.png"
+              src="/خدمات خوام.png"
               alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
               loading="lazy"
               decoding="async"
               onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                // Fallback إلى لوغو محلي إذا فشل تحميل الصورة
+                // Fallback إلى صورة بديلة إذا فشل تحميل الصورة
                 const target = e.target as HTMLImageElement;
-                target.src = "/logo.jpg";
-                console.warn('⚠️ Failed to load services showcase image, using logo fallback');
+                target.src = "/services-showcase.png";
+                console.warn('⚠️ Failed to load services image, using fallback');
               }}
               animate={{
                 y: [0, -10, 0],

@@ -41,7 +41,8 @@
   border: none;
   cursor: pointer;
   font-weight: 600;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
 }
@@ -73,7 +74,8 @@
   font-size: 28px;
   font-weight: 900;
   color: white;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   margin: 0;
 }
@@ -260,7 +262,8 @@
   font-size: 20px;
   font-weight: 700;
   color: var(--primary);
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   margin: 0;
 }
 
@@ -278,7 +281,8 @@
   border: none;
   cursor: pointer;
   font-weight: 600;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -312,7 +316,8 @@
   font-size: 24px;
   font-weight: 900;
   color: #1a202c;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   margin-bottom: 8px;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   -webkit-background-clip: text;
@@ -353,7 +358,8 @@
   font-weight: 700;
   color: #1e293b;
   margin-bottom: 12px;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
 }
 
 .gps-label .required {
@@ -405,7 +411,8 @@
   font-size: 14px;
   font-weight: 600;
   color: #334155;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
 }
 
 .form-field-label .optional {
@@ -420,7 +427,8 @@
   border: 2px solid #e2e8f0;
   border-radius: 10px;
   font-size: 15px;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   background: white;
   color: #1a202c;
   transition: all 0.3s ease;
@@ -439,7 +447,8 @@
   border: 2px solid #e2e8f0;
   border-radius: 10px;
   font-size: 15px;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   background: white;
   color: #1a202c;
   transition: all 0.3s ease;
@@ -484,7 +493,8 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
 }
 
 .image-upload-button:hover {
@@ -559,7 +569,8 @@
   border: 2px solid #cbd5e1;
   border-radius: 12px;
   font-weight: 700;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
@@ -582,7 +593,8 @@
   border: none;
   border-radius: 12px;
   font-weight: 700;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;

@@ -14,7 +14,8 @@
   font-size: 16px;
   cursor: pointer;
   transition: all 0.3s;
-  font-family: 'Tajawal', sans-serif;
+  /* font-family: 'Tajawal', sans-serif; */
+  /* Tajawal font disabled */
 }
 
 .btn-primary {

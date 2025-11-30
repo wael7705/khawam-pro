@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 80px 20px;
+  padding: 80px 60px;
   background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.1));
   position: relative;
   overflow: hidden;
@@ -17,6 +17,7 @@
 .hero-content {
   flex: 1;
   max-width: 600px;
+  padding-right: 40px;
 }
 
 .hero-content h1 {
@@ -27,10 +28,13 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .hero-content p {
   font-size: 1.5rem;
+  font-weight: 700;
   margin-bottom: 30px;
   color: var(--text);
 }
@@ -39,6 +43,7 @@
   flex: 1;
   max-width: 500px;
   position: relative;
+  padding-left: 40px;
 }
 
 .hero-logo {
@@ -691,14 +696,21 @@
   .hero {
     flex-direction: column;
     text-align: center;
+    padding: 60px 30px;
+  }
+  
+  .hero-content {
+    padding-right: 0;
   }
   
   .hero-content h1 {
     font-size: 2.5rem;
+    white-space: normal;
   }
   
   .hero-image {
     margin-top: 40px;
+    padding-left: 0;
   }
 
   .works-grid {

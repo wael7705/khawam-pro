@@ -56,7 +56,6 @@ export default function Navbar() {
               <Link to="/dashboard" className="btn btn-secondary">لوحة التحكم</Link>
           )}
           <UserMenu />
-          <div className="logo">خوام</div>
         </div>
       </div>
       </div>

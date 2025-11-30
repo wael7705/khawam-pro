@@ -3289,7 +3289,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             message: `جاري تحضير الملفات... (${prev.current + 1}/${totalFiles})` 
           }))
         })
-      )
+        )
       
       setUploadProgress({ current: totalFiles, total: totalFiles, message: 'جاري إرسال الطلب...' })
 

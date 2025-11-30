@@ -85,43 +85,8 @@ export default function Home() {
 }
 
 function ServicesShowcaseSection() {
-  const [imageSrc, setImageSrc] = useState<string>('/خدمات خوام.png');
-  
-  useEffect(() => {
-    // محاولة تحميل الصورة العربية بطرق مختلفة
-    const img = new Image();
-    const tryLoadImage = (src: string, onSuccess: () => void, onError: () => void) => {
-      img.onload = onSuccess;
-      img.onerror = onError;
-      img.src = src;
-    };
-    
-    // محاولة 1: المسار المباشر
-    tryLoadImage(
-      '/خدمات خوام.png',
-      () => setImageSrc('/خدمات خوام.png'),
-      () => {
-        // محاولة 2: المسار المشفر
-        const encoded = encodeURI('/خدمات خوام.png');
-        tryLoadImage(
-          encoded,
-          () => setImageSrc(encoded),
-          () => {
-            // محاولة 3: استخدام encodeURIComponent
-            const encodedComponent = '/' + encodeURIComponent('خدمات خوام.png');
-            tryLoadImage(
-              encodedComponent,
-              () => setImageSrc(encodedComponent),
-              () => {
-                // Fallback: الصورة البديلة
-                setImageSrc('/services-showcase.png');
-              }
-            );
-          }
-        );
-      }
-    );
-  }, []);
+  // استخدام الاسم الإنجليزي للصورة لتجنب مشاكل encoding
+  const imageSrc = '/khawam_services.png';
 
   return (
     <section className="section services-showcase-section">

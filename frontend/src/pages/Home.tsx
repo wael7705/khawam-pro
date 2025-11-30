@@ -117,8 +117,15 @@ function ServicesShowcaseSection() {
               onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                 // Fallback إلى صورة بديلة إذا فشل تحميل الصورة
                 const target = e.target as HTMLImageElement;
-                target.src = "/services-showcase.png";
-                console.warn('⚠️ Failed to load services image, using fallback');
+                // محاولة استخدام encodeURIComponent للجزء العربي فقط
+                const arabicFileName = encodeURIComponent("خدمات خوام.png");
+                target.src = `/${arabicFileName}`;
+                console.warn('⚠️ Failed to load services image, trying encoded path');
+                // إذا فشل مرة أخرى، استخدم الصورة البديلة
+                target.onerror = () => {
+                  target.src = "/services-showcase.png";
+                  console.warn('⚠️ Failed to load encoded services image, using fallback');
+                };
               }}
               animate={{
                 y: [0, -10, 0],

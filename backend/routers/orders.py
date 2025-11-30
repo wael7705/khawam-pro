@@ -733,16 +733,24 @@ async def create_order(
         
         # ربط الطلب بالمستخدم الحالي إذا كان مسجل دخول
         customer_id = None
+        customer_phone = order_data.customer_phone
         if current_user:
             customer_id = current_user.id
-            print(f"✅ Order {order_number} linked to user ID: {customer_id}")
+            # استخدام رقم هاتف المستخدم المسجل دخول إذا كان موجوداً (لضمان التطابق)
+            if current_user.phone:
+                customer_phone = current_user.phone
+                print(f"✅ Order {order_number} linked to user ID: {customer_id}, using user phone: {customer_phone}")
+            else:
+                print(f"✅ Order {order_number} linked to user ID: {customer_id}, using order phone: {customer_phone}")
+        else:
+            print(f"⚠️ Order {order_number} created without user login, using order phone: {customer_phone}")
         
         order_dict = {
             'order_number': order_number,
             'customer_id': customer_id,
             'customer_name': order_data.customer_name,
-            'customer_phone': order_data.customer_phone,
-            'customer_whatsapp': order_data.customer_whatsapp or order_data.customer_phone,
+            'customer_phone': customer_phone,
+            'customer_whatsapp': order_data.customer_whatsapp or customer_phone,
             'shop_name': order_data.shop_name,
             'status': 'pending',
             'total_amount': order_data.total_amount,
@@ -1138,21 +1146,42 @@ async def get_orders(
         orders_query_start = time.time()
         try:
             if user_role == "عميل":
-                # للعملاء: فلترة الطلبات حسب customer_id فقط
-                # يجب أن تظهر فقط الطلبات التي تخص المستخدم الحالي (customer_id = user.id)
+                # للعملاء: فلترة الطلبات حسب customer_id أو customer_phone
+                # يجب أن تظهر فقط الطلبات التي تخص المستخدم الحالي
                 try:
                     params = {}
                     where_clause = None
                     
-                    # إضافة شرط customer_id فقط - هذا هو المعيار الأساسي
+                    # إضافة شرط customer_id أولاً - هذا هو المعيار الأساسي
                     if current_user and current_user.id:
-                        where_clause = "customer_id = :customer_id"
-                        params['customer_id'] = current_user.id
+                        # جرب customer_id أولاً، وإذا كان هناك phone أيضاً، أضف fallback
+                        if current_user.phone and customer_phone_variants:
+                            # استخدام customer_id OR customer_phone (للتأكد من جلب جميع الطلبات)
+                            phone_conditions = " OR ".join([f"customer_phone = :phone_{i}" for i in range(len(customer_phone_variants))])
+                            where_clause = f"(customer_id = :customer_id OR {phone_conditions})"
+                            params['customer_id'] = current_user.id
+                            for i, phone in enumerate(customer_phone_variants):
+                                params[f'phone_{i}'] = phone
+                            params['limit'] = 100
+                            print(f"✅ Orders API - Filtering by customer_id ({current_user.id}) OR customer_phone ({customer_phone_variants})")
+                        else:
+                            # فقط customer_id
+                            where_clause = "customer_id = :customer_id"
+                            params['customer_id'] = current_user.id
+                            params['limit'] = 100
+                            print(f"✅ Orders API - Filtering by customer_id only: {current_user.id}")
+                    elif current_user and current_user.phone and customer_phone_variants:
+                        # إذا لم يكن هناك customer_id، استخدم customer_phone كبديل
+                        # هذا مهم للطلبات التي تم إنشاؤها قبل تسجيل الدخول
+                        phone_conditions = " OR ".join([f"customer_phone = :phone_{i}" for i in range(len(customer_phone_variants))])
+                        where_clause = f"({phone_conditions})"
+                        for i, phone in enumerate(customer_phone_variants):
+                            params[f'phone_{i}'] = phone
                         params['limit'] = 100
-                        print(f"✅ Orders API - Filtering by customer_id only: {current_user.id}")
+                        print(f"✅ Orders API - Filtering by customer_phone (fallback): {customer_phone_variants}")
                     else:
-                        # إذا لم يكن هناك customer_id، لا نرجع أي طلبات
-                        print(f"⚠️ Orders API - Customer has no customer_id, returning empty orders")
+                        # إذا لم يكن هناك customer_id أو phone، لا نرجع أي طلبات
+                        print(f"⚠️ Orders API - Customer has no customer_id or phone, returning empty orders")
                         orders = []
                     
                     if where_clause:
@@ -1255,9 +1284,13 @@ async def get_orders(
                                 continue
                         
                         if orders:
-                            print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for customer_id: {current_user.id})")
+                            filter_type = "customer_id" if (current_user and current_user.id) else "customer_phone"
+                            filter_value = current_user.id if (current_user and current_user.id) else customer_phone_variants
+                            print(f"✅ Orders API - Customer orders query: {time.time() - orders_query_start:.2f}s (found {len(orders)} orders for {filter_type}: {filter_value})")
                         else:
-                            print(f"⚠️ Orders API - No orders found for customer_id: {current_user.id}")
+                            filter_type = "customer_id" if (current_user and current_user.id) else "customer_phone"
+                            filter_value = current_user.id if (current_user and current_user.id) else customer_phone_variants
+                            print(f"⚠️ Orders API - No orders found for {filter_type}: {filter_value}")
                 except Exception as filter_error:
                     print(f"❌ Orders API - Error filtering customer orders: {filter_error}")
                     import traceback
@@ -1494,19 +1527,27 @@ async def get_orders(
                         orders = []
             else:
                 # إذا كان نوع المستخدم غير معروف أو None، نتعامل معه كعميل
-                # استخدام customer_id فقط - نفس منطق العملاء
-                print(f"⚠️ Orders API - Unknown user role ({user_role}), treating as customer with customer_id filter")
+                # استخدام customer_id أو customer_phone - نفس منطق العملاء
+                print(f"⚠️ Orders API - Unknown user role ({user_role}), treating as customer with customer_id/phone filter")
                 params = {}
                 where_clause = None
                 
-                # إضافة شرط customer_id فقط
+                # إضافة شرط customer_id أولاً، ثم customer_phone كبديل
                 if current_user and current_user.id:
                     where_clause = "customer_id = :customer_id"
                     params['customer_id'] = current_user.id
                     params['limit'] = 100
-                    print(f"✅ Orders API - Unknown role: Filtering by customer_id only: {current_user.id}")
+                    print(f"✅ Orders API - Unknown role: Filtering by customer_id: {current_user.id}")
+                elif current_user and current_user.phone and customer_phone_variants:
+                    # إذا لم يكن هناك customer_id، استخدم customer_phone كبديل
+                    phone_conditions = " OR ".join([f"customer_phone = :phone_{i}" for i in range(len(customer_phone_variants))])
+                    where_clause = f"({phone_conditions})"
+                    for i, phone in enumerate(customer_phone_variants):
+                        params[f'phone_{i}'] = phone
+                    params['limit'] = 100
+                    print(f"✅ Orders API - Unknown role: Filtering by customer_phone (fallback): {customer_phone_variants}")
                 else:
-                    print(f"⚠️ Orders API - Unknown role user has no customer_id, returning empty orders")
+                    print(f"⚠️ Orders API - Unknown role user has no customer_id or phone, returning empty orders")
                     orders = []
                 
                 if where_clause:

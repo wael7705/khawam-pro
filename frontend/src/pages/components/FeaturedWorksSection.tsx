@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { portfolioAPI } from '../../lib/api'
-import { fetchWithCache } from '../../utils/cache'
+import { fetchWithCache } from '../../utils/dataCache'
 import '../Home.css'
 
 interface Work {

@@ -53,13 +53,8 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 1000,
     sourcemap: false,
-    // تحسين الـ minification
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: false, // إبقاء console للـ debugging
-      },
-    },
+    // تحسين الـ minification - استخدام esbuild (أسرع وأخف)
+    minify: 'esbuild',
     // تحسين الـ assets
     assetsInlineLimit: 4096, // inline assets أصغر من 4KB
   },

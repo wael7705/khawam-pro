@@ -100,15 +100,20 @@ function ServicesShowcaseSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <img 
+            <motion.img 
+              // @ts-ignore
               src={imageSrc}
               alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
               loading="eager"
               decoding="async"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
+              animate={{
+                y: [0, -10, 0],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut"
               }}
             />
           </motion.div>

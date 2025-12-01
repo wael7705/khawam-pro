@@ -38,8 +38,14 @@ export default defineConfig({
           }
         },
       },
+      onwarn(warning, warn) {
+        // تجاهل تحذيرات معينة
+        if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return
+        warn(warning)
+      },
     },
     chunkSizeWarningLimit: 1000,
+    sourcemap: false,
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],

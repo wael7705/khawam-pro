@@ -107,13 +107,8 @@ function ServicesShowcaseSection() {
               loading="eager"
               decoding="async"
               onError={(e) => {
-                console.error('خطأ في تحميل الصورة:', imageSrc);
                 const target = e.target as HTMLImageElement;
-                console.error('المسار الكامل:', window.location.origin + imageSrc);
                 target.style.display = 'none';
-              }}
-              onLoad={() => {
-                console.log('تم تحميل الصورة بنجاح:', imageSrc);
               }}
             />
           </motion.div>

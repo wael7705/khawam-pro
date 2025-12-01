@@ -209,7 +209,7 @@ async def create_pricing_rule(rule_data: PricingRuleCreate, db: Session = Depend
              base_price, price_multipliers, specifications, unit, is_active, display_order)
             VALUES 
             (:name_ar, :name_en, :description_ar, :description_en, :calculation_type,
-             :base_price, :price_multipliers::jsonb, :specifications::jsonb, :unit, :is_active, :display_order)
+             :base_price, CAST(:price_multipliers AS JSONB), CAST(:specifications AS JSONB), :unit, :is_active, :display_order)
             RETURNING id
         """), {
             "name_ar": rule_data.name_ar,
@@ -288,7 +288,7 @@ async def update_pricing_rule(
             params["base_price"] = rule_data.base_price
         
         if rule_data.price_multipliers is not None:
-            update_fields.append("price_multipliers = :price_multipliers::jsonb")
+            update_fields.append("price_multipliers = CAST(:price_multipliers AS JSONB)")
             # تحويل dict إلى JSON string إذا لزم الأمر
             if isinstance(rule_data.price_multipliers, dict):
                 params["price_multipliers"] = json.dumps(rule_data.price_multipliers, ensure_ascii=False)
@@ -298,7 +298,7 @@ async def update_pricing_rule(
                 params["price_multipliers"] = json.dumps(rule_data.price_multipliers, ensure_ascii=False)
         
         if rule_data.specifications is not None:
-            update_fields.append("specifications = :specifications::jsonb")
+            update_fields.append("specifications = CAST(:specifications AS JSONB)")
             # تحويل dict إلى JSON string إذا لزم الأمر
             if isinstance(rule_data.specifications, dict):
                 params["specifications"] = json.dumps(rule_data.specifications, ensure_ascii=False)

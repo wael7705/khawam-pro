@@ -240,7 +240,7 @@ async def create_advanced_pricing_rule(
              specifications, unit, is_active, display_order)
             VALUES 
             (:name_ar, :name_en, :description_ar, :calculation_type, :base_price,
-             :specifications, :unit, :is_active, :display_order)
+             CAST(:specifications AS JSONB), :unit, :is_active, :display_order)
             RETURNING id
         """), {
             "name_ar": rule_data.name_ar,
@@ -248,7 +248,7 @@ async def create_advanced_pricing_rule(
             "description_ar": rule_data.description_ar,
             "calculation_type": rule_data.calculation_type,
             "base_price": rule_data.base_price,
-            "specifications": json.dumps(specifications),
+            "specifications": json.dumps(specifications, ensure_ascii=False),
             "unit": rule_data.unit or "صفحة",
             "is_active": rule_data.is_active,
             "display_order": rule_data.display_order

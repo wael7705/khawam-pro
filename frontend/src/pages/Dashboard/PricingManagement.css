@@ -11,9 +11,9 @@
   align-items: center;
   margin-bottom: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(239, 68, 68, 0.95) 100%);
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .pricing-header h1 {
@@ -35,7 +35,7 @@
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   background: white;
-  color: #667eea;
+  color: #dc2626;
   border: none;
   border-radius: 8px;
   font-weight: 600;
@@ -68,8 +68,8 @@
 }
 
 .search-box:focus-within {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
 .search-icon {
@@ -102,7 +102,7 @@
 
 .loading-container .spinner {
   animation: spin 1s linear infinite;
-  color: #667eea;
+  color: #dc2626;
 }
 
 @keyframes spin {
@@ -214,7 +214,7 @@
   border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 500;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(239, 68, 68, 0.95) 100%);
   color: white;
 }
 
@@ -325,7 +325,7 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(239, 68, 68, 0.95) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -405,8 +405,8 @@
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
 .form-group small {
@@ -436,7 +436,7 @@
   width: 20px;
   height: 20px;
   cursor: pointer;
-  accent-color: #667eea;
+  accent-color: #dc2626;
 }
 
 .checkbox-group span {
@@ -467,13 +467,13 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.95) 0%, rgba(239, 68, 68, 0.95) 100%);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
 }
 
 .btn-primary:disabled {
@@ -496,6 +496,55 @@
   animation: spin 1s linear infinite;
 }
 
+.paper-size-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.delivery-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radio-option:hover {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: #dc2626;
+}
+
+.radio-option input[type="radio"]:checked + span {
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.radio-option:has(input[type="radio"]:checked) {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
 @media (max-width: 768px) {
   .pricing-management {
     padding: 1rem;
@@ -505,6 +554,11 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .pricing-header > div:last-child {
+    width: 100%;
+    flex-direction: column;
   }
 
   .form-row {
@@ -518,5 +572,9 @@
   .pricing-table th,
   .pricing-table td {
     padding: 0.75rem 0.5rem;
+  }
+
+  .delivery-options {
+    grid-template-columns: 1fr !important;
   }
 }

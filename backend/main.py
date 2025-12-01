@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
         loop.create_task(_setup_banners_service())
         loop.create_task(_ensure_default_services())
         loop.create_task(_ensure_portfolio_images_column())
+        loop.create_task(_init_advanced_pricing_data())
         print("✅ Startup tasks initiated in background")
     except Exception as e:
         print(f"⚠️ Warning: Failed to create startup tasks: {str(e)[:200]}")
@@ -1376,6 +1377,28 @@ async def _setup_banners_service():
             except:
                 pass
 
+async def _init_advanced_pricing_data():
+    """تهيئة البيانات الأولية للأسعار المتقدمة"""
+    import asyncio
+    await asyncio.sleep(5)  # انتظار قليل لضمان جاهزية قاعدة البيانات
+    
+    try:
+        from init_advanced_pricing_data import init_advanced_pricing_data
+        init_advanced_pricing_data()
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to init advanced pricing data: {str(e)[:200]}")
+
+async def _init_advanced_pricing_data():
+    """تهيئة البيانات الأولية للأسعار المتقدمة"""
+    import asyncio
+    await asyncio.sleep(5)  # انتظار قليل لضمان جاهزية قاعدة البيانات
+    
+    try:
+        from init_advanced_pricing_data import init_advanced_pricing_data
+        init_advanced_pricing_data()
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to init advanced pricing data: {str(e)[:200]}")
+
 async def _ensure_portfolio_images_column():
     """التأكد من وجود عمود images في جدول portfolio_works"""
     import asyncio
@@ -1551,7 +1574,7 @@ app.add_middleware(
 )
 
 # Include routers
-from routers import auth, services, orders, portfolio, products, admin, studio, service_workflows
+from routers import auth, services, orders, portfolio, products, admin, studio, service_workflows, pricing, advanced_pricing
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(services.router, prefix="/api/services", tags=["services"])
@@ -1561,6 +1584,8 @@ app.include_router(products.router, prefix="/api/products", tags=["products"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(studio.router, prefix="/api/studio", tags=["studio"])
 app.include_router(service_workflows.router, prefix="/api/workflows", tags=["workflows"])
+app.include_router(pricing.router, prefix="/api", tags=["pricing"])
+app.include_router(advanced_pricing.router, prefix="/api", tags=["advanced-pricing"])
 
 # Static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

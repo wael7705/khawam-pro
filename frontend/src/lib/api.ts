@@ -245,16 +245,47 @@ export const pricingAPI = {
     const queryParams = new URLSearchParams()
     if (params?.is_active !== undefined) queryParams.append('is_active', params.is_active.toString())
     if (params?.calculation_type) queryParams.append('calculation_type', params.calculation_type)
-    return api.get(`/pricing/pricing-rules?${queryParams.toString()}`)
+    return api.get(`/pricing-rules?${queryParams.toString()}`)
   },
-  getById: (id: number) => api.get(`/pricing/pricing-rules/${id}`),
-  create: (data: any) => api.post('/pricing/pricing-rules', data),
-  update: (id: number, data: any) => api.put(`/pricing/pricing-rules/${id}`, data),
-  delete: (id: number) => api.delete(`/pricing/pricing-rules/${id}`),
+  getById: (id: number) => api.get(`/pricing-rules/${id}`),
+  create: (data: any) => api.post('/pricing-rules', data),
+  update: (id: number, data: any) => api.put(`/pricing-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/pricing-rules/${id}`),
   calculatePrice: (data: { calculation_type: string; quantity: number; specifications: any }) =>
-    api.post('/pricing/calculate-price', data),
+    api.post('/calculate-price', data),
   calculatePriceByRule: (ruleId: number, data: { quantity: number; specifications: any }) =>
-    api.post(`/pricing/calculate-price-by-rule/${ruleId}`, data),
+    api.post(`/calculate-price-by-rule/${ruleId}`, data),
+  // Advanced pricing
+  getAdvancedRules: (params?: { calculation_type?: string; print_type?: string; paper_size?: string; is_active?: boolean }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.calculation_type) queryParams.append('calculation_type', params.calculation_type)
+    if (params?.print_type) queryParams.append('print_type', params.print_type)
+    if (params?.paper_size) queryParams.append('paper_size', params.paper_size)
+    if (params?.is_active !== undefined) queryParams.append('is_active', params.is_active.toString())
+    return api.get(`/advanced-pricing-rules?${queryParams.toString()}`)
+  },
+  createAdvancedRule: (data: any) => api.post('/advanced-pricing-rules', data),
+  calculateAdvancedPrice: (params: {
+    calculation_type: string
+    quantity: number
+    width_cm?: number
+    height_cm?: number
+    print_type?: string
+    quality_type?: string
+    paper_type?: string
+  }) => {
+    const queryParams = new URLSearchParams()
+    queryParams.append('calculation_type', params.calculation_type)
+    queryParams.append('quantity', params.quantity.toString())
+    if (params.width_cm) queryParams.append('width_cm', params.width_cm.toString())
+    if (params.height_cm) queryParams.append('height_cm', params.height_cm.toString())
+    if (params.print_type) queryParams.append('print_type', params.print_type)
+    if (params.quality_type) queryParams.append('quality_type', params.quality_type)
+    if (params.paper_type) queryParams.append('paper_type', params.paper_type)
+    return api.get(`/calculate-price-advanced?${queryParams.toString()}`)
+  },
+  bulkUpdatePrices: (data: { percentage: number; operation: 'increase' | 'decrease'; filter_criteria?: any }) =>
+    api.post('/bulk-update-prices', data),
 }
 
 export const pricingHierarchicalAPI = {

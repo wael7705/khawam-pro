@@ -99,6 +99,7 @@ function ServicesShowcaseSection() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             animate={{
+              opacity: 1,
               y: [0, -10, 0],
             }}
             transition={{
@@ -107,7 +108,8 @@ function ServicesShowcaseSection() {
               y: {
                 duration: 3,
                 repeat: Infinity,
-                ease: "easeInOut"
+                ease: "easeInOut",
+                delay: 0.8
               }
             }}
           >

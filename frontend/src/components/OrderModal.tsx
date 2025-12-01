@@ -282,20 +282,28 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   }
 
   const applyWorkflowSteps = (steps: any[], currentServiceName: string) => {
+    // تصفية المراحل - حذف invoice و summary من جميع الخدمات
+    let filteredSteps = steps.filter((step: any) => 
+      step.step_type !== 'invoice' && step.step_type !== 'summary'
+    )
+    
     // تصفية المراحل لخدمة الفليكس - حذف print_options و colors
-    let filteredSteps = steps
     if (isFlexPrinting) {
-      filteredSteps = steps.filter((step: any) => 
+      filteredSteps = filteredSteps.filter((step: any) => 
         step.step_type !== 'print_options' && step.step_type !== 'colors'
       )
-      // إعادة ترقيم المراحل بعد الحذف
-      filteredSteps = filteredSteps.map((step: any, index: number) => ({
-        ...step,
-        step_number: index + 1
-      }))
       console.log('✅ Filtered flex printing steps - removed print_options and colors')
-      console.log('📋 Original steps count:', steps.length, 'Filtered:', filteredSteps.length)
     }
+    
+    // إعادة ترقيم المراحل بعد الحذف
+    filteredSteps = filteredSteps.map((step: any, index: number) => ({
+      ...step,
+      step_number: index + 1
+    }))
+    
+    console.log('✅ Filtered workflow steps - removed invoice and summary')
+    console.log('📋 Original steps count:', steps.length, 'Filtered:', filteredSteps.length)
+    
     setWorkflowSteps(filteredSteps)
     let savedStep: number | null = null
 
@@ -3149,7 +3157,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       }
     }
 
-    // التحقق من skip_invoice - إذا كان true وstep الحالي هو customer_info، أرسل الطلب مباشرة
     if (workflowSteps.length > 0) {
       const currentStep = workflowSteps.find((s) => s.step_number === step)
       
@@ -3184,7 +3191,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           }
         }
       }
-      if (currentStep?.step_type === 'customer_info' && currentStep?.step_config?.skip_invoice) {
+      
+      // إذا كان step الحالي هو customer_info، أرسل الطلب مباشرة (لأننا أزلنا invoice و summary)
+      if (currentStep?.step_type === 'customer_info') {
         // التحقق من البيانات المطلوبة قبل الإرسال
         if (!customerName.trim()) {
           showError('يرجى إدخال اسم العميل')
@@ -3839,21 +3848,20 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           {(() => {
             const maxStep = workflowSteps.length > 0 ? workflowSteps.length : defaultSteps.length
             const currentStep = workflowSteps.length > 0 ? workflowSteps.find((s) => s.step_number === step) : null
-            const shouldSkipInvoice = currentStep?.step_type === 'customer_info' && currentStep?.step_config?.skip_invoice
             
-            // إذا كان skip_invoice = true، نعرض زر "تأكيد الطلب" في customer_info step
-            if (shouldSkipInvoice) {
+            // إذا كان step الحالي هو customer_info، نعرض زر "تأكيد الطلب" مباشرة (لأننا أزلنا invoice و summary)
+            if (currentStep?.step_type === 'customer_info') {
               return (
                 <button 
                   className="btn btn-primary" 
                   onClick={handleSubmit}
                   disabled={isSubmitting}
                 >
-  {isSubmitting 
-                  ? (uploadProgress.total > 0 && uploadProgress.current < uploadProgress.total
-                      ? `${uploadProgress.message} (${uploadProgress.current}/${uploadProgress.total})`
-                      : uploadProgress.message || 'جاري الإرسال...')
-                  : 'تأكيد الطلب'}
+                  {isSubmitting 
+                    ? (uploadProgress.total > 0 && uploadProgress.current < uploadProgress.total
+                        ? `${uploadProgress.message} (${uploadProgress.current}/${uploadProgress.total})`
+                        : uploadProgress.message || 'جاري الإرسال...')
+                    : 'تأكيد الطلب'}
                 </button>
               )
             }
@@ -3868,7 +3876,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-{isSubmitting 
+                {isSubmitting 
                   ? (uploadProgress.total > 0 && uploadProgress.current < uploadProgress.total
                       ? `${uploadProgress.message} (${uploadProgress.current}/${uploadProgress.total})`
                       : uploadProgress.message || 'جاري الإرسال...')

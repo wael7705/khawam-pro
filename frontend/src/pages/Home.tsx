@@ -85,9 +85,6 @@ export default function Home() {
 }
 
 function ServicesShowcaseSection() {
-  // استخدام الاسم الإنجليزي للصورة لتجنب مشاكل encoding
-  const imageSrc = '/khawam_services.png';
-
   return (
     <section className="section services-showcase-section">
       <div className="container">
@@ -100,7 +97,7 @@ function ServicesShowcaseSection() {
             transition={{ duration: 0.8, delay: 0.2 }}
           >
             <img 
-              src={imageSrc}
+              src="/khawam_services.png" 
               alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
               loading="eager"
@@ -111,9 +108,8 @@ function ServicesShowcaseSection() {
             // @ts-ignore
             className="services-showcase-text"
             initial={{ opacity: 0, x: 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
           >
             <h2 className="services-showcase-title">خدماتنا</h2>
             <p className="services-showcase-description">

@@ -98,17 +98,21 @@ function ServicesShowcaseSection() {
           >
             <img 
               src="/khawam_services.png" 
-              alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
+              alt="خدمات الطباعة الحديثة والمتقنة"
               className="services-showcase-image"
               loading="eager"
+              style={{ 
+                display: 'block',
+                width: '100%',
+                height: 'auto',
+                objectFit: 'contain'
+              }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                console.error('Failed to load image:', target.src);
                 // محاولة استخدام مسار بديل
-                target.src = '/khawam_services.png';
-              }}
-              onLoad={() => {
-                console.log('Image loaded successfully');
+                if (target.src.includes('/khawam_services.png')) {
+                  target.src = `${window.location.origin}/khawam_services.png`;
+                }
               }}
             />
           </motion.div>

@@ -205,6 +205,17 @@
   min-height: 200px;
   width: 100%;
   overflow: visible;
+  background: transparent;
+}
+
+.services-showcase-image-wrapper::before {
+  content: '';
+  display: none;
+}
+
+.services-showcase-image-wrapper::after {
+  content: '';
+  display: none;
 }
 
 .services-showcase-image {
@@ -216,10 +227,12 @@
   box-shadow: 0 20px 60px rgba(220, 38, 38, 0.3);
   object-fit: contain;
   filter: drop-shadow(0 10px 30px rgba(220, 38, 38, 0.2));
-  background: var(--bg);
-  display: block;
-  visibility: visible;
-  opacity: 1;
+  background: transparent;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative;
+  z-index: 1;
 }
 
 .services-showcase-video {

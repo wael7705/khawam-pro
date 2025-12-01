@@ -172,11 +172,13 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       // إضافة token
       wsUrl += `?token=${encodeURIComponent(token)}`
 
-      console.log('🔌 Connecting to WebSocket...', wsUrl.replace(token, 'TOKEN_HIDDEN'))
+      // إزالة console.log للتقليل من الضوضاء في الكونسول
+      // console.log('🔌 Connecting to WebSocket...', wsUrl.replace(token, 'TOKEN_HIDDEN'))
       const ws = new WebSocket(wsUrl)
 
       ws.onopen = () => {
-        console.log('✅ WebSocket connected')
+        // إزالة console.log للتقليل من الضوضاء
+        // console.log('✅ WebSocket connected')
         setIsConnected(true)
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current)
@@ -187,7 +189,8 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          console.log('📨 WebSocket message received:', data)
+          // إزالة console.log للتقليل من الضوضاء
+          // console.log('📨 WebSocket message received:', data)
 
           // معالجة رسائل ping/pong
           if (data.type === 'ping') {
@@ -200,13 +203,14 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
             handleNewOrder(data as OrderNotification)
           }
         } catch (error) {
-          console.error('❌ Error parsing WebSocket message:', error)
+          // فقط طباعة الأخطاء المهمة
+          // console.error('❌ Error parsing WebSocket message:', error)
         }
       }
 
       ws.onerror = (error) => {
-        // لا تطبع الخطأ - WebSocket errors عادية عند انقطاع الاتصال
-        // فقط تحديث الحالة
+        // لا تطبع الخطأ في الكونسول - WebSocket errors عادية عند انقطاع الاتصال
+        // فقط تحديث الحالة بشكل صامت
         setIsConnected(false)
       }
 
@@ -224,10 +228,13 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
           }
           
           // إعادة الاتصال بعد تأخير متزايد (exponential backoff)
-          const delay = Math.min(3000 * Math.pow(1.5, 0), 30000) // بين 3 ثواني و 30 ثانية
+          // حساب عدد المحاولات من delay
+          const attemptCount = Math.floor(Math.log(reconnectTimeoutRef.current ? 1 : 0) / Math.log(1.5)) || 0
+          const delay = Math.min(3000 * Math.pow(1.5, attemptCount), 30000) // بين 3 ثواني و 30 ثانية
+          
           reconnectTimeoutRef.current = setTimeout(() => {
-            if (isAuthenticated()) {
-              console.log('🔄 Reconnecting WebSocket...')
+            if (isAuthenticated() && !wsRef.current) {
+              // إعادة الاتصال فقط إذا لم يكن هناك اتصال موجود
               connectWebSocket()
             }
           }, delay)
@@ -242,7 +249,8 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
 
       wsRef.current = ws
     } catch (error) {
-      console.error('❌ Error creating WebSocket:', error)
+      // إزالة console.error للتقليل من الضوضاء - الأخطاء عادية عند مشاكل الشبكة
+      // console.error('❌ Error creating WebSocket:', error)
       setIsConnected(false)
     }
   }, [handleNewOrder])

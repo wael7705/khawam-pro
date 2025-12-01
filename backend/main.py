@@ -104,6 +104,10 @@ async def _init_pricing_table():
                 'name_en': "ALTER TABLE pricing_rules ADD COLUMN name_en VARCHAR(200)",
                 'description_ar': "ALTER TABLE pricing_rules ADD COLUMN description_ar TEXT",
                 'description_en': "ALTER TABLE pricing_rules ADD COLUMN description_en TEXT",
+                'calculation_type': "ALTER TABLE pricing_rules ADD COLUMN calculation_type VARCHAR(20)",
+                'price_multipliers': "ALTER TABLE pricing_rules ADD COLUMN price_multipliers JSONB",
+                'specifications': "ALTER TABLE pricing_rules ADD COLUMN specifications JSONB",
+                'unit': "ALTER TABLE pricing_rules ADD COLUMN unit VARCHAR(50)",
                 'is_active': "ALTER TABLE pricing_rules ADD COLUMN is_active BOOLEAN DEFAULT true",
                 'display_order': "ALTER TABLE pricing_rules ADD COLUMN display_order INTEGER DEFAULT 0",        
                 'created_at': "ALTER TABLE pricing_rules ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",        
@@ -117,8 +121,15 @@ async def _init_pricing_table():
                         conn.commit()
                         print(f"✅ Added column '{col_name}' to pricing_rules table")
                     except Exception as e:
-                        print(f"⚠️ Error adding column '{col_name}': {str(e)[:100]}")
-                        conn.rollback()
+                        error_msg = str(e)
+                        # تجاهل الخطأ إذا كان العمود موجوداً بالفعل
+                        if 'already exists' in error_msg.lower() or 'duplicate column' in error_msg.lower():
+                            print(f"⏭️  Column '{col_name}' already exists, skipping")
+                        else:
+                            print(f"⚠️ Error adding column '{col_name}': {error_msg[:100]}")
+                            conn.rollback()
+                else:
+                    print(f"✅ Column '{col_name}' already exists")
         else:
             # الجدول غير موجود - إنشاؤه
             conn.execute(text("""
@@ -130,12 +141,11 @@ async def _init_pricing_table():
                     name_en VARCHAR(200),
                     description_ar TEXT,
                     description_en TEXT,
-                    base_price DECIMAL(10, 2),
-                    unit_price DECIMAL(10, 2),
-                    min_quantity INTEGER DEFAULT 1,
-                    max_quantity INTEGER,
-                    pricing_formula TEXT,
-                    conditions JSONB,
+                    calculation_type VARCHAR(20),
+                    base_price DECIMAL(10, 4),
+                    price_multipliers JSONB,
+                    specifications JSONB,
+                    unit VARCHAR(50),
                     is_active BOOLEAN DEFAULT true,
                     display_order INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT NOW(),

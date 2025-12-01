@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from decimal import Decimal
 from datetime import datetime
+import json
 
 router = APIRouter()
 
@@ -208,7 +209,7 @@ async def create_pricing_rule(rule_data: PricingRuleCreate, db: Session = Depend
              base_price, price_multipliers, specifications, unit, is_active, display_order)
             VALUES 
             (:name_ar, :name_en, :description_ar, :description_en, :calculation_type,
-             :base_price, :price_multipliers, :specifications, :unit, :is_active, :display_order)
+             :base_price, :price_multipliers::jsonb, :specifications::jsonb, :unit, :is_active, :display_order)
             RETURNING id
         """), {
             "name_ar": rule_data.name_ar,
@@ -217,8 +218,8 @@ async def create_pricing_rule(rule_data: PricingRuleCreate, db: Session = Depend
             "description_en": rule_data.description_en,
             "calculation_type": rule_data.calculation_type,
             "base_price": rule_data.base_price,
-            "price_multipliers": rule_data.price_multipliers,
-            "specifications": rule_data.specifications,
+            "price_multipliers": json.dumps(rule_data.price_multipliers, ensure_ascii=False) if rule_data.price_multipliers else None,
+            "specifications": json.dumps(rule_data.specifications, ensure_ascii=False) if rule_data.specifications else None,
             "unit": rule_data.unit,
             "is_active": rule_data.is_active,
             "display_order": rule_data.display_order
@@ -287,12 +288,24 @@ async def update_pricing_rule(
             params["base_price"] = rule_data.base_price
         
         if rule_data.price_multipliers is not None:
-            update_fields.append("price_multipliers = :price_multipliers")
-            params["price_multipliers"] = rule_data.price_multipliers
+            update_fields.append("price_multipliers = :price_multipliers::jsonb")
+            # تحويل dict إلى JSON string إذا لزم الأمر
+            if isinstance(rule_data.price_multipliers, dict):
+                params["price_multipliers"] = json.dumps(rule_data.price_multipliers, ensure_ascii=False)
+            elif isinstance(rule_data.price_multipliers, str):
+                params["price_multipliers"] = rule_data.price_multipliers
+            else:
+                params["price_multipliers"] = json.dumps(rule_data.price_multipliers, ensure_ascii=False)
         
         if rule_data.specifications is not None:
-            update_fields.append("specifications = :specifications")
-            params["specifications"] = rule_data.specifications
+            update_fields.append("specifications = :specifications::jsonb")
+            # تحويل dict إلى JSON string إذا لزم الأمر
+            if isinstance(rule_data.specifications, dict):
+                params["specifications"] = json.dumps(rule_data.specifications, ensure_ascii=False)
+            elif isinstance(rule_data.specifications, str):
+                params["specifications"] = rule_data.specifications
+            else:
+                params["specifications"] = json.dumps(rule_data.specifications, ensure_ascii=False)
         
         if rule_data.unit is not None:
             update_fields.append("unit = :unit")

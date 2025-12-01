@@ -100,30 +100,20 @@ function ServicesShowcaseSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            {/* 
-              خيارات للمحتوى المتحرك:
-              1. GIF من Giphy/Tenor: استبدل URL أدناه
-              2. فيديو محلي: استخدم <video> بدلاً من <img>
-              3. فيديو YouTube: استخدم <iframe>
-              
-              روابط GIF مقترحة للطباعة:
-              - Giphy: https://giphy.com/search/printing-machine
-              - Tenor: https://tenor.com/search/printing-gifs
-            */}
-            <motion.img 
-              // @ts-ignore
+            <img 
               src={imageSrc}
               alt="خدمات الطباعة الحديثة والمتقنة - معرض عمليات الطباعة والتصميم"
               className="services-showcase-image"
-              loading="lazy"
+              loading="eager"
               decoding="async"
-              animate={{
-                y: [0, -10, 0],
+              onError={(e) => {
+                console.error('خطأ في تحميل الصورة:', imageSrc);
+                const target = e.target as HTMLImageElement;
+                console.error('المسار الكامل:', window.location.origin + imageSrc);
+                target.style.display = 'none';
               }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut"
+              onLoad={() => {
+                console.log('تم تحميل الصورة بنجاح:', imageSrc);
               }}
             />
           </motion.div>

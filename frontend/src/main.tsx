@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
+import ErrorBoundary from './components/ErrorBoundary.tsx'
 
 // Ensure React is available globally for libraries that expect it (like recharts)
 if (typeof window !== 'undefined') {
@@ -77,10 +78,55 @@ if ('serviceWorker' in navigator) {
   })
 }
 
+// معالجة أخطاء تحميل الـ scripts
+window.addEventListener('error', (event) => {
+  if (event.target && (event.target as HTMLElement).tagName === 'SCRIPT') {
+    const script = event.target as HTMLScriptElement
+    console.error('❌ Script loading error:', script.src)
+    
+    // إعادة محاولة تحميل الـ script
+    if (script.src && !script.dataset.retried) {
+      script.dataset.retried = 'true'
+      const newScript = document.createElement('script')
+      newScript.src = script.src
+      newScript.type = 'module'
+      newScript.async = true
+      
+      newScript.onload = () => {
+        console.log('✅ Script reloaded successfully:', script.src)
+      }
+      
+      newScript.onerror = () => {
+        console.error('❌ Script reload failed:', script.src)
+      }
+      
+      document.head.appendChild(newScript)
+    }
+  }
+}, true)
+
+// معالجة أخطاء الـ chunks
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && typeof event.reason === 'object' && 'message' in event.reason) {
+    const message = String(event.reason.message)
+    if (message.includes('Failed to fetch') || message.includes('ERR_CONNECTION_RESET')) {
+      console.warn('⚠️ Chunk loading error detected, will retry...')
+      // إعادة تحميل الصفحة بعد تأخير قصير
+      setTimeout(() => {
+        if (document.readyState === 'complete') {
+          window.location.reload()
+        }
+      }, 2000)
+    }
+  }
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

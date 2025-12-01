@@ -21,7 +21,8 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
   const [notifications, setNotifications] = useState<OrderNotificationDisplay[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptsRef = useRef<number>(0)
   const knownOrderIdsRef = useRef<Set<number>>(new Set())
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
 
@@ -67,7 +68,7 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
     (notification: OrderNotification) => {
       if (!enableDesktopNotifications || notificationPermission !== 'granted') return
 
-      const { order_number, customer_name, total_amount, service_name } = notification.data
+      const { order_number, customer_name, service_name } = notification.data
 
       try {
         const browserNotification = new Notification('🆕 طلب جديد', {
@@ -180,6 +181,8 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
         // إزالة console.log للتقليل من الضوضاء
         // console.log('✅ WebSocket connected')
         setIsConnected(true)
+        // إعادة تعيين عدد المحاولات عند الاتصال الناجح
+        reconnectAttemptsRef.current = 0
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current)
           reconnectTimeoutRef.current = null
@@ -208,7 +211,7 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
         }
       }
 
-      ws.onerror = (error) => {
+      ws.onerror = () => {
         // لا تطبع الخطأ في الكونسول - WebSocket errors عادية عند انقطاع الاتصال
         // فقط تحديث الحالة بشكل صامت
         setIsConnected(false)
@@ -225,12 +228,13 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
           // تنظيف أي timeout سابق
           if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current)
+            reconnectTimeoutRef.current = null
           }
           
           // إعادة الاتصال بعد تأخير متزايد (exponential backoff)
-          // حساب عدد المحاولات من delay
-          const attemptCount = Math.floor(Math.log(reconnectTimeoutRef.current ? 1 : 0) / Math.log(1.5)) || 0
-          const delay = Math.min(3000 * Math.pow(1.5, attemptCount), 30000) // بين 3 ثواني و 30 ثانية
+          // زيادة عدد المحاولات
+          reconnectAttemptsRef.current += 1
+          const delay = Math.min(3000 * Math.pow(1.5, reconnectAttemptsRef.current - 1), 30000) // بين 3 ثواني و 30 ثانية
           
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isAuthenticated() && !wsRef.current) {
@@ -239,11 +243,12 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
             }
           }, delay)
         } else {
-          // تنظيف timeout إذا كان الإغلاق طبيعياً
+          // تنظيف timeout وإعادة تعيين عدد المحاولات إذا كان الإغلاق طبيعياً
           if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current)
             reconnectTimeoutRef.current = null
           }
+          reconnectAttemptsRef.current = 0
         }
       }
 

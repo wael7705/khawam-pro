@@ -1,24 +1,14 @@
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Link, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { portfolioAPI } from '../lib/api'
+import ServicesShowcaseSection from './components/ServicesShowcaseSection'
+import FeaturedWorksSection from './components/FeaturedWorksSection'
 import './Home.css'
-
-interface Work {
-  id: number
-  title_ar?: string
-  title?: string
-  image_url?: string
-  category_ar?: string
-}
 
 export default function Home() {
   return (
-    <div className="home">
+    <div className="home-page">
       {/* Hero Section */}
       <section className="hero">
-        {/* @ts-ignore */}
         <motion.div 
           // @ts-ignore
           className="hero-content"
@@ -26,10 +16,9 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <h1>KHAWAM PRINTING</h1>
-          <p>خدمات الطباعة والتصميم الاحترافية</p>
+          <h1>خوام للطباعة والتصميم</h1>
+          <p>نقدم لكم أفضل خدمات الطباعة والتصميم بجودة عالية وأسعار مناسبة</p>
         </motion.div>
-        
         <motion.div 
           // @ts-ignore
           className="hero-image"
@@ -39,9 +28,8 @@ export default function Home() {
         >
           <img 
             src="/logo.jpg" 
-            alt="خوام - Khawam Printing" 
+            alt="خوام للطباعة والتصميم"
             className="hero-logo"
-            loading="eager"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
@@ -81,169 +69,5 @@ export default function Home() {
       {/* Featured Works Section */}
       <FeaturedWorksSection />
     </div>
-  )
-}
-
-function ServicesShowcaseSection() {
-  return (
-    <section className="section services-showcase-section">
-      <div className="container">
-        <div className="services-showcase-content">
-          <motion.div 
-            // @ts-ignore
-            className="services-showcase-image-wrapper"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <img 
-              src="/khawam_services.png" 
-              alt="خدمات الطباعة الحديثة والمتقنة"
-              className="services-showcase-image"
-              loading="eager"
-              style={{ 
-                display: 'block',
-                width: '100%',
-                height: 'auto',
-                objectFit: 'contain'
-              }}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                // محاولة استخدام مسار بديل
-                if (target.src.includes('/khawam_services.png')) {
-                  target.src = `${window.location.origin}/khawam_services.png`;
-                }
-              }}
-            />
-          </motion.div>
-          
-          <motion.div 
-            // @ts-ignore
-            className="services-showcase-text"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            <h2 className="services-showcase-title">خدماتنا</h2>
-            <p className="services-showcase-description">
-              نقدم لكم أفضل الخدمات التي تبرز فيها الجودة والاتقان والحداثة لنضع بين أيديكم جودة فريدة في عالم الطباعة مع تقديم اسعار مناسبةم
-            </p>
-            <Link to="/services" className="explore-services-btn">
-              <span className="btn-text">استكشف خدماتنا</span>
-              <span className="btn-shimmer"></span>
-            </Link>
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function FeaturedWorksSection() {
-  const navigate = useNavigate()
-  const [works, setWorks] = useState<Work[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadFeaturedWorks()
-  }, [])
-
-  const loadFeaturedWorks = async () => {
-    try {
-      const { fetchWithCache } = await import('../utils/dataCache')
-      const data = await fetchWithCache<Work[]>(
-        'portfolio:featured',
-        async () => {
-      const response = await portfolioAPI.getFeatured()
-          return Array.isArray(response.data) ? response.data : []
-        },
-        15 * 60 * 1000 // Cache for 15 minutes
-      )
-      setWorks(Array.isArray(data) ? data : [])
-    } catch (error: any) {
-      // Silently fail - don't show error for featured works
-      console.error('Error loading featured works:', error)
-      setWorks([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <section className="section featured-works-section">
-      <div className="container">
-        <h2 className="section-title">أبرز أعمالنا</h2>
-        {loading ? (
-          <div className="loading">جاري التحميل...</div>
-        ) : (
-          <div className="works-carousel-wrapper">
-            <button 
-              className="scroll-btn scroll-btn-left"
-              onClick={() => {
-                const container = document.querySelector('.works-carousel') as HTMLElement;
-                if (container) container.scrollBy({ left: -450, behavior: 'smooth' });
-              }}
-              aria-label="تمرير لليسار"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            
-            <div className="works-carousel-container">
-              <div className="works-carousel">
-                {works && works.length > 0 ? (
-                  works.map((work) => (
-                    <div 
-                      key={work.id} 
-                      className="work-card-mini"
-                      onClick={() => navigate(`/work/${work.id}`)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="work-image-mini">
-                        {work.image_url ? (
-                          <img 
-                            src={
-                              work.image_url.startsWith('data:') || work.image_url.startsWith('http')
-                                ? work.image_url
-                                : `https://khawam-pro-production.up.railway.app${work.image_url.startsWith('/') ? work.image_url : '/' + work.image_url}`
-                            }
-                            alt={work.title_ar || work.title}
-                            loading="lazy"
-                            decoding="async"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              const placeholder = target.nextElementSibling as HTMLElement;
-                              if (placeholder) placeholder.style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div className={`placeholder-mini ${work.image_url ? 'hidden' : ''}`}></div>
-                      </div>
-                      <div className="work-info-mini">
-                        <span className="work-category-mini">{work.category_ar || 'عام'}</span>
-                        <h4>{work.title_ar || work.title}</h4>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="loading">لا توجد أعمال للعرض حالياً</div>
-                )}
-              </div>
-            </div>
-            
-            <button 
-              className="scroll-btn scroll-btn-right"
-              onClick={() => {
-                const container = document.querySelector('.works-carousel') as HTMLElement;
-                if (container) container.scrollBy({ left: 450, behavior: 'smooth' });
-              }}
-              aria-label="تمرير لليمين"
-            >
-              <ChevronRight size={24} />
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
   )
 }

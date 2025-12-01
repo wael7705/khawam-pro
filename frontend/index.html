@@ -1,20 +1,75 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/jpeg" href="/logo.jpg" sizes="192x192" />
     <link rel="apple-touch-icon" href="/logo.jpg" />
     <link rel="shortcut icon" type="image/jpeg" href="/logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
      crossorigin=""/>
     <!-- Preload critical images for faster page load - only for above-the-fold content -->
     <!-- Removed preload for images that are not immediately visible to avoid warnings -->
     <title>خوام - خدمات الطباعة والتصميم</title>
+    <script>
+      // معالجة أخطاء تحميل الـ chunks قبل تحميل React
+      (function() {
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        function handleScriptError(event) {
+          if (event.target && event.target.tagName === 'SCRIPT') {
+            const script = event.target;
+            if (script.src && retryCount < maxRetries && !script.dataset.retried) {
+              retryCount++;
+              script.dataset.retried = 'true';
+              
+              setTimeout(function() {
+                const newScript = document.createElement('script');
+                newScript.src = script.src;
+                newScript.type = script.type || 'module';
+                newScript.async = true;
+                newScript.crossOrigin = script.crossOrigin || '';
+                
+                newScript.onload = function() {
+                  console.log('✅ Script reloaded:', script.src);
+                };
+                
+                newScript.onerror = function() {
+                  console.error('❌ Script reload failed:', script.src);
+                  if (retryCount >= maxRetries) {
+                    console.error('❌ Max retries reached, reloading page...');
+                    setTimeout(function() {
+                      window.location.reload();
+                    }, 1000);
+                  }
+                };
+                
+                document.head.appendChild(newScript);
+              }, 1000 * retryCount);
+            }
+          }
+        }
+        
+        window.addEventListener('error', handleScriptError, true);
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; gap: 20px;">
+        <div style="font-size: 18px; color: #666;">جاري التحميل...</div>
+        <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #dc2626; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      </div>
+      <style>
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,47 +1,52 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import HeroSlider from '../components/HeroSlider'
 import ServicesShowcaseSection from './components/ServicesShowcaseSection'
 import FeaturedWorksSection from './components/FeaturedWorksSection'
+import { heroSlidesAPI } from '../lib/api'
 import './Home.css'
 
+interface HeroSlide {
+  id: number
+  image_url: string
+  is_logo: boolean
+  is_active: boolean
+  display_order: number
+}
+
 export default function Home() {
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadHeroSlides()
+  }, [])
+
+  const loadHeroSlides = async () => {
+    try {
+      const response = await heroSlidesAPI.getAll(true) // فقط السلايدات النشطة
+      if (response.data.success) {
+        setHeroSlides(response.data.slides || [])
+      }
+    } catch (error) {
+      console.error('Error loading hero slides:', error)
+      // Fallback: استخدام اللوغو كسلايدة افتراضية
+      setHeroSlides([{
+        id: 0,
+        image_url: '/logo.jpg',
+        is_logo: true,
+        is_active: true,
+        display_order: 0
+      }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="home-page">
-      {/* Hero Section */}
-      <section className="hero">
-        <motion.div 
-          // @ts-ignore
-          className="hero-content"
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <h1>خوام للطباعة والتصميم</h1>
-          <p>نقدم لكم أفضل خدمات الطباعة والتصميم بجودة عالية وأسعار مناسبة</p>
-        </motion.div>
-        <motion.div 
-          // @ts-ignore
-          className="hero-image"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          <img 
-            src="/logo.jpg" 
-            alt="خوام للطباعة والتصميم"
-            className="hero-logo"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const placeholder = target.nextElementSibling as HTMLElement;
-              if (placeholder) placeholder.style.display = 'flex';
-            }}
-          />
-          <div className="placeholder-image" style={{ display: 'none' }}>
-            <span>خوام</span>
-          </div>
-        </motion.div>
-      </section>
+      {/* Hero Slider Section */}
+      {!loading && <HeroSlider slides={heroSlides} />}
 
       {/* Services Promo */}
       <section className="section services-promo">

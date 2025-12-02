@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
         loop.create_task(_ensure_default_services())
         loop.create_task(_ensure_portfolio_images_column())
         loop.create_task(_init_advanced_pricing_data())
+        loop.create_task(_init_hero_slides_table())
         print("✅ Startup tasks initiated in background")
     except Exception as e:
         print(f"⚠️ Warning: Failed to create startup tasks: {str(e)[:200]}")
@@ -1584,7 +1585,7 @@ app.add_middleware(
 )
 
 # Include routers
-from routers import auth, services, orders, portfolio, products, admin, studio, service_workflows, pricing, advanced_pricing
+from routers import auth, services, orders, portfolio, products, admin, studio, service_workflows, pricing, advanced_pricing, hero_slides
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(services.router, prefix="/api/services", tags=["services"])
@@ -1596,6 +1597,7 @@ app.include_router(studio.router, prefix="/api/studio", tags=["studio"])
 app.include_router(service_workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(pricing.router, prefix="/api", tags=["pricing"])
 app.include_router(advanced_pricing.router, prefix="/api", tags=["advanced-pricing"])
+app.include_router(hero_slides.router, prefix="/api", tags=["hero-slides"])
 
 # Static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

@@ -77,7 +77,21 @@ export const servicesAPI = {
 }
 
   // Portfolio API
-  export const portfolioAPI = {
+  export const heroSlidesAPI = {
+  getAll: (is_active?: boolean) => {
+    const params = is_active !== undefined ? { is_active } : {}
+    return api.get('/hero-slides', { params })
+  },
+  create: (data: { image_url: string; is_logo?: boolean; is_active?: boolean; display_order?: number }) =>
+    api.post('/hero-slides', data),
+  update: (id: number, data: { image_url?: string; is_logo?: boolean; is_active?: boolean; display_order?: number }) =>
+    api.put(`/hero-slides/${id}`, data),
+  delete: (id: number) => api.delete(`/hero-slides/${id}`),
+  reorder: (slide_orders: Array<{ id: number; display_order: number }>) =>
+    api.post('/hero-slides/reorder', slide_orders),
+}
+
+export const portfolioAPI = {
     getAll: async () => {
       const response = await api.get('/portfolio/')
       return { data: Array.isArray(response.data) ? response.data : [] }

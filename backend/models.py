@@ -234,6 +234,18 @@ class ServiceWorkflow(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
+class HeroSlide(Base):
+    """سلايدات Hero للصفحة الرئيسية"""
+    __tablename__ = "hero_slides"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    image_url = Column(Text, nullable=False)  # رابط الصورة
+    is_logo = Column(Boolean, default=False)  # هل هذه السلايدة هي اللوغو؟
+    is_active = Column(Boolean, default=True)  # هل السلايدة نشطة؟
+    display_order = Column(Integer, default=0)  # ترتيب العرض
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
 class PricingRule(Base):
     """قواعد التسعير القديمة (للتوافق مع النظام القديم)"""
     __tablename__ = "pricing_rules"

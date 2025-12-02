@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard, Image as ImageIcon } from 'lucide-react'
 const DashboardHome = lazy(() => import('./Dashboard/DashboardHome'))
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
@@ -11,6 +11,7 @@ import CustomersManagement from './Dashboard/CustomersManagement'
 import PricingManagement from './Dashboard/PricingManagement'
 import PricingWizard from './Dashboard/PricingWizard'
 import PaymentSettings from './Dashboard/PaymentSettings'
+import HeroSlidesManagement from './Dashboard/HeroSlidesManagement'
 import Studio from './Studio'
 import ProfileSettings from './ProfileSettings'
 import { isEmployee, isAdmin, getUserData, isAuthenticated } from '../lib/auth'
@@ -64,6 +65,7 @@ export default function Dashboard() {
     { id: 'customers', name: 'العملاء', icon: Users, path: '/dashboard/customers', adminOnly: true },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services', adminOnly: true },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works', adminOnly: true },
+    { id: 'hero-slides', name: 'سلايدات Hero', icon: ImageIcon, path: '/dashboard/hero-slides', adminOnly: true },
     { id: 'pricing', name: 'إدارة مالية', icon: DollarSign, path: '/dashboard/pricing', adminOnly: true },
     { id: 'payments', name: 'إعدادات الدفع', icon: CreditCard, path: '/dashboard/payments', adminOnly: true },
     { id: 'studio', name: 'الاستديو', icon: Sparkles, path: '/dashboard/studio', adminOnly: false },
@@ -95,6 +97,7 @@ export default function Dashboard() {
 
     if (path.startsWith('/dashboard/services')) return 'services'
     if (path.startsWith('/dashboard/works')) return 'works'
+    if (path.startsWith('/dashboard/hero-slides')) return 'hero-slides'
     if (path.startsWith('/dashboard/pricing')) return 'pricing'
     if (path.startsWith('/dashboard/payments')) return 'payments'
     if (path.startsWith('/dashboard/studio')) return 'studio'
@@ -209,6 +212,7 @@ export default function Dashboard() {
 
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}
             {isAdmin() && <Route path="/works" element={<WorksManagement />} />}
+            {isAdmin() && <Route path="/hero-slides" element={<HeroSlidesManagement />} />}
             {isAdmin() && <Route path="/pricing" element={<PricingManagement />} />}
             {isAdmin() && <Route path="/pricing/wizard" element={<PricingWizard />} />}
             {isAdmin() && <Route path="/payments" element={<PaymentSettings />} />}

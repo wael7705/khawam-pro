@@ -3,57 +3,35 @@ import { motion } from 'framer-motion'
 import { useState, useEffect, useRef } from 'react'
 import '../Home.css'
 
+// استخدام المسار المطلق للصورة من public
+const khawamServicesImage = '/khawam_services.png'
+
 export default function ServicesShowcaseSection() {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
-  const [imageSrc, setImageSrc] = useState('/khawam_services.png')
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
-    // محاولة تحميل الصورة مع عدة مسارات بديلة
-    const tryLoadImage = () => {
-      const img = new Image()
-      const sources = [
-        '/khawam_services.png',
-        `${window.location.origin}/khawam_services.png`,
-        '/assets/khawam_services.png',
-        `${window.location.origin}/assets/khawam_services.png`,
-      ]
-
-      let currentIndex = 0
-
-      const loadNext = () => {
-        if (currentIndex < sources.length) {
-          img.src = sources[currentIndex]
-          setImageSrc(sources[currentIndex])
-        }
+    // استخدام الصورة من public مباشرة
+    const img = new Image()
+    
+    img.onload = () => {
+      console.log('✅ Image loaded successfully:', khawamServicesImage)
+      setImageLoaded(true)
+      setImageError(false)
+      if (imgRef.current) {
+        imgRef.current.src = khawamServicesImage
       }
-
-      img.onload = () => {
-        console.log('✅ Image loaded successfully:', img.src)
-        setImageLoaded(true)
-        setImageError(false)
-        if (imgRef.current) {
-          imgRef.current.src = img.src
-        }
-      }
-
-      img.onerror = () => {
-        console.warn('⚠️ Failed to load image:', sources[currentIndex])
-        currentIndex++
-        if (currentIndex < sources.length) {
-          loadNext()
-        } else {
-          console.error('❌ All image sources failed')
-          setImageError(true)
-          setImageLoaded(false)
-        }
-      }
-
-      loadNext()
     }
 
-    tryLoadImage()
+    img.onerror = () => {
+      console.error('❌ Failed to load image:', khawamServicesImage)
+      setImageError(true)
+      setImageLoaded(false)
+    }
+
+    // محاولة تحميل الصورة
+    img.src = khawamServicesImage
   }, [])
 
   return (
@@ -78,7 +56,7 @@ export default function ServicesShowcaseSection() {
             {!imageError ? (
               <img 
                 ref={imgRef}
-                src={imageSrc}
+                src={khawamServicesImage}
                 alt="خدمات الطباعة الحديثة والمتقنة"
                 className="services-showcase-image"
                 loading="eager"
@@ -104,13 +82,6 @@ export default function ServicesShowcaseSection() {
                   const target = e.target as HTMLImageElement
                   setImageError(true)
                   setImageLoaded(false)
-                  // محاولة استخدام مسار بديل
-                  if (target.src.includes('/khawam_services.png')) {
-                    const newSrc = `${window.location.origin}/khawam_services.png`
-                    if (target.src !== newSrc) {
-                      target.src = newSrc
-                    }
-                  }
                 }}
               />
             ) : (

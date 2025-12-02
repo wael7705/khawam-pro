@@ -1457,6 +1457,100 @@ async def _ensure_portfolio_images_column():
             except:
                 pass
 
+async def _init_hero_slides_table():
+    """إنشاء جدول hero_slides إذا لم يكن موجوداً"""
+    import asyncio
+    await asyncio.sleep(3)  # انتظار قليل لضمان جاهزية قاعدة البيانات
+    
+    conn = None
+    try:
+        print("🔄 Initializing hero_slides table...")
+        conn = engine.connect()
+        
+        # التحقق من وجود الجدول
+        check_table = conn.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_name = 'hero_slides'
+            )
+        """)).fetchone()
+        
+        if check_table and check_table[0]:
+            # الجدول موجود - التحقق من الأعمدة
+            check_columns = conn.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'hero_slides'
+            """)).fetchall()
+            
+            existing_columns = [col[0] for col in check_columns]
+            required_columns = ['id', 'image_url', 'is_logo', 'is_active', 'display_order', 'created_at', 'updated_at']
+            
+            # إضافة الأعمدة المفقودة
+            columns_to_add = {
+                'id': "ALTER TABLE hero_slides ADD COLUMN id SERIAL PRIMARY KEY",
+                'image_url': "ALTER TABLE hero_slides ADD COLUMN image_url TEXT NOT NULL",
+                'is_logo': "ALTER TABLE hero_slides ADD COLUMN is_logo BOOLEAN DEFAULT false",
+                'is_active': "ALTER TABLE hero_slides ADD COLUMN is_active BOOLEAN DEFAULT true",
+                'display_order': "ALTER TABLE hero_slides ADD COLUMN display_order INTEGER DEFAULT 0",
+                'created_at': "ALTER TABLE hero_slides ADD COLUMN created_at TIMESTAMP DEFAULT NOW()",
+                'updated_at': "ALTER TABLE hero_slides ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()"
+            }
+            
+            for col_name in required_columns:
+                if col_name not in existing_columns:
+                    if col_name == 'id':
+                        # لا يمكن إضافة PRIMARY KEY بعد إنشاء الجدول
+                        continue
+                    try:
+                        alter_sql = columns_to_add.get(col_name)
+                        if alter_sql:
+                            conn.execute(text(alter_sql))
+                            conn.commit()
+                            print(f"✅ Added column '{col_name}' to hero_slides table")
+                    except Exception as e:
+                        error_msg = str(e)
+                        if 'already exists' in error_msg.lower() or 'duplicate column' in error_msg.lower():
+                            print(f"⏭️  Column '{col_name}' already exists, skipping")
+                        else:
+                            print(f"⚠️ Error adding column '{col_name}': {error_msg[:100]}")
+                            conn.rollback()
+                else:
+                    print(f"✅ Column '{col_name}' already exists")
+            
+            print("✅ hero_slides table verified")
+        else:
+            # الجدول غير موجود - إنشاؤه
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS hero_slides (
+                    id SERIAL PRIMARY KEY,
+                    image_url TEXT NOT NULL,
+                    is_logo BOOLEAN DEFAULT false,
+                    is_active BOOLEAN DEFAULT true,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+            print("✅ Created hero_slides table")
+    except Exception as e:
+        print(f"❌ Error initializing hero_slides table: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
 async def _ensure_default_services():
     """التأكد من وجود الخدمات الأساسية في قاعدة البيانات"""
     import asyncio

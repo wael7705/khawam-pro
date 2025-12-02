@@ -176,6 +176,67 @@ export default function HeroSlidesManagement() {
     setFormData({ ...formData, image_url: url })
   }
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // التحقق من نوع الملف
+    if (!file.type.startsWith('image/')) {
+      showError('الملف يجب أن يكون صورة')
+      return
+    }
+
+    // التحقق من حجم الملف (حد أقصى 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      showError('حجم الصورة كبير جداً (الحد الأقصى 10MB)')
+      return
+    }
+
+    try {
+      setUploading(true)
+      
+      // رفع الصورة
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'}/hero-slides/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        },
+        body: formData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'خطأ في رفع الصورة')
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.url) {
+        setFormData(prev => ({ ...prev, image_url: data.url }))
+        showSuccess('تم رفع الصورة بنجاح')
+      } else {
+        throw new Error('فشل رفع الصورة')
+      }
+    } catch (error: any) {
+      console.error('Error uploading image:', error)
+      showError(error.message || 'خطأ في رفع الصورة')
+    } finally {
+      setUploading(false)
+      // إعادة تعيين input الملف
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   return (
     <div className="hero-slides-management">
       {/* Header */}

@@ -318,6 +318,49 @@
   color: var(--text-primary);
 }
 
+.upload-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-upload-image {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.btn-upload-image:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-upload-image:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upload-divider {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.image-url-input {
+  flex: 1;
+  min-width: 200px;
+}
+
 .form-group input[type="text"],
 .form-group input[type="number"] {
   width: 100%;

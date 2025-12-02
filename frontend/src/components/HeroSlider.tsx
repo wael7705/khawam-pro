@@ -133,7 +133,7 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
         }}
       >
         {activeSlides.map((slide) => (
-          <div key={slide.id} className="hero-slide">
+          <div key={slide.id} className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}>
             <img 
               src={slide.image_url} 
               alt={slide.is_logo ? "خوام للطباعة والتصميم" : "سلايدة"}

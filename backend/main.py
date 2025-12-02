@@ -1600,6 +1600,9 @@ app.include_router(advanced_pricing.router, prefix="/api", tags=["advanced-prici
 app.include_router(hero_slides.router, prefix="/api", tags=["hero-slides"])
 
 # Static files
+# إنشاء مجلدات uploads إذا لم تكن موجودة
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("uploads/hero_slides", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Serve frontend static files (must be after API routes)

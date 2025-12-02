@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Edit, Trash2, Upload, ArrowUp, ArrowDown, X, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { heroSlidesAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
@@ -21,6 +21,7 @@ export default function HeroSlidesManagement() {
   const [editingSlide, setEditingSlide] = useState<HeroSlide | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     image_url: '',
@@ -298,15 +299,44 @@ export default function HeroSlidesManagement() {
             
             <form className="hero-slide-form" onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>رابط الصورة *</label>
-                <input
-                  type="text"
-                  value={formData.image_url}
-                  onChange={(e) => handleImageUrlChange(e.target.value)}
-                  placeholder="https://example.com/image.jpg أو /path/to/image.jpg"
-                  required
-                />
-                <small>أدخل رابط الصورة (URL أو مسار محلي)</small>
+                <label>رفع صورة أو إدخال رابط *</label>
+                <div className="upload-section">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-upload-image"
+                    onClick={handleUploadClick}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="spinner" size={18} />
+                        جاري الرفع...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={18} />
+                        رفع صورة
+                      </>
+                    )}
+                  </button>
+                  <span className="upload-divider">أو</span>
+                  <input
+                    type="text"
+                    value={formData.image_url}
+                    onChange={(e) => handleImageUrlChange(e.target.value)}
+                    placeholder="https://example.com/image.jpg أو /path/to/image.jpg"
+                    className="image-url-input"
+                    required
+                  />
+                </div>
+                <small>يمكنك رفع صورة من جهازك أو إدخال رابط صورة</small>
               </div>
 
               <div className="form-group">

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db
@@ -6,9 +6,17 @@ from models import HeroSlide
 from pydantic import BaseModel
 from typing import Optional, List
 import os
+import uuid
+import aiofiles
 from datetime import datetime
+from PIL import Image
+import io
 
 router = APIRouter()
+
+# مجلد رفع الصور
+UPLOAD_DIR = "uploads/hero_slides"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class HeroSlideCreate(BaseModel):
     image_url: str
@@ -207,4 +215,62 @@ async def reorder_hero_slides(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في إعادة ترتيب السلايدات: {str(e)}")
+
+@router.post("/hero-slides/upload")
+async def upload_hero_slide_image(file: UploadFile = File(...)):
+    """رفع صورة للسلايدة وحفظها في مجلد uploads/hero_slides"""
+    try:
+        # التحقق من نوع الملف
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="الملف يجب أن يكون صورة")
+        
+        # قراءة محتوى الملف
+        content = await file.read()
+        
+        # التحقق من حجم الملف (حد أقصى 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(content) > max_size:
+            raise HTTPException(status_code=400, detail="حجم الصورة كبير جداً (الحد الأقصى 10MB)")
+        
+        # تحديد امتداد الملف
+        ext = os.path.splitext(file.filename or 'image.jpg')[1] or '.jpg'
+        if ext.lower() not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+            ext = '.jpg'
+        
+        # إنشاء اسم ملف فريد
+        filename = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        
+        # حفظ الملف
+        async with aiofiles.open(file_path, 'wb') as f:
+            await f.write(content)
+        
+        # إرجاع المسار النسبي
+        relative_url = f"/uploads/hero_slides/{filename}"
+        
+        # الحصول على URL المطلق
+        base_url = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+        if not base_url:
+            domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+            if domain:
+                base_url = f"https://{domain}" if not domain.startswith("http") else domain
+            else:
+                base_url = "https://khawam-pro-production.up.railway.app"
+        
+        absolute_url = f"{base_url}{relative_url}"
+        
+        return {
+            "success": True,
+            "url": absolute_url,
+            "image_url": absolute_url,
+            "relative_url": relative_url,
+            "filename": filename
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading hero slide image: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في رفع الصورة: {str(e)}")
 

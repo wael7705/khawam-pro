@@ -3,35 +3,63 @@ import { motion } from 'framer-motion'
 import { useState, useEffect, useRef } from 'react'
 import '../Home.css'
 
-// استخدام المسار المطلق للصورة من public
-const khawamServicesImage = '/khawam_services.png'
+// قائمة المسارات البديلة للصورة
+const getImagePaths = () => {
+  const baseUrl = window.location.origin
+  return [
+    '/khawam_services.png',
+    `${baseUrl}/khawam_services.png`,
+    '/assets/khawam_services.png',
+    `${baseUrl}/assets/khawam_services.png`,
+  ]
+}
 
 export default function ServicesShowcaseSection() {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [imageSrc, setImageSrc] = useState('/khawam_services.png')
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
-    // استخدام الصورة من public مباشرة
-    const img = new Image()
-    
-    img.onload = () => {
-      console.log('✅ Image loaded successfully:', khawamServicesImage)
-      setImageLoaded(true)
-      setImageError(false)
-      if (imgRef.current) {
-        imgRef.current.src = khawamServicesImage
+    // محاولة تحميل الصورة من عدة مسارات
+    const tryLoadImage = () => {
+      const paths = getImagePaths()
+      let currentIndex = 0
+
+      const tryNext = () => {
+        if (currentIndex >= paths.length) {
+          console.warn('⚠️ All image paths failed, showing placeholder')
+          setImageError(true)
+          setImageLoaded(false)
+          return
+        }
+
+        const img = new Image()
+        const currentPath = paths[currentIndex]
+        
+        img.onload = () => {
+          console.log('✅ Image loaded successfully:', currentPath)
+          setImageSrc(currentPath)
+          setImageLoaded(true)
+          setImageError(false)
+          if (imgRef.current) {
+            imgRef.current.src = currentPath
+          }
+        }
+
+        img.onerror = () => {
+          console.warn(`⚠️ Failed to load image from: ${currentPath}, trying next...`)
+          currentIndex++
+          tryNext()
+        }
+
+        img.src = currentPath
       }
+
+      tryNext()
     }
 
-    img.onerror = () => {
-      console.error('❌ Failed to load image:', khawamServicesImage)
-      setImageError(true)
-      setImageLoaded(false)
-    }
-
-    // محاولة تحميل الصورة
-    img.src = khawamServicesImage
+    tryLoadImage()
   }, [])
 
   return (
@@ -56,7 +84,7 @@ export default function ServicesShowcaseSection() {
             {!imageError ? (
               <img 
                 ref={imgRef}
-                src={khawamServicesImage}
+                src={imageSrc}
                 alt="خدمات الطباعة الحديثة والمتقنة"
                 className="services-showcase-image"
                 loading="eager"
@@ -70,7 +98,7 @@ export default function ServicesShowcaseSection() {
                   visibility: imageLoaded ? 'visible' : 'hidden',
                 }}
                 onLoad={(e) => {
-                  console.log('✅ Image onLoad event fired')
+                  console.log('✅ Image onLoad event fired for:', imageSrc)
                   setImageLoaded(true)
                   setImageError(false)
                   const target = e.target as HTMLImageElement
@@ -78,10 +106,23 @@ export default function ServicesShowcaseSection() {
                   target.style.display = 'block'
                 }}
                 onError={(e) => {
-                  console.error('❌ Image onError event fired')
+                  console.warn('⚠️ Image onError event fired for:', imageSrc)
                   const target = e.target as HTMLImageElement
-                  setImageError(true)
-                  setImageLoaded(false)
+                  const paths = getImagePaths()
+                  const currentIndex = paths.indexOf(imageSrc)
+                  
+                  if (currentIndex < paths.length - 1) {
+                    // جرب المسار التالي
+                    const nextPath = paths[currentIndex + 1]
+                    console.log('🔄 Trying next path:', nextPath)
+                    setImageSrc(nextPath)
+                    target.src = nextPath
+                  } else {
+                    // جميع المسارات فشلت
+                    console.error('❌ All image paths failed')
+                    setImageError(true)
+                    setImageLoaded(false)
+                  }
                 }}
               />
             ) : (

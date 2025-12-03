@@ -43,7 +43,14 @@ export default defineConfig({
         // تحسين أسماء الملفات لتجنب مشاكل الـ caching
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
+        assetFileNames: (assetInfo) => {
+          // ملفات public (مثل khawam_services.png) تُنسخ مباشرة بدون hash
+          if (assetInfo.name && (assetInfo.name.includes('khawam_services') || assetInfo.name.includes('logo'))) {
+            return '[name][extname]'
+          }
+          // باقي الملفات في assets مع hash
+          return 'assets/[name]-[hash].[ext]'
+        },
       },
       onwarn(warning, warn) {
         // تجاهل تحذيرات معينة

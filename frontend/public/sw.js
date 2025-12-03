@@ -37,6 +37,11 @@ function shouldIntercept(url) {
     return false
   }
   
+  // NEVER intercept images from public directory (khawam_services.png, logo.jpg, etc.)
+  if (urlLower.includes('khawam_services.png') || urlLower.includes('logo.jpg') || urlLower.includes('logo.png')) {
+    return false // Let browser handle images directly
+  }
+  
   // Never intercept external domains
   try {
     const urlObj = new URL(url)
@@ -52,7 +57,7 @@ function shouldIntercept(url) {
   // Only intercept navigation requests (page loads) and specific static files we want to cache
   // This means we only handle:
   // - Navigation requests (page loads)
-  // - Specific static files like /logo.jpg, /index.html
+  // - Specific static files like /index.html
   return true
 }
 

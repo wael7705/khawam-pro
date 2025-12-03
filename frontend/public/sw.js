@@ -59,18 +59,28 @@ function shouldIntercept(url) {
 // Install event
 self.addEventListener('install', (event) => {
   console.log('🔄 Service Worker: Installing v5...')
-  // Force activation of new service worker immediately
-  self.skipWaiting()
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('✅ Service Worker: Cache opened', CACHE_NAME)
-        // Only cache static assets
-        return cache.addAll(urlsToCache.map(url => new Request(url, { cache: 'reload' })))
+        // Only cache static assets - don't fail if some fail to cache
+        return Promise.allSettled(
+          urlsToCache.map(url => 
+            cache.add(new Request(url, { cache: 'reload' })).catch((err) => {
+              console.warn(`⚠️ Service Worker: Failed to cache ${url}:`, err.message)
+              return null
+            })
+          )
+        ).then(() => {
+          // Force activation of new service worker immediately after caching
+          return self.skipWaiting()
+        })
       })
       .catch((error) => {
         console.error('❌ Service Worker: Cache failed', error)
+        // Still skip waiting even if cache fails
+        return self.skipWaiting()
       })
   )
 })
@@ -90,8 +100,19 @@ self.addEventListener('activate', (event) => {
         })
       )
     }).then(() => {
-      // Take control of all pages immediately
-      return self.clients.claim()
+      // Take control of all pages immediately - but only if we're active
+      if (self.registration.active) {
+        return self.clients.claim().catch((error) => {
+          // Ignore claim errors - they're not critical
+          console.warn('⚠️ Service Worker: Could not claim clients (this is normal during updates):', error.message)
+          return Promise.resolve()
+        })
+      }
+      return Promise.resolve()
+    }).catch((error) => {
+      console.error('❌ Service Worker: Activation error:', error)
+      // Don't throw - allow activation to complete
+      return Promise.resolve()
     })
   )
 })

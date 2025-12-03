@@ -43,14 +43,18 @@ async function cleanupOldServiceWorkers() {
 // Register Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    // تنظيف القديم أولاً
-    await cleanupOldServiceWorkers()
-    
-    // انتظر قليلاً ثم سجل الجديد
-    setTimeout(() => {
-      navigator.serviceWorker
-        .register('/sw.js', { updateViaCache: 'none' })
-        .then((registration) => {
+    try {
+      // تنظيف القديم أولاً
+      await cleanupOldServiceWorkers()
+      
+      // انتظر قليلاً ثم سجل الجديد
+      setTimeout(async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js', { 
+            updateViaCache: 'none',
+            scope: '/' 
+          })
+          
           console.log('✅ Service Worker registered:', registration.scope)
           
           // التحقق من التحديثات
@@ -60,21 +64,38 @@ if ('serviceWorker' in navigator) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                   console.log('🔄 New service worker available, reloading...')
-                  window.location.reload()
+                  // انتظر قليلاً قبل إعادة التحميل
+                  setTimeout(() => {
+                    window.location.reload()
+                  }, 1000)
                 }
               })
             }
           })
           
-          // التحقق من التحديثات كل 60 ثانية
-          setInterval(() => {
-            registration.update()
-          }, 60000)
-        })
-        .catch((error) => {
-          console.warn('⚠️ Service Worker registration failed:', error)
-        })
-    }, 500)
+          // التحقق من التحديثات كل 60 ثانية (بعد التأكد من أن registration موجود)
+          if (registration) {
+            setInterval(() => {
+              try {
+                registration.update().catch((err) => {
+                  // تجاهل أخطاء التحديث - قد تكون طبيعية
+                  console.warn('⚠️ Service Worker update check failed (this is normal):', err.message)
+                })
+              } catch (err) {
+                // تجاهل الأخطاء
+              }
+            }, 60000)
+          }
+        } catch (error: any) {
+          // تجاهل أخطاء التسجيل - قد تكون طبيعية في بعض الحالات
+          if (error.message && !error.message.includes('already registered')) {
+            console.warn('⚠️ Service Worker registration failed:', error.message)
+          }
+        }
+      }, 1000) // زيادة الوقت للانتظار
+    } catch (error) {
+      console.warn('⚠️ Service Worker setup failed:', error)
+    }
   })
 }
 

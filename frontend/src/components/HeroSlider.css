@@ -1,21 +1,21 @@
 .hero-slider {
   position: relative;
   width: 100%;
-  height: calc(50vh + 35px);
-  min-height: 435px;
-  max-height: 535px;
+  height: calc(50vh + 150px);
+  min-height: 550px;
+  max-height: 650px;
   overflow: hidden;
   background: #000;
   z-index: 999;
   margin-top: 0;
   padding-top: 0;
-  margin-bottom: -35px;
+  margin-bottom: -150px;
   /* التأكد من أن Hero Slider يبدأ من أعلى الصفحة ولا يختفي تحت Navbar */
   top: 0;
   /* إضافة ظل ضوئي في الأسفل لانتشار خط الفصل */
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 
               0 10px 30px rgba(0, 0, 0, 0.2),
-              inset 0 -50px 80px -30px rgba(255, 255, 255, 0.1);
+              inset 0 -80px 120px -40px rgba(255, 255, 255, 0.15);
 }
 
 .hero-slides-container {
@@ -59,12 +59,13 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 80px;
+  height: 120px;
   background: linear-gradient(
     to bottom,
     transparent,
-    rgba(255, 255, 255, 0.1),
-    rgba(255, 255, 255, 0.2)
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.25)
   );
   pointer-events: none;
   z-index: 1;
@@ -144,14 +145,14 @@
 /* Responsive */
 @media (max-width: 768px) {
   .hero-slider {
-    height: calc(50vh + 20px);
-    min-height: 320px;
-    max-height: 420px;
-    margin-bottom: -20px;
+    height: calc(50vh + 80px);
+    min-height: 400px;
+    max-height: 500px;
+    margin-bottom: -80px;
   }
   
   .hero-slider::after {
-    height: 50px;
+    height: 80px;
   }
 
   .hero-slider-nav {

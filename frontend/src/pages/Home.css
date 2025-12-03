@@ -3,9 +3,9 @@
 
 .services-promo {
   background: var(--gray);
-  padding: 35px 0 70px 0;
+  padding: 150px 0 70px 0;
   color: var(--text);
-  margin-top: 35px;
+  margin-top: 0;
   position: relative;
   z-index: 998;
 }
@@ -133,9 +133,8 @@
   object-fit: contain;
   filter: drop-shadow(0 10px 30px rgba(220, 38, 38, 0.2));
   background: transparent;
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+  display: block;
+  visibility: visible;
   position: relative;
   z-index: 1;
 }

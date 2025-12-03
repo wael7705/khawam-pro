@@ -1,16 +1,21 @@
 .hero-slider {
   position: relative;
   width: 100%;
-  height: 50vh;
-  min-height: 400px;
-  max-height: 500px;
+  height: calc(50vh + 35px);
+  min-height: 435px;
+  max-height: 535px;
   overflow: hidden;
   background: #000;
   z-index: 999;
   margin-top: 0;
   padding-top: 0;
+  margin-bottom: -35px;
   /* التأكد من أن Hero Slider يبدأ من أعلى الصفحة ولا يختفي تحت Navbar */
   top: 0;
+  /* إضافة ظل ضوئي في الأسفل لانتشار خط الفصل */
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 
+              0 10px 30px rgba(0, 0, 0, 0.2),
+              inset 0 -50px 80px -30px rgba(255, 255, 255, 0.1);
 }
 
 .hero-slides-container {
@@ -31,9 +36,10 @@
 .hero-slide img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   display: block;
+  background: #000;
 }
 
 /* معالجة خاصة للوغو - عرض أفضل */
@@ -44,6 +50,24 @@
   background: rgba(255, 255, 255, 0.05);
   max-width: 100%;
   max-height: 100%;
+}
+
+/* إضافة ظل ضوئي في أسفل السلايد لانتشار خط الفصل */
+.hero-slider::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.2)
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Navigation Arrows */
@@ -120,9 +144,14 @@
 /* Responsive */
 @media (max-width: 768px) {
   .hero-slider {
-    height: 50vh;
-    min-height: 300px;
-    max-height: 400px;
+    height: calc(50vh + 20px);
+    min-height: 320px;
+    max-height: 420px;
+    margin-bottom: -20px;
+  }
+  
+  .hero-slider::after {
+    height: 50px;
   }
 
   .hero-slider-nav {

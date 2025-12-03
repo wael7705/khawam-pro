@@ -3,8 +3,11 @@
 
 .services-promo {
   background: var(--gray);
-  padding: 70px 0;
+  padding: 35px 0 70px 0;
   color: var(--text);
+  margin-top: 35px;
+  position: relative;
+  z-index: 998;
 }
 
 /* في الوضع الليلي، استخدم نفس لون خلفية قسم الخدمات */

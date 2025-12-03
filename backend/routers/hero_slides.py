@@ -125,9 +125,10 @@ async def update_hero_slide(
         update_fields = []
         params = {"id": slide_id}
         
-        if slide_data.image_url is not None:
+        # تحديث image_url فقط إذا كانت قيمة جديدة وغير فارغة
+        if slide_data.image_url is not None and slide_data.image_url.strip():
             update_fields.append("image_url = :image_url")
-            params["image_url"] = slide_data.image_url
+            params["image_url"] = slide_data.image_url.strip()
         
         if slide_data.is_logo is not None:
             update_fields.append("is_logo = :is_logo")

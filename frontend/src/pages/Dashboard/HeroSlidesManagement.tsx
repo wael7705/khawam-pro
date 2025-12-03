@@ -66,6 +66,8 @@ export default function HeroSlidesManagement() {
       setSaving(true)
       
       if (editingSlide) {
+        // عند التحديث، نرسل جميع البيانات بما فيها image_url
+        // Backend سيتحقق من أن image_url غير فارغ قبل التحديث
         await heroSlidesAPI.update(editingSlide.id, formData)
         showSuccess('تم تحديث السلايدة بنجاح')
       } else {

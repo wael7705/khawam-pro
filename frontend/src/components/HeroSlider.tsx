@@ -12,23 +12,31 @@ interface HeroSlide {
 
 // دالة لحل المسار النسبي إلى URL مطلق
 const resolveImageUrl = (url: string): string => {
-  if (!url) return ''
+  if (!url || !url.trim()) return ''
+  
+  const trimmedUrl = url.trim()
   
   // إذا كان URL مطلق (يبدأ بـ http:// أو https://)، استخدمه كما هو
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url
+  if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+    return trimmedUrl
   }
   
   // إذا كان مسار نسبي (يبدأ بـ /)، أضف base URL
-  if (url.startsWith('/')) {
+  if (trimmedUrl.startsWith('/')) {
+    // محاولة استخدام window.location.origin أولاً (يعمل في الإنتاج)
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return `${window.location.origin}${trimmedUrl}`
+    }
+    
+    // Fallback: استخدام VITE_API_URL
     const apiUrl = import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'
     // إزالة /api من نهاية URL إذا كان موجوداً
     const baseUrl = apiUrl.replace(/\/api$/, '')
-    return `${baseUrl}${url}`
+    return `${baseUrl}${trimmedUrl}`
   }
   
   // إذا كان مسار نسبي بدون /، أضف / في البداية
-  return `/${url}`
+  return `/${trimmedUrl}`
 }
 
 interface HeroSliderProps {
@@ -239,13 +247,33 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                   objectPosition: 'center',
                   display: 'block',
                 }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  console.error('❌ Failed to load hero slide image:', imageUrl, 'Original:', slide.image_url, 'Index:', index)
-                  // إضافة السلايد إلى قائمة الفاشلة
-                  setFailedImages(prev => new Set(prev).add(slide.id))
-                  target.onerror = null // منع الحلقة اللانهائية
-                }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                const originalUrl = slide.image_url
+                console.error('❌ Failed to load hero slide image:', {
+                  resolved: imageUrl,
+                  original: originalUrl,
+                  index: index,
+                  slideId: slide.id,
+                  isLogo: slide.is_logo
+                })
+                
+                // محاولة استخدام URL الأصلي مباشرة إذا كان مختلفاً
+                if (originalUrl && originalUrl !== imageUrl && (originalUrl.startsWith('http') || originalUrl.startsWith('/'))) {
+                  console.log('🔄 Retrying with original URL:', originalUrl)
+                  target.src = resolveImageUrl(originalUrl)
+                  return
+                }
+                
+                // إضافة السلايد إلى قائمة الفاشلة فقط بعد فشل جميع المحاولات
+                setTimeout(() => {
+                  if (target.complete && target.naturalWidth === 0) {
+                    setFailedImages(prev => new Set(prev).add(slide.id))
+                  }
+                }, 1000)
+                
+                target.onerror = null // منع الحلقة اللانهائية
+              }}
                 onLoad={() => {
                   console.log('✅ Hero slide image loaded and ready:', imageUrl, 'Index:', index, 'Current:', currentIndex)
                 }}

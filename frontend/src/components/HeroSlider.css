@@ -5,7 +5,7 @@
   min-height: 550px;
   max-height: 650px;
   overflow: hidden;
-  background: #000;
+  background: var(--bg-light);
   z-index: 999;
   margin-top: 0;
   padding-top: 0;
@@ -16,6 +16,12 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 
               0 10px 30px rgba(0, 0, 0, 0.2),
               inset 0 -80px 120px -40px rgba(255, 255, 255, 0.15);
+  transition: background-color 0.3s ease;
+}
+
+/* الوضع الليلي */
+[data-theme="dark"] .hero-slider {
+  background: var(--bg-dark);
 }
 
 .hero-slides-container {
@@ -40,7 +46,7 @@
   object-fit: contain;
   object-position: center;
   display: block;
-  background: #000;
+  background: var(--bg-light);
   /* 
    * القياس الموصى به للصور في Hero Slider:
    * 1920 × 1080 بكسل (نسبة 16:9)
@@ -50,6 +56,12 @@
    * - Mobile: يعرض بشكل كامل داخل container (500px ارتفاع)
    * - جميع الشاشات: الصورة ستظهر كاملة بدون قص
    */
+  transition: opacity 0.3s ease;
+}
+
+/* الوضع الليلي */
+[data-theme="dark"] .hero-slide img {
+  background: var(--bg-dark);
 }
 
 /* معالجة خاصة للوغو - عرض أفضل */
@@ -57,12 +69,17 @@
   object-fit: contain;
   object-position: center;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-light);
   max-width: 100%;
   max-height: 100%;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
+}
+
+/* الوضع الليلي للوغو */
+[data-theme="dark"] .hero-slide.logo-slide img {
+  background: var(--bg-dark);
 }
 
 /* إضافة ظل ضوئي في أسفل السلايد لانتشار خط الفصل */

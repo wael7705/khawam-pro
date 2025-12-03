@@ -84,6 +84,50 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     }
   }, [activeSlides.length, currentIndex])
 
+  // تحميل جميع الصور مسبقاً (preload) لضمان جاهزيتها
+  useEffect(() => {
+    if (activeSlides.length === 0) return
+
+    console.log('🔄 Preloading all hero slide images...')
+    
+    // إضافة preload links إلى head
+    const preloadLinks: HTMLLinkElement[] = []
+    
+    activeSlides.forEach((slide, index) => {
+      const imageUrl = resolveImageUrl(slide.image_url)
+      
+      // إنشاء preload link
+      const link = document.createElement('link')
+      link.rel = 'preload'
+      link.as = 'image'
+      link.href = imageUrl
+      link.setAttribute('fetchPriority', index === 0 ? 'high' : index === 1 ? 'high' : 'low')
+      document.head.appendChild(link)
+      preloadLinks.push(link)
+      
+      // إنشاء Image object لتحميل الصورة في الخلفية
+      const img = new Image()
+      img.src = imageUrl
+      
+      img.onload = () => {
+        console.log(`✅ Preloaded slide ${index + 1}/${activeSlides.length}:`, imageUrl)
+      }
+      
+      img.onerror = () => {
+        console.error(`❌ Failed to preload slide ${index + 1}/${activeSlides.length}:`, imageUrl)
+      }
+    })
+    
+    // تنظيف preload links عند إلغاء التحميل
+    return () => {
+      preloadLinks.forEach(link => {
+        if (link.parentNode) {
+          link.parentNode.removeChild(link)
+        }
+      })
+    }
+  }, [activeSlides])
+
   // إعداد auto-play عند تحميل المكون أو تغيير الإعدادات
   useEffect(() => {
     if (activeSlides.length === 0) return
@@ -176,29 +220,39 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
           transition: isTransitioning ? 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }}
       >
-        {activeSlides.map((slide, index) => (
-          <div 
-            key={slide.id} 
-            className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}
-          >
-            <img 
-              src={resolveImageUrl(slide.image_url)} 
-              alt={slide.is_logo ? "خوام للطباعة والتصميم" : "سلايدة"}
-              loading={slide.is_logo ? "eager" : "lazy"}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                const resolvedUrl = resolveImageUrl(slide.image_url)
-                console.error('❌ Failed to load hero slide image:', resolvedUrl, 'Original:', slide.image_url)
-                // إضافة السلايد إلى قائمة الفاشلة
-                setFailedImages(prev => new Set(prev).add(slide.id))
-                target.onerror = null // منع الحلقة اللانهائية
-              }}
-              onLoad={() => {
-                console.log('✅ Hero slide image loaded:', resolveImageUrl(slide.image_url))
-              }}
-            />
-          </div>
-        ))}
+        {activeSlides.map((slide, index) => {
+          const imageUrl = resolveImageUrl(slide.image_url)
+          return (
+            <div 
+              key={slide.id} 
+              className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}
+            >
+              <img 
+                src={imageUrl}
+                alt={slide.is_logo ? "خوام للطباعة والتصميم" : "سلايدة"}
+                loading="eager"
+                fetchPriority={index === 0 ? 'high' : index === 1 ? 'high' : 'auto'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  objectPosition: 'center',
+                  display: 'block',
+                }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  console.error('❌ Failed to load hero slide image:', imageUrl, 'Original:', slide.image_url, 'Index:', index)
+                  // إضافة السلايد إلى قائمة الفاشلة
+                  setFailedImages(prev => new Set(prev).add(slide.id))
+                  target.onerror = null // منع الحلقة اللانهائية
+                }}
+                onLoad={() => {
+                  console.log('✅ Hero slide image loaded and ready:', imageUrl, 'Index:', index, 'Current:', currentIndex)
+                }}
+              />
+            </div>
+          )
+        })}
       </div>
 
       {/* Navigation Arrows */}

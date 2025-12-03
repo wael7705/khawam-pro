@@ -1,15 +1,11 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import '../Home.css'
-
-// استخدام المسار المباشر للصورة من public
-const KHAWAM_SERVICES_IMAGE = '/khawam_services.png'
 
 export default function ServicesShowcaseSection() {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
-  const imgRef = useRef<HTMLImageElement>(null)
 
   return (
     <section className="section services-showcase-section">
@@ -32,8 +28,7 @@ export default function ServicesShowcaseSection() {
           >
             {!imageError ? (
               <img 
-                ref={imgRef}
-                src={KHAWAM_SERVICES_IMAGE}
+                src="/khawam_services.png"
                 alt="خدمات الطباعة الحديثة والمتقنة"
                 className="services-showcase-image"
                 loading="eager"
@@ -46,32 +41,11 @@ export default function ServicesShowcaseSection() {
                   transition: 'opacity 0.5s ease-in-out',
                   visibility: 'visible',
                 }}
-                onLoad={(e) => {
-                  console.log('✅ Image onLoad event fired for:', KHAWAM_SERVICES_IMAGE)
+                onLoad={() => {
                   setImageLoaded(true)
                   setImageError(false)
-                  const target = e.target as HTMLImageElement
-                  target.style.opacity = '1'
-                  target.style.display = 'block'
-                  target.style.visibility = 'visible'
                 }}
-                onError={(e) => {
-                  console.error('❌ Image onError event fired for:', KHAWAM_SERVICES_IMAGE)
-                  const target = e.target as HTMLImageElement
-                  
-                  // محاولة استخدام مسار بديل
-                  const baseUrl = window.location.origin
-                  const altPath = `${baseUrl}${KHAWAM_SERVICES_IMAGE}`
-                  
-                  if (!target.dataset.retried && target.src !== altPath) {
-                    console.log('🔄 Trying alternative path:', altPath)
-                    target.dataset.retried = 'true'
-                    target.src = altPath
-                    return
-                  }
-                  
-                  // إذا فشل المسار البديل أيضاً
-                  console.error('❌ All image paths failed')
+                onError={() => {
                   setImageError(true)
                   setImageLoaded(false)
                 }}

@@ -245,19 +245,26 @@ async def upload_hero_slide_image(file: UploadFile = File(...)):
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(content)
         
-        # إرجاع المسار النسبي
+        # إرجاع المسار النسبي (سيتم خدمته من StaticFiles)
         relative_url = f"/uploads/hero_slides/{filename}"
         
-        # الحصول على URL المطلق
+        # الحصول على URL المطلق للاستخدام في قاعدة البيانات
+        # لكن نفضل استخدام المسار النسبي لأنه يعمل في جميع البيئات
         base_url = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
         if not base_url:
             domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
             if domain:
                 base_url = f"https://{domain}" if not domain.startswith("http") else domain
             else:
-                base_url = "https://khawam-pro-production.up.railway.app"
+                # استخدام المسار النسبي كبديل - سيعمل مع أي base URL
+                base_url = ""
         
-        absolute_url = f"{base_url}{relative_url}"
+        # إذا كان base_url موجوداً، استخدمه. وإلا استخدم المسار النسبي فقط
+        if base_url:
+            absolute_url = f"{base_url}{relative_url}"
+        else:
+            # استخدام المسار النسبي - سيتم حله تلقائياً من قبل المتصفح
+            absolute_url = relative_url
         
         return {
             "success": True,

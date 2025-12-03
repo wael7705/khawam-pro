@@ -138,8 +138,8 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background: transparent;
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
@@ -147,18 +147,18 @@
 }
 
 .hero-slider-dot:hover {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 1);
   transform: scale(1.2);
 }
 
 .hero-slider-dot.active {
-  background: white;
-  border-color: white;
-  width: 24px;
+  background: #dc2626;
+  border-color: #dc2626;
+  width: 10px;
   height: 10px;
-  border-radius: 5px;
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.6);
 }
 
 /* Responsive */
@@ -197,7 +197,7 @@
   }
 
   .hero-slider-dot.active {
-    width: 20px;
+    width: 8px;
     height: 8px;
   }
 }

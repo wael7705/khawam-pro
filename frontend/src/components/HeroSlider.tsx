@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import './HeroSlider.css'
 
@@ -10,13 +10,34 @@ interface HeroSlide {
   display_order: number
 }
 
+// دالة لحل المسار النسبي إلى URL مطلق
+const resolveImageUrl = (url: string): string => {
+  if (!url) return ''
+  
+  // إذا كان URL مطلق (يبدأ بـ http:// أو https://)، استخدمه كما هو
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // إذا كان مسار نسبي (يبدأ بـ /)، أضف base URL
+  if (url.startsWith('/')) {
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'
+    // إزالة /api من نهاية URL إذا كان موجوداً
+    const baseUrl = apiUrl.replace(/\/api$/, '')
+    return `${baseUrl}${url}`
+  }
+  
+  // إذا كان مسار نسبي بدون /، أضف / في البداية
+  return `/${url}`
+}
+
 interface HeroSliderProps {
   slides: HeroSlide[]
   autoPlay?: boolean
   autoPlayInterval?: number
 }
 
-export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval = 5000 }: HeroSliderProps) {
+export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval = 10000 }: HeroSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set())
@@ -35,19 +56,12 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
       return a.display_order - b.display_order
     })
 
-  // تحديث currentIndex عند تغيير activeSlides
-  useEffect(() => {
-    if (activeSlides.length === 0) return
-    
-    // التأكد من أن currentIndex صحيح
-    if (currentIndex >= activeSlides.length) {
-      setCurrentIndex(0)
+  // دالة لإعادة تشغيل auto-play
+  const restartAutoPlay = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-  }, [activeSlides.length, currentIndex])
-
-  useEffect(() => {
-    if (activeSlides.length === 0) return
-
     if (autoPlay && activeSlides.length > 1) {
       intervalRef.current = setInterval(() => {
         setCurrentIndex((prev) => {
@@ -58,49 +72,59 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
         })
       }, autoPlayInterval)
     }
+  }, [autoPlay, activeSlides.length, autoPlayInterval])
+
+  // تحديث currentIndex عند تغيير activeSlides
+  useEffect(() => {
+    if (activeSlides.length === 0) return
+    
+    // التأكد من أن currentIndex صحيح
+    if (currentIndex >= activeSlides.length) {
+      setCurrentIndex(0)
+    }
+  }, [activeSlides.length, currentIndex])
+
+  // إعداد auto-play عند تحميل المكون أو تغيير الإعدادات
+  useEffect(() => {
+    if (activeSlides.length === 0) return
+
+    restartAutoPlay()
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
     }
-  }, [activeSlides.length, autoPlay, autoPlayInterval])
+  }, [restartAutoPlay])
 
   const goToSlide = (index: number) => {
-    if (index === currentIndex) return
+    if (index === currentIndex || index < 0 || index >= activeSlides.length) return
     setIsTransitioning(true)
     setCurrentIndex(index)
     setTimeout(() => setIsTransitioning(false), 600)
+    // إعادة تشغيل auto-play بعد التمرير اليدوي
+    restartAutoPlay()
   }
 
   const goToPrevious = () => {
     if (activeSlides.length <= 1) return
     const newIndex = currentIndex === 0 ? activeSlides.length - 1 : currentIndex - 1
-    goToSlide(newIndex)
+    setIsTransitioning(true)
+    setCurrentIndex(newIndex)
+    setTimeout(() => setIsTransitioning(false), 600)
     // إعادة تشغيل auto-play
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    if (autoPlay) {
-      intervalRef.current = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
-      }, autoPlayInterval)
-    }
+    restartAutoPlay()
   }
 
   const goToNext = () => {
     if (activeSlides.length <= 1) return
     const newIndex = (currentIndex + 1) % activeSlides.length
-    goToSlide(newIndex)
+    setIsTransitioning(true)
+    setCurrentIndex(newIndex)
+    setTimeout(() => setIsTransitioning(false), 600)
     // إعادة تشغيل auto-play
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    if (autoPlay) {
-      intervalRef.current = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
-      }, autoPlayInterval)
-    }
+    restartAutoPlay()
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -122,6 +146,10 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     } else if (distance < -minSwipeDistance) {
       goToPrevious()
     }
+    
+    // إعادة تعيين قيم اللمس
+    touchStartX.current = 0
+    touchEndX.current = 0
   }
 
   if (activeSlides.length === 0) {
@@ -154,18 +182,19 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
             className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}
           >
             <img 
-              src={slide.image_url} 
+              src={resolveImageUrl(slide.image_url)} 
               alt={slide.is_logo ? "خوام للطباعة والتصميم" : "سلايدة"}
               loading={slide.is_logo ? "eager" : "lazy"}
               onError={(e) => {
                 const target = e.target as HTMLImageElement
-                console.error('❌ Failed to load hero slide image:', slide.image_url)
+                const resolvedUrl = resolveImageUrl(slide.image_url)
+                console.error('❌ Failed to load hero slide image:', resolvedUrl, 'Original:', slide.image_url)
                 // إضافة السلايد إلى قائمة الفاشلة
                 setFailedImages(prev => new Set(prev).add(slide.id))
                 target.onerror = null // منع الحلقة اللانهائية
               }}
               onLoad={() => {
-                console.log('✅ Hero slide image loaded:', slide.image_url)
+                console.log('✅ Hero slide image loaded:', resolveImageUrl(slide.image_url))
               }}
             />
           </div>

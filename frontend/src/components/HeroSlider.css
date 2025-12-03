@@ -9,7 +9,7 @@
   z-index: 999;
   margin-top: 0;
   padding-top: 0;
-  margin-bottom: -200px;
+  margin-bottom: 0;
   /* التأكد من أن Hero Slider يبدأ من أعلى الصفحة ولا يختفي تحت Navbar */
   top: 0;
   /* إضافة ظل ضوئي في الأسفل لانتشار خط الفصل */

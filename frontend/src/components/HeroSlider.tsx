@@ -19,13 +19,14 @@ interface HeroSliderProps {
 export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval = 5000 }: HeroSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set())
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const touchStartX = useRef<number>(0)
   const touchEndX = useRef<number>(0)
 
   // تصفية السلايدات النشطة فقط وترتيبها
   const activeSlides = slides
-    .filter(slide => slide.is_active)
+    .filter(slide => slide.is_active && !failedImages.has(slide.id))
     .sort((a, b) => {
       // اللوغو دائماً أولاً
       if (a.is_logo && !b.is_logo) return -1
@@ -33,6 +34,16 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
       // ثم حسب display_order
       return a.display_order - b.display_order
     })
+
+  // تحديث currentIndex عند تغيير activeSlides
+  useEffect(() => {
+    if (activeSlides.length === 0) return
+    
+    // التأكد من أن currentIndex صحيح
+    if (currentIndex >= activeSlides.length) {
+      setCurrentIndex(0)
+    }
+  }, [activeSlides.length, currentIndex])
 
   useEffect(() => {
     if (activeSlides.length === 0) return
@@ -149,8 +160,8 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
               onError={(e) => {
                 const target = e.target as HTMLImageElement
                 console.error('❌ Failed to load hero slide image:', slide.image_url)
-                // إظهار placeholder بدلاً من إخفاء الصورة
-                target.style.opacity = '0.3'
+                // إضافة السلايد إلى قائمة الفاشلة
+                setFailedImages(prev => new Set(prev).add(slide.id))
                 target.onerror = null // منع الحلقة اللانهائية
               }}
               onLoad={() => {

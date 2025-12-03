@@ -39,7 +39,12 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
 
     if (autoPlay && activeSlides.length > 1) {
       intervalRef.current = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
+        setCurrentIndex((prev) => {
+          const nextIndex = (prev + 1) % activeSlides.length
+          setIsTransitioning(true)
+          setTimeout(() => setIsTransitioning(false), 600)
+          return nextIndex
+        })
       }, autoPlayInterval)
     }
 
@@ -54,7 +59,7 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     if (index === currentIndex) return
     setIsTransitioning(true)
     setCurrentIndex(index)
-    setTimeout(() => setIsTransitioning(false), 500)
+    setTimeout(() => setIsTransitioning(false), 600)
   }
 
   const goToPrevious = () => {
@@ -129,18 +134,27 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
         className="hero-slides-container"
         style={{
           transform: `translateX(-${currentIndex * 100}%)`,
-          transition: isTransitioning ? 'transform 0.5s ease-in-out' : 'none',
+          transition: isTransitioning ? 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }}
       >
-        {activeSlides.map((slide) => (
-          <div key={slide.id} className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}>
+        {activeSlides.map((slide, index) => (
+          <div 
+            key={slide.id} 
+            className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}
+          >
             <img 
               src={slide.image_url} 
               alt={slide.is_logo ? "خوام للطباعة والتصميم" : "سلايدة"}
               loading={slide.is_logo ? "eager" : "lazy"}
               onError={(e) => {
                 const target = e.target as HTMLImageElement
-                target.style.display = 'none'
+                console.error('❌ Failed to load hero slide image:', slide.image_url)
+                // إظهار placeholder بدلاً من إخفاء الصورة
+                target.style.opacity = '0.3'
+                target.onerror = null // منع الحلقة اللانهائية
+              }}
+              onLoad={() => {
+                console.log('✅ Hero slide image loaded:', slide.image_url)
               }}
             />
           </div>

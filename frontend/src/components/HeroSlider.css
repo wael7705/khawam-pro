@@ -9,7 +9,7 @@
   z-index: 999;
   margin-top: 0;
   padding-top: 0;
-  margin-bottom: -150px;
+  margin-bottom: -200px;
   /* التأكد من أن Hero Slider يبدأ من أعلى الصفحة ولا يختفي تحت Navbar */
   top: 0;
   /* إضافة ظل ضوئي في الأسفل لانتشار خط الفصل */
@@ -23,6 +23,7 @@
   width: 100%;
   height: 100%;
   will-change: transform;
+  position: relative;
 }
 
 .hero-slide {
@@ -59,6 +60,9 @@
   background: rgba(255, 255, 255, 0.05);
   max-width: 100%;
   max-height: 100%;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* إضافة ظل ضوئي في أسفل السلايد لانتشار خط الفصل */
@@ -120,35 +124,41 @@
 /* Dots Indicator */
 .hero-slider-dots {
   position: absolute;
-  bottom: 20px;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 10px;
+  gap: 8px;
   z-index: 10;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-slider-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.3);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
+  position: relative;
 }
 
 .hero-slider-dot:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.2);
 }
 
 .hero-slider-dot.active {
   background: white;
   border-color: white;
-  width: 30px;
-  border-radius: 6px;
+  width: 24px;
+  height: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.4);
 }
 
 /* Responsive */
@@ -182,12 +192,13 @@
   }
 
   .hero-slider-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   .hero-slider-dot.active {
-    width: 24px;
+    width: 20px;
+    height: 8px;
   }
 }
 

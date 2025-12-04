@@ -286,7 +286,14 @@ export const PrintingService: ServiceHandler = {
     
     // إضافة الأبعاد إذا كانت موجودة
     if (length || width || height) {
-      specifications.dimensions = { length, width, height, unit }
+      specifications.dimensions = { 
+        length: length || null, 
+        width: width || null, 
+        height: height || null, 
+        widthUnit: serviceData.widthUnit || 'cm', 
+        heightUnit: serviceData.heightUnit || 'cm',
+        unit: serviceData.widthUnit || serviceData.heightUnit || unit || 'cm' // للتوافق مع الكود القديم
+      }
     }
     
     // إضافة الألوان إذا كانت موجودة
@@ -314,7 +321,9 @@ export const PrintingService: ServiceHandler = {
           length: length || null,
           width: width || null,
           height: height || null,
-          unit: unit
+          widthUnit: serviceData.widthUnit || 'cm',
+          heightUnit: serviceData.heightUnit || 'cm',
+          unit: serviceData.widthUnit || serviceData.heightUnit || unit || 'cm' // للتوافق مع الكود القديم
         } : undefined,
         colors: selectedColors || [],
         design_files: uploadedFiles || []

@@ -32,6 +32,8 @@ export default function Home() {
 
   const loadHeroSlides = async () => {
     try {
+      // جلب السلايدات مباشرة من API بدون cache
+      // إضافة timestamp لمنع cache من المتصفح
       const response = await heroSlidesAPI.getAll(true) // فقط السلايدات النشطة
       if (response.data.success && response.data.slides && response.data.slides.length > 0) {
         setHeroSlides(response.data.slides)

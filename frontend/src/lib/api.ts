@@ -80,7 +80,16 @@ export const servicesAPI = {
   export const heroSlidesAPI = {
   getAll: (is_active?: boolean) => {
     const params = is_active !== undefined ? { is_active } : {}
-    return api.get('/hero-slides', { params })
+    // إضافة timestamp لمنع cache من المتصفح
+    params['_t'] = Date.now()
+    return api.get('/hero-slides', { 
+      params,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
   },
   create: (data: { image_url: string; is_logo?: boolean; is_active?: boolean; display_order?: number }) =>
     api.post('/hero-slides', data),

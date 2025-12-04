@@ -21,6 +21,7 @@ async def get_services(db: Session = Depends(get_db), response: Response = None)
             return cached_result
         
         # استخدام raw SQL للتحقق من جميع الخدمات
+        # ملاحظة: هذا endpoint للواجهة العامة - يعرض فقط الخدمات النشطة والظاهرة
         result = db.execute(text("""
             SELECT id, name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order
             FROM services

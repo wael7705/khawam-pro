@@ -6,6 +6,7 @@ import { showSuccess, showError } from '../utils/toast'
 import ColorPicker from './ColorPicker'
 import { findServiceHandler } from '../services/serviceRegistry'
 import { getUserData, isAdmin, isEmployee } from '../lib/auth'
+import { normalizeNumber } from '../utils/arabicNumbers'
 import './OrderModal.css'
 
 type PrintQuality = 'standard' | 'laser' | 'uv'
@@ -728,11 +729,24 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={width}
-                  onChange={(e) => setWidth(e.target.value)}
+                  onChange={(e) => {
+                    // دعم الأرقام العربية والإنجليزية
+                    const normalized = e.target.value.replace(/[٠-٩]/g, (char) => {
+                      const arabicToEnglish: Record<string, string> = {
+                        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+                      }
+                      return arabicToEnglish[char] || char
+                    })
+                    // السماح فقط بالأرقام والنقطة
+                    const cleaned = normalized.replace(/[^0-9.]/g, '')
+                    setWidth(cleaned)
+                  }}
                   className="form-input"
                   placeholder="0"
                   required={stepConfig.required}
@@ -758,11 +772,24 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={height}
-                  onChange={(e) => setHeight(e.target.value)}
+                  onChange={(e) => {
+                    // دعم الأرقام العربية والإنجليزية
+                    const normalized = e.target.value.replace(/[٠-٩]/g, (char) => {
+                      const arabicToEnglish: Record<string, string> = {
+                        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+                      }
+                      return arabicToEnglish[char] || char
+                    })
+                    // السماح فقط بالأرقام والنقطة
+                    const cleaned = normalized.replace(/[^0-9.]/g, '')
+                    setHeight(cleaned)
+                  }}
                   className="form-input"
                   placeholder="0"
                   required={stepConfig.required}
@@ -1358,11 +1385,24 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <label>العرض {stepConfig.required ? <span className="required">*</span> : ''}</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
                       value={width}
-                      onChange={(e) => setWidth(e.target.value)}
+                      onChange={(e) => {
+                        // دعم الأرقام العربية والإنجليزية
+                        const normalized = e.target.value.replace(/[٠-٩]/g, (char) => {
+                          const arabicToEnglish: Record<string, string> = {
+                            '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                            '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+                          }
+                          return arabicToEnglish[char] || char
+                        })
+                        // السماح فقط بالأرقام والنقطة
+                        const cleaned = normalized.replace(/[^0-9.]/g, '')
+                        setWidth(cleaned)
+                      }}
                       className="form-input"
                       placeholder="0"
                       required={stepConfig.required}
@@ -1385,11 +1425,24 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                   <label>الارتفاع {stepConfig.required ? <span className="required">*</span> : ''}</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
                       value={height}
-                      onChange={(e) => setHeight(e.target.value)}
+                      onChange={(e) => {
+                        // دعم الأرقام العربية والإنجليزية
+                        const normalized = e.target.value.replace(/[٠-٩]/g, (char) => {
+                          const arabicToEnglish: Record<string, string> = {
+                            '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                            '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+                          }
+                          return arabicToEnglish[char] || char
+                        })
+                        // السماح فقط بالأرقام والنقطة
+                        const cleaned = normalized.replace(/[^0-9.]/g, '')
+                        setHeight(cleaned)
+                      }}
                       className="form-input"
                       placeholder="0"
                       required={stepConfig.required}
@@ -2287,11 +2340,24 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                   min="0"
                   step="0.01"
                   value={width}
-                  onChange={(e) => setWidth(e.target.value)}
+                  onChange={(e) => {
+                    // دعم الأرقام العربية والإنجليزية
+                    const normalized = e.target.value.replace(/[٠-٩]/g, (char) => {
+                      const arabicToEnglish: Record<string, string> = {
+                        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+                      }
+                      return arabicToEnglish[char] || char
+                    })
+                    // السماح فقط بالأرقام والنقطة
+                    const cleaned = normalized.replace(/[^0-9.]/g, '')
+                    setWidth(cleaned)
+                  }}
                 className="form-input"
                 placeholder="0"
                 required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
@@ -2319,16 +2385,29 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               </label>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                   min="0"
                   step="0.01"
                 value={height}
-                onChange={(e) => setHeight(e.target.value)}
+                  onChange={(e) => {
+                    // دعم الأرقام العربية والإنجليزية
+                    const normalized = e.target.value.replace(/[٠-٩]/g, (char) => {
+                      const arabicToEnglish: Record<string, string> = {
+                        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+                      }
+                      return arabicToEnglish[char] || char
+                    })
+                    // السماح فقط بالأرقام والنقطة
+                    const cleaned = normalized.replace(/[^0-9.]/g, '')
+                    setHeight(cleaned)
+                  }}
                 className="form-input"
                 placeholder="0"
                   required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
                   style={{ flex: 1 }}
-                />
+              />
                 <select 
                   value={heightUnit} 
                   onChange={(e) => setHeightUnit(e.target.value)} 
@@ -3482,9 +3561,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           printQuality,
           printSides,
           notes,
-          length,
-          width,
-          height,
+          length: normalizeNumber(length),
+          width: normalizeNumber(width),
+          height: normalizeNumber(height),
           widthUnit,
           heightUnit,
           selectedColors,
@@ -3529,9 +3608,9 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               total_price: safeTotalPrice,
               specifications: {
                 dimensions: length || width || height ? { 
-                  length: length || null, 
-                  width: width || null, 
-                  height: height || null, 
+                  length: normalizeNumber(length) || null, 
+                  width: normalizeNumber(width) || null, 
+                  height: normalizeNumber(height) || null, 
                   widthUnit: widthUnit || 'cm', 
                   heightUnit: heightUnit || 'cm' 
                 } : undefined,
@@ -3552,11 +3631,11 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 rollup_source: rollupSource || undefined
               },
               dimensions: {
-                length: length || null,
-                width: width || null,
-                height: height || null,
-                widthUnit: widthUnit,
-                heightUnit: heightUnit
+                length: normalizeNumber(length) || null,
+                width: normalizeNumber(width) || null,
+                height: normalizeNumber(height) || null,
+                widthUnit: widthUnit || 'cm',
+                heightUnit: heightUnit || 'cm'
               },
               colors: selectedColors,
               design_files: uploadedFiles // سيتم تحويلها لاحقاً في ensureSerializedEntry

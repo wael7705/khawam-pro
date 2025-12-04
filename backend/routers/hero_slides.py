@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db
@@ -11,6 +11,7 @@ import aiofiles
 from datetime import datetime
 from PIL import Image
 import io
+import base64
 
 router = APIRouter()
 
@@ -33,10 +34,16 @@ class HeroSlideUpdate(BaseModel):
 @router.get("/hero-slides")
 async def get_hero_slides(
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    response: Response = None
 ):
-    """جلب جميع سلايدات Hero"""
+    """جلب جميع سلايدات Hero - بدون cache"""
     try:
+        # منع cache من المتصفح
+        if response:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         query = """
             SELECT id, image_url, is_logo, is_active, display_order, created_at, updated_at
             FROM hero_slides
@@ -219,8 +226,10 @@ async def reorder_hero_slides(
 
 @router.post("/hero-slides/upload")
 async def upload_hero_slide_image(file: UploadFile = File(...)):
-    """رفع صورة للسلايدة وحفظها في مجلد uploads/hero_slides"""
+    """رفع صورة للسلايدة وحفظها كـ base64 في قاعدة البيانات (بدلاً من نظام الملفات)"""
     try:
+        import base64
+        
         # التحقق من نوع الملف
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="الملف يجب أن يكون صورة")
@@ -233,46 +242,43 @@ async def upload_hero_slide_image(file: UploadFile = File(...)):
         if len(content) > max_size:
             raise HTTPException(status_code=400, detail="حجم الصورة كبير جداً (الحد الأقصى 10MB)")
         
-        # تحديد امتداد الملف
-        ext = os.path.splitext(file.filename or 'image.jpg')[1] or '.jpg'
-        if ext.lower() not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
-            ext = '.jpg'
+        # ضغط الصورة إذا كانت كبيرة (أكبر من 2MB)
+        if len(content) > 2 * 1024 * 1024:
+            try:
+                # فتح الصورة باستخدام PIL
+                img = Image.open(io.BytesIO(content))
+                
+                # تحويل إلى RGB إذا كانت PNG شفافة
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                
+                # ضغط الصورة
+                output = io.BytesIO()
+                img.save(output, format='JPEG', quality=85, optimize=True)
+                content = output.getvalue()
+                file.content_type = 'image/jpeg'
+                print(f"✅ Compressed image from {len(content) / 1024 / 1024:.2f}MB to {len(output.getvalue()) / 1024 / 1024:.2f}MB")
+            except Exception as compress_error:
+                print(f"⚠️ Failed to compress image, using original: {compress_error}")
+                # استخدم الملف الأصلي إذا فشل الضغط
         
-        # إنشاء اسم ملف فريد
-        filename = f"{uuid.uuid4()}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        # تحويل الصورة إلى base64 data URL
+        base64_content = base64.b64encode(content).decode('utf-8')
+        mime_type = file.content_type or 'image/jpeg'
+        data_url = f"data:{mime_type};base64,{base64_content}"
         
-        # حفظ الملف
-        async with aiofiles.open(file_path, 'wb') as f:
-            await f.write(content)
-        
-        # إرجاع المسار النسبي (سيتم خدمته من StaticFiles)
-        relative_url = f"/uploads/hero_slides/{filename}"
-        
-        # الحصول على URL المطلق للاستخدام في قاعدة البيانات
-        # لكن نفضل استخدام المسار النسبي لأنه يعمل في جميع البيئات
-        base_url = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
-        if not base_url:
-            domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
-            if domain:
-                base_url = f"https://{domain}" if not domain.startswith("http") else domain
-            else:
-                # استخدام المسار النسبي كبديل - سيعمل مع أي base URL
-                base_url = ""
-        
-        # إذا كان base_url موجوداً، استخدمه. وإلا استخدم المسار النسبي فقط
-        if base_url:
-            absolute_url = f"{base_url}{relative_url}"
-        else:
-            # استخدام المسار النسبي - سيتم حله تلقائياً من قبل المتصفح
-            absolute_url = relative_url
-        
+        # إرجاع data URL مباشرة (سيتم حفظه في قاعدة البيانات)
         return {
             "success": True,
-            "url": absolute_url,
-            "image_url": absolute_url,
-            "relative_url": relative_url,
-            "filename": filename
+            "url": data_url,
+            "image_url": data_url,
+            "data_url": data_url,
+            "mime_type": mime_type,
+            "size_bytes": len(content)
         }
     except HTTPException:
         raise

@@ -356,7 +356,7 @@ async def update_service(service_id: int, service: ServiceUpdate, db: Session = 
 
 @router.delete("/services/{service_id}")
 async def delete_service(service_id: int, db: Session = Depends(get_db)):
-    """Delete a service and its workflows"""
+    """Delete a service and its workflows - حذف نهائي من قاعدة البيانات"""
     try:
         from sqlalchemy import text
         
@@ -367,21 +367,27 @@ async def delete_service(service_id: int, db: Session = Depends(get_db)):
         # حذف المراحل المرتبطة بالخدمة أولاً
         db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
                   {"service_id": service_id})
+        db.commit()  # Commit بعد حذف workflows
         
-        # حذف الخدمة
-        db.delete(service)
+        # حذف الخدمة نهائياً من قاعدة البيانات
+        db.execute(text("DELETE FROM services WHERE id = :service_id"), 
+                  {"service_id": service_id})
         db.commit()
         
         # إبطال cache الخدمات
-        from cache import invalidate_cache
+        from cache import invalidate_cache, clear_cache
         invalidate_cache('services')
+        clear_cache()  # مسح جميع الـ cache للتأكد
         
-        return {"success": True, "message": "Service deleted"}
+        return {"success": True, "message": "Service deleted permanently"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error deleting service {service_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف الخدمة: {str(e)}")
 
 @router.post("/services/cleanup-duplicates")
 async def cleanup_duplicate_services(db: Session = Depends(get_db)):

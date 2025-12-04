@@ -15,8 +15,16 @@ interface HeroSlide {
 }
 
 export default function Home() {
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([])
-  const [loading, setLoading] = useState(true)
+  // Fallback slide - يظهر فوراً قبل تحميل السلايدات
+  const fallbackSlide: HeroSlide = {
+    id: 0,
+    image_url: '/logo.jpg',
+    is_logo: true,
+    is_active: true,
+    display_order: 0
+  }
+
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([fallbackSlide])
 
   useEffect(() => {
     loadHeroSlides()
@@ -25,28 +33,26 @@ export default function Home() {
   const loadHeroSlides = async () => {
     try {
       const response = await heroSlidesAPI.getAll(true) // فقط السلايدات النشطة
-      if (response.data.success) {
-        setHeroSlides(response.data.slides || [])
+      if (response.data.success && response.data.slides && response.data.slides.length > 0) {
+        setHeroSlides(response.data.slides)
+      } else {
+        // إذا لم توجد سلايدات، استخدم fallback
+        setHeroSlides([fallbackSlide])
       }
     } catch (error) {
-      console.error('Error loading hero slides:', error)
+      // فقط في وضع التطوير
+      if (import.meta.env.DEV) {
+        console.error('Error loading hero slides:', error)
+      }
       // Fallback: استخدام اللوغو كسلايدة افتراضية
-      setHeroSlides([{
-        id: 0,
-        image_url: '/logo.jpg',
-        is_logo: true,
-        is_active: true,
-        display_order: 0
-      }])
-    } finally {
-      setLoading(false)
+      setHeroSlides([fallbackSlide])
     }
   }
 
   return (
     <div className="home-page">
-      {/* Hero Slider Section */}
-      {!loading && <HeroSlider slides={heroSlides} />}
+      {/* Hero Slider Section - يظهر فوراً مع fallback slide */}
+      <HeroSlider slides={heroSlides} />
 
       {/* Services Promo */}
       <section className="section services-promo">

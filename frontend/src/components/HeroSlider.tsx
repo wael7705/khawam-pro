@@ -90,47 +90,71 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     if (currentIndex >= activeSlides.length) {
       setCurrentIndex(0)
     }
-  }, [activeSlides.length, currentIndex])
+    // إعادة تشغيل auto-play عند تغيير السلايدات
+    restartAutoPlay()
+  }, [activeSlides.length, currentIndex, restartAutoPlay])
 
   // تحميل جميع الصور مسبقاً (preload) لضمان جاهزيتها
   useEffect(() => {
     if (activeSlides.length === 0) return
 
-    console.log('🔄 Preloading all hero slide images...')
-    
     // إضافة preload links إلى head
     const preloadLinks: HTMLLinkElement[] = []
+    const imageObjects: HTMLImageElement[] = []
     
     activeSlides.forEach((slide, index) => {
-      const imageUrl = resolveImageUrl(slide.image_url)
-      
-      // إنشاء preload link
-      const link = document.createElement('link')
-      link.rel = 'preload'
-      link.as = 'image'
-      link.href = imageUrl
-      link.setAttribute('fetchPriority', index === 0 ? 'high' : index === 1 ? 'high' : 'low')
-      document.head.appendChild(link)
-      preloadLinks.push(link)
-      
-      // إنشاء Image object لتحميل الصورة في الخلفية
-      const img = new Image()
-      img.src = imageUrl
-      
-      img.onload = () => {
-        console.log(`✅ Preloaded slide ${index + 1}/${activeSlides.length}:`, imageUrl)
-      }
-      
-      img.onerror = () => {
-        console.error(`❌ Failed to preload slide ${index + 1}/${activeSlides.length}:`, imageUrl)
+      try {
+        const imageUrl = resolveImageUrl(slide.image_url)
+        if (!imageUrl) return
+        
+        // إنشاء preload link للصورتين الأوليين فقط (لتحسين الأداء)
+        if (index < 2) {
+          const link = document.createElement('link')
+          link.rel = 'preload'
+          link.as = 'image'
+          link.href = imageUrl
+          if (index === 0) {
+            link.setAttribute('fetchPriority', 'high')
+          }
+          document.head.appendChild(link)
+          preloadLinks.push(link)
+        }
+        
+        // إنشاء Image object لتحميل الصورة في الخلفية
+        const img = new Image()
+        img.src = imageUrl
+        imageObjects.push(img)
+        
+        img.onload = () => {
+          // لا نطبع console.log في الإنتاج لتقليل الضوضاء
+          if (import.meta.env.DEV) {
+            console.log(`✅ Preloaded slide ${index + 1}/${activeSlides.length}`)
+          }
+        }
+        
+        img.onerror = () => {
+          // فقط في وضع التطوير
+          if (import.meta.env.DEV) {
+            console.warn(`⚠️ Failed to preload slide ${index + 1}/${activeSlides.length}`)
+          }
+        }
+      } catch (error) {
+        // تجاهل الأخطاء في preload - الصورة ستُحمل عند الحاجة
+        if (import.meta.env.DEV) {
+          console.warn('Error preloading slide:', error)
+        }
       }
     })
     
     // تنظيف preload links عند إلغاء التحميل
     return () => {
       preloadLinks.forEach(link => {
-        if (link.parentNode) {
-          link.parentNode.removeChild(link)
+        try {
+          if (link.parentNode) {
+            link.parentNode.removeChild(link)
+          }
+        } catch (error) {
+          // تجاهل أخطاء التنظيف
         }
       })
     }
@@ -250,17 +274,22 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
               onError={(e) => {
                 const target = e.target as HTMLImageElement
                 const originalUrl = slide.image_url
-                console.error('❌ Failed to load hero slide image:', {
-                  resolved: imageUrl,
-                  original: originalUrl,
-                  index: index,
-                  slideId: slide.id,
-                  isLogo: slide.is_logo
-                })
+                
+                // فقط في وضع التطوير
+                if (import.meta.env.DEV) {
+                  console.warn('⚠️ Failed to load hero slide image:', {
+                    resolved: imageUrl,
+                    original: originalUrl,
+                    index: index,
+                    slideId: slide.id
+                  })
+                }
                 
                 // محاولة استخدام URL الأصلي مباشرة إذا كان مختلفاً
                 if (originalUrl && originalUrl !== imageUrl && (originalUrl.startsWith('http') || originalUrl.startsWith('/'))) {
-                  console.log('🔄 Retrying with original URL:', originalUrl)
+                  if (import.meta.env.DEV) {
+                    console.log('🔄 Retrying with original URL')
+                  }
                   target.src = resolveImageUrl(originalUrl)
                   return
                 }
@@ -274,9 +303,12 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                 
                 target.onerror = null // منع الحلقة اللانهائية
               }}
-                onLoad={() => {
-                  console.log('✅ Hero slide image loaded and ready:', imageUrl, 'Index:', index, 'Current:', currentIndex)
-                }}
+              onLoad={() => {
+                // لا نطبع console.log في الإنتاج لتقليل الضوضاء
+                if (import.meta.env.DEV) {
+                  console.log('✅ Hero slide image loaded:', index)
+                }
+              }}
               />
             </div>
           )

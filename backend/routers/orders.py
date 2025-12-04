@@ -714,10 +714,56 @@ async def create_order(
 ):
     """Create a new order - يستخدم transaction واحدة آمنة لضمان حفظ كل شيء معاً"""
     try:
-        # Generate unique order number: ORDYYMMDD-xxx
+        # Generate unique order number: ORDyymmdd-xxx (xxx يبدأ من 001 كل يوم)
+        # ملاحظة: هذا النظام الجديد يبدأ من اليوم - الطلبات القديمة لا تتأثر
         date_str = datetime.now().strftime('%y%m%d')
-        random_suffix = uuid.uuid4().hex[:3].upper()
-        order_number = f"ORD{date_str}-{random_suffix}"
+        
+        # البحث عن آخر طلب بنفس التاريخ (ORDyymmdd-xxx)
+        # فقط الطلبات التي تبدأ بـ ORD{date_str}- (الصيغة الجديدة)
+        # الطلبات القديمة بصيغ مختلفة لن تتأثر
+        last_order_result = db.execute(text("""
+            SELECT order_number FROM orders 
+            WHERE order_number LIKE :pattern 
+            AND LENGTH(order_number) = 13
+            AND order_number SIMILAR TO 'ORD[0-9]{6}-[0-9]{3}'
+            ORDER BY id DESC LIMIT 1
+        """), {"pattern": f"ORD{date_str}-%"})
+        
+        last_order_row = last_order_result.fetchone()
+        
+        if last_order_row:
+            # استخراج الرقم التسلسلي من آخر طلب
+            last_order_number = last_order_row[0]
+            try:
+                # استخراج الرقم بعد الشرطة (مثلاً: ORD241225-001 -> 001)
+                last_sequence = int(last_order_number.split('-')[1])
+                next_sequence = last_sequence + 1
+                # حماية: التأكد من أن الرقم لا يتجاوز 999
+                if next_sequence > 999:
+                    next_sequence = 1
+                    print(f"⚠️ Warning: Sequence number exceeded 999 for date {date_str}, resetting to 001")
+            except (ValueError, IndexError):
+                # إذا فشل الاستخراج، ابدأ من 1
+                next_sequence = 1
+        else:
+            # لا يوجد طلبات لهذا التاريخ بالصيغة الجديدة، ابدأ من 001
+            next_sequence = 1
+        
+        # تنسيق الرقم التسلسلي بثلاثة أرقام (001, 002, ..., 999)
+        order_number = f"ORD{date_str}-{next_sequence:03d}"
+        
+        # التحقق من عدم وجود طلب بنفس الرقم (حماية إضافية)
+        existing_order = db.execute(text("""
+            SELECT id FROM orders WHERE order_number = :order_number
+        """), {"order_number": order_number}).fetchone()
+        
+        if existing_order:
+            # إذا كان الرقم موجوداً، أضف 1
+            next_sequence += 1
+            if next_sequence > 999:
+                next_sequence = 1
+            order_number = f"ORD{date_str}-{next_sequence:03d}"
+            print(f"⚠️ Warning: Order number {order_number} already exists, using next sequence")
         
         ensure_order_columns(db)
         

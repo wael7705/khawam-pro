@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect
 from database import get_db
 from models import Product, Service, PortfolioWork, Order, OrderItem, ProductCategory
 from typing import Optional
 from pydantic import BaseModel, Field, validator
 from utils import handle_error, success_response, validate_price, validate_string
+from datetime import datetime, timedelta, date
 import os
 import uuid
 import requests
@@ -3673,3 +3675,297 @@ async def update_order_payment(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في تحديث حالة الدفع: {str(e)}")
+
+
+# ============================================
+# الأرشيف اليومي والشهري
+# ============================================
+
+@router.post("/orders/archive/daily-move")
+async def move_completed_to_archive_daily(db: Session = Depends(get_db)):
+    """نقل الطلبات المكتملة إلى الأرشيف يومياً - يتم استدعاؤها تلقائياً"""
+    try:
+        from sqlalchemy import text
+        from datetime import datetime, timedelta
+        
+        # نقل الطلبات المكتملة التي تم إكمالها قبل اليوم (أي مكتملة بالأمس أو قبل)
+        # هذا يعني أن الطلبات المكتملة اليوم تبقى في تبويب "مكتمل" حتى اليوم التالي
+        yesterday = datetime.now().date() - timedelta(days=1)
+        
+        # البحث عن الطلبات المكتملة التي لم يتم نقلها للأرشيف بعد
+        # نستخدم حقل archived_at للتحقق (إذا لم يكن موجوداً، نضيفه)
+        
+        # التحقق من وجود عمود archived_at
+        inspector = inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('orders')]
+        
+        if 'archived_at' not in columns:
+            # إضافة عمود archived_at إذا لم يكن موجوداً
+            try:
+                db.execute(text("""
+                    ALTER TABLE orders 
+                    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP
+                """))
+                db.commit()
+                print("✅ Added archived_at column to orders table")
+            except Exception as e:
+                print(f"⚠️ Could not add archived_at column: {e}")
+                db.rollback()
+        
+        # نقل الطلبات المكتملة التي تم إكمالها قبل اليوم ولم يتم أرشفتها بعد
+        # نتحقق من أن status = 'completed' و archived_at IS NULL
+        result = db.execute(text("""
+            UPDATE orders 
+            SET archived_at = NOW(), status = 'archived'
+            WHERE status = 'completed' 
+            AND archived_at IS NULL
+            AND DATE(updated_at) < :yesterday_date
+            RETURNING id, order_number
+        """), {"yesterday_date": yesterday})
+        
+        moved_orders = result.fetchall()
+        db.commit()
+        
+        moved_count = len(moved_orders)
+        print(f"✅ Moved {moved_count} completed orders to archive")
+        
+        return {
+            "success": True,
+            "message": f"تم نقل {moved_count} طلب إلى الأرشيف",
+            "moved_count": moved_count,
+            "moved_orders": [{"id": o[0], "order_number": o[1]} for o in moved_orders]
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"Error moving orders to archive: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في نقل الطلبات إلى الأرشيف: {str(e)}")
+
+
+@router.post("/orders/archive/monthly-move")
+async def move_archived_to_monthly(db: Session = Depends(get_db)):
+    """نقل الطلبات الأرشيفية القديمة (أكثر من 30 يوم) إلى الأرشيف الشهري"""
+    try:
+        from sqlalchemy import text
+        from datetime import datetime, timedelta
+        
+        # نقل الطلبات الأرشيفية التي تم أرشفتها قبل 30 يوم
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        
+        # التحقق من وجود عمود monthly_archived_at
+        inspector = inspect(db.bind)
+        columns = [col['name'] for col in inspector.get_columns('orders')]
+        
+        if 'monthly_archived_at' not in columns:
+            try:
+                db.execute(text("""
+                    ALTER TABLE orders 
+                    ADD COLUMN IF NOT EXISTS monthly_archived_at TIMESTAMP
+                """))
+                db.commit()
+                print("✅ Added monthly_archived_at column to orders table")
+            except Exception as e:
+                print(f"⚠️ Could not add monthly_archived_at column: {e}")
+                db.rollback()
+        
+        # نقل الطلبات الأرشيفية القديمة إلى الأرشيف الشهري
+        result = db.execute(text("""
+            UPDATE orders 
+            SET monthly_archived_at = NOW()
+            WHERE status = 'archived' 
+            AND archived_at IS NOT NULL
+            AND archived_at < :thirty_days_ago
+            AND monthly_archived_at IS NULL
+            RETURNING id, order_number
+        """), {"thirty_days_ago": thirty_days_ago})
+        
+        moved_orders = result.fetchall()
+        db.commit()
+        
+        moved_count = len(moved_orders)
+        print(f"✅ Moved {moved_count} archived orders to monthly archive")
+        
+        return {
+            "success": True,
+            "message": f"تم نقل {moved_count} طلب إلى الأرشيف الشهري",
+            "moved_count": moved_count,
+            "moved_orders": [{"id": o[0], "order_number": o[1]} for o in moved_orders]
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"Error moving orders to monthly archive: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في نقل الطلبات إلى الأرشيف الشهري: {str(e)}")
+
+
+@router.get("/orders/archive/daily")
+async def get_daily_archive(
+    archive_date: Optional[str] = Query(None, description="تاريخ الأرشيف (YYYY-MM-DD). إذا لم يتم تحديده، يتم استخدام اليوم"),
+    db: Session = Depends(get_db)
+):
+    """الحصول على الأرشيف اليومي - طلبات تاريخ محدد"""
+    try:
+        from sqlalchemy import text
+        
+        # إذا لم يتم تحديد التاريخ، استخدم اليوم
+        if archive_date:
+            try:
+                target_date = datetime.strptime(archive_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="صيغة التاريخ غير صحيحة. استخدم YYYY-MM-DD")
+        else:
+            target_date = datetime.now().date()
+        
+        # جلب الطلبات الأرشيفية للتاريخ المحدد
+        # نبحث عن الطلبات التي تم أرشفتها في هذا التاريخ
+        result = db.execute(text("""
+            SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                   shop_name, status, total_amount, final_amount, payment_status,
+                   delivery_type, delivery_address, notes, created_at, archived_at
+            FROM orders
+            WHERE status = 'archived'
+            AND DATE(archived_at) = :target_date
+            ORDER BY archived_at DESC
+        """), {"target_date": target_date})
+        
+        orders = []
+        for row in result.fetchall():
+            orders.append({
+                "id": row[0],
+                "order_number": row[1],
+                "customer_name": row[2] or "",
+                "customer_phone": row[3] or "",
+                "customer_whatsapp": row[4] or "",
+                "shop_name": row[5] or "",
+                "status": row[6],
+                "total_amount": float(row[7]) if row[7] else 0.0,
+                "final_amount": float(row[8]) if row[8] else 0.0,
+                "payment_status": row[9] or "pending",
+                "delivery_type": row[10] or "self",
+                "delivery_address": row[11],
+                "notes": row[12],
+                "created_at": row[13].isoformat() if row[13] else None,
+                "archived_at": row[14].isoformat() if row[14] else None,
+            })
+        
+        return {
+            "success": True,
+            "archive_date": target_date.isoformat(),
+            "orders": orders,
+            "count": len(orders)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting daily archive: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب الأرشيف اليومي: {str(e)}")
+
+
+@router.get("/orders/archive/monthly")
+async def get_monthly_archive(
+    year: int = Query(..., description="السنة (مثلاً: 2024)"),
+    month: int = Query(..., description="الشهر (1-12)"),
+    db: Session = Depends(get_db)
+):
+    """الحصول على الأرشيف الشهري - طلبات شهر محدد"""
+    try:
+        from sqlalchemy import text
+        
+        # التحقق من صحة الشهر
+        if month < 1 or month > 12:
+            raise HTTPException(status_code=400, detail="الشهر يجب أن يكون بين 1 و 12")
+        
+        # حساب بداية ونهاية الشهر
+        start_date = datetime(year, month, 1).date()
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1).date()
+        else:
+            end_date = datetime(year, month + 1, 1).date()
+        
+        # جلب الطلبات الأرشيفية الشهرية للشهر المحدد
+        # نبحث عن الطلبات التي تم أرشفتها في هذا الشهر
+        result = db.execute(text("""
+            SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                   shop_name, status, total_amount, final_amount, payment_status,
+                   delivery_type, delivery_address, notes, created_at, archived_at, monthly_archived_at
+            FROM orders
+            WHERE status = 'archived'
+            AND monthly_archived_at IS NOT NULL
+            AND DATE(monthly_archived_at) >= :start_date
+            AND DATE(monthly_archived_at) < :end_date
+            ORDER BY monthly_archived_at DESC
+        """), {
+            "start_date": start_date,
+            "end_date": end_date
+        })
+        
+        orders = []
+        for row in result.fetchall():
+            orders.append({
+                "id": row[0],
+                "order_number": row[1],
+                "customer_name": row[2] or "",
+                "customer_phone": row[3] or "",
+                "customer_whatsapp": row[4] or "",
+                "shop_name": row[5] or "",
+                "status": row[6],
+                "total_amount": float(row[7]) if row[7] else 0.0,
+                "final_amount": float(row[8]) if row[8] else 0.0,
+                "payment_status": row[9] or "pending",
+                "delivery_type": row[10] or "self",
+                "delivery_address": row[11],
+                "notes": row[12],
+                "created_at": row[13].isoformat() if row[13] else None,
+                "archived_at": row[14].isoformat() if row[14] else None,
+                "monthly_archived_at": row[15].isoformat() if row[15] else None,
+            })
+        
+        return {
+            "success": True,
+            "year": year,
+            "month": month,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "orders": orders,
+            "count": len(orders),
+            "total_revenue": sum(o["final_amount"] for o in orders)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting monthly archive: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب الأرشيف الشهري: {str(e)}")
+
+
+@router.get("/orders/archive/dates")
+async def get_archive_dates(db: Session = Depends(get_db)):
+    """الحصول على قائمة التواريخ المتاحة في الأرشيف اليومي"""
+    try:
+        from sqlalchemy import text
+        
+        result = db.execute(text("""
+            SELECT DISTINCT DATE(archived_at) as archive_date
+            FROM orders
+            WHERE status = 'archived'
+            AND archived_at IS NOT NULL
+            ORDER BY archive_date DESC
+        """))
+        
+        dates = [row[0].isoformat() for row in result.fetchall()]
+        
+        return {
+            "success": True,
+            "dates": dates,
+            "count": len(dates)
+        }
+    except Exception as e:
+        print(f"Error getting archive dates: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب تواريخ الأرشيف: {str(e)}")

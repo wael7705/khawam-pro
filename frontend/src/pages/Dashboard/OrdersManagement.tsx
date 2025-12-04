@@ -58,6 +58,11 @@ export default function OrdersManagement() {
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
   const [selectedOrderForMap, setSelectedOrderForMap] = useState<number | null>(null)
   const [archivedOrders, setArchivedOrders] = useState<Order[]>([])
+  const [archiveDate, setArchiveDate] = useState<string>('') // تاريخ الأرشيف اليومي
+  const [archiveYear, setArchiveYear] = useState<number>(new Date().getFullYear()) // سنة الأرشيف الشهري
+  const [archiveMonth, setArchiveMonth] = useState<number>(new Date().getMonth() + 1) // شهر الأرشيف الشهري
+  const [archiveMode, setArchiveMode] = useState<'daily' | 'monthly'>('daily') // نوع الأرشيف
+  const [availableArchiveDates, setAvailableArchiveDates] = useState<string[]>([])
   const [deleteModalOpen, setDeleteModalOpen] = useState<number | null>(null)
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteAllPendingModalOpen, setDeleteAllPendingModalOpen] = useState(false)
@@ -249,44 +254,45 @@ export default function OrdersManagement() {
     }
   }, [])
 
-  const loadArchivedOrders = () => {
-    const archived = localStorage.getItem('archivedOrders')
-    if (archived) {
-      try {
-        setArchivedOrders(JSON.parse(archived))
-      } catch (e) {
-        console.error('Error loading archived orders:', e)
-        setArchivedOrders([])
+  const loadArchivedOrders = async () => {
+    try {
+      if (archiveMode === 'daily') {
+        // جلب الأرشيف اليومي
+        const response = await adminAPI.orders.archive.getDaily(archiveDate || undefined)
+        if (response.data.success) {
+          setArchivedOrders(response.data.orders || [])
+        }
+      } else {
+        // جلب الأرشيف الشهري
+        const response = await adminAPI.orders.archive.getMonthly(archiveYear, archiveMonth)
+        if (response.data.success) {
+          setArchivedOrders(response.data.orders || [])
+        }
       }
+    } catch (error) {
+      console.error('Error loading archived orders:', error)
+      setArchivedOrders([])
     }
   }
 
-  // Move completed orders to archive automatically (but keep them in completed tab too)
-  useEffect(() => {
-    const completedOrders = orders.filter(o => o.status === 'completed')
-    if (completedOrders.length > 0) {
-      const archived = localStorage.getItem('archivedOrders')
-      let existingArchived: Order[] = []
-      if (archived) {
-        try {
-          existingArchived = JSON.parse(archived)
-        } catch (e) {
-          existingArchived = []
-        }
+  const loadAvailableArchiveDates = async () => {
+    try {
+      const response = await adminAPI.orders.archive.getDates()
+      if (response.data.success) {
+        setAvailableArchiveDates(response.data.dates || [])
       }
-      
-      // Add new completed orders to archive (avoid duplicates)
-      const existingIds = new Set(existingArchived.map(o => o.id))
-      const newArchivedOrders = completedOrders.filter(o => !existingIds.has(o.id))
-      
-      if (newArchivedOrders.length > 0) {
-        const updatedArchived = [...existingArchived, ...newArchivedOrders]
-        localStorage.setItem('archivedOrders', JSON.stringify(updatedArchived))
-        setArchivedOrders(updatedArchived)
-        // DON'T remove from main orders list - keep them visible in completed tab
-      }
+    } catch (error) {
+      console.error('Error loading archive dates:', error)
     }
-  }, [orders])
+  }
+
+  // تحميل الأرشيف عند تغيير التبويب أو التاريخ
+  useEffect(() => {
+    if (activeTab === 'archived') {
+      loadAvailableArchiveDates()
+      loadArchivedOrders()
+    }
+  }, [activeTab, archiveDate, archiveYear, archiveMonth, archiveMode])
 
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '')
@@ -713,17 +719,7 @@ export default function OrdersManagement() {
       const date = new Date().toISOString().split('T')[0]
       XLSX.writeFile(workbook, `أرشيف_الطلبات_${date}.xlsx`)
 
-      // Get completed order IDs from archive
-      const completedOrderIds = archivedOrders.map(o => o.id)
-      
-      // Clear archive after export
-      localStorage.removeItem('archivedOrders')
-      setArchivedOrders([])
-      
-      // Remove completed orders from main orders list
-      setOrders(prev => prev.filter(o => !completedOrderIds.includes(o.id)))
-      
-      showSuccess('تم تصدير الأرشيف بنجاح وتم مسح محتوياته من الأرشيف وتبويب مكتمل')
+      showSuccess('تم تصدير الأرشيف بنجاح')
     } catch (error: any) {
       console.error('Error exporting archive:', error)
       if (error.message?.includes('xlsx') || error.code === 'MODULE_NOT_FOUND') {
@@ -791,6 +787,71 @@ export default function OrdersManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        
+        {/* فلاتر الأرشيف */}
+        {activeTab === 'archived' && (
+          <div className="archive-filters" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <label style={{ fontSize: '14px', fontWeight: 500 }}>نوع الأرشيف:</label>
+              <select 
+                value={archiveMode} 
+                onChange={(e) => setArchiveMode(e.target.value as 'daily' | 'monthly')}
+                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+              >
+                <option value="daily">يومي</option>
+                <option value="monthly">شهري</option>
+              </select>
+            </div>
+            
+            {archiveMode === 'daily' ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ fontSize: '14px', fontWeight: 500 }}>التاريخ:</label>
+                <input
+                  type="date"
+                  value={archiveDate}
+                  onChange={(e) => setArchiveDate(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                />
+                {availableArchiveDates.length > 0 && (
+                  <select
+                    value={archiveDate}
+                    onChange={(e) => setArchiveDate(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                  >
+                    <option value="">اختر تاريخاً</option>
+                    {availableArchiveDates.map(date => (
+                      <option key={date} value={date}>{date}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ fontSize: '14px', fontWeight: 500 }}>السنة:</label>
+                <input
+                  type="number"
+                  value={archiveYear}
+                  onChange={(e) => setArchiveYear(parseInt(e.target.value) || new Date().getFullYear())}
+                  min="2020"
+                  max={new Date().getFullYear()}
+                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', width: '100px' }}
+                />
+                <label style={{ fontSize: '14px', fontWeight: 500 }}>الشهر:</label>
+                <select
+                  value={archiveMonth}
+                  onChange={(e) => setArchiveMonth(parseInt(e.target.value))}
+                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
+                    <option key={month} value={month}>
+                      {new Date(2000, month - 1, 1).toLocaleDateString('ar-SA', { month: 'long' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
         </div>
 
       {/* Status Tabs */}

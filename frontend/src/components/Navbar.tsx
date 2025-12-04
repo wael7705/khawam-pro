@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, ShoppingCart } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import UserMenu from './UserMenu'
 import { isAuthenticated, isAdmin, isEmployee, getUserData } from '../lib/auth'
@@ -47,6 +47,13 @@ export default function Navbar() {
         </div>
         
         <div className="nav-right">
+          {/* Show Orders quick access for employees */}
+          {isAuthenticated() && isEmployee() && (
+              <Link to="/dashboard/orders" className="btn btn-orders">
+                <ShoppingCart size={18} />
+                <span>الطلبات</span>
+              </Link>
+          )}
           {/* Show Studio for admin and employee */}
           {isAuthenticated() && showStudio && (
               <Link to="/studio" className="btn btn-primary">استيديو</Link>

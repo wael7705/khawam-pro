@@ -43,6 +43,8 @@ async def lifespan(app: FastAPI):
         loop.create_task(_ensure_portfolio_images_column())
         loop.create_task(_init_advanced_pricing_data())
         loop.create_task(_init_hero_slides_table())
+        loop.create_task(_daily_archive_task())
+        loop.create_task(_monthly_archive_task())
         print("✅ Startup tasks initiated in background")
     except Exception as e:
         print(f"⚠️ Warning: Failed to create startup tasks: {str(e)[:200]}")
@@ -1743,6 +1745,95 @@ else:
         if os.path.exists(index_path):
             return FileResponse(index_path)
         return {"message": "Khawam API", "version": "1.0.1"}
+
+async def _daily_archive_task():
+    """مهمة يومية: نقل الطلبات المكتملة إلى الأرشيف"""
+    import asyncio
+    import httpx
+    
+    # انتظر قليلاً حتى يكون التطبيق جاهزاً
+    await asyncio.sleep(10)
+    
+    while True:
+        try:
+            # انتظر حتى منتصف الليل (00:00) ثم نفذ المهمة
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            # حساب الوقت حتى منتصف الليل التالي
+            next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            wait_seconds = (next_midnight - now).total_seconds()
+            
+            print(f"📅 Daily archive task: Will run at midnight (in {wait_seconds/3600:.1f} hours)")
+            await asyncio.sleep(wait_seconds)
+            
+            # تنفيذ المهمة
+            print("🔄 Running daily archive task...")
+            try:
+                # استدعاء endpoint الأرشيف اليومي
+                async with httpx.AsyncClient() as client:
+                    # استخدام URL داخلي
+                    base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+                    if not base_url.startswith("http"):
+                        base_url = f"http://localhost:8000"
+                    
+                    response = await client.post(f"{base_url}/api/admin/orders/archive/daily-move")
+                    if response.status_code == 200:
+                        result = response.json()
+                        print(f"✅ Daily archive task completed: {result.get('message', '')}")
+                    else:
+                        print(f"⚠️ Daily archive task failed: {response.status_code}")
+            except Exception as e:
+                print(f"⚠️ Error in daily archive task: {e}")
+            
+        except Exception as e:
+            print(f"⚠️ Error in daily archive task loop: {e}")
+            # انتظر ساعة قبل إعادة المحاولة
+            await asyncio.sleep(3600)
+
+
+async def _monthly_archive_task():
+    """مهمة شهرية: نقل الطلبات الأرشيفية القديمة (أكثر من 30 يوم) إلى الأرشيف الشهري"""
+    import asyncio
+    import httpx
+    
+    # انتظر قليلاً حتى يكون التطبيق جاهزاً
+    await asyncio.sleep(15)
+    
+    while True:
+        try:
+            # تنفيذ المهمة كل يوم (للتحقق من الطلبات القديمة)
+            # انتظر حتى الساعة 1:00 صباحاً
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            next_run = (now + timedelta(days=1)).replace(hour=1, minute=0, second=0, microsecond=0)
+            wait_seconds = (next_run - now).total_seconds()
+            
+            print(f"📅 Monthly archive task: Will run at 1:00 AM (in {wait_seconds/3600:.1f} hours)")
+            await asyncio.sleep(wait_seconds)
+            
+            # تنفيذ المهمة
+            print("🔄 Running monthly archive task...")
+            try:
+                # استدعاء endpoint الأرشيف الشهري
+                async with httpx.AsyncClient() as client:
+                    base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+                    if not base_url.startswith("http"):
+                        base_url = f"http://localhost:8000"
+                    
+                    response = await client.post(f"{base_url}/api/admin/orders/archive/monthly-move")
+                    if response.status_code == 200:
+                        result = response.json()
+                        print(f"✅ Monthly archive task completed: {result.get('message', '')}")
+                    else:
+                        print(f"⚠️ Monthly archive task failed: {response.status_code}")
+            except Exception as e:
+                print(f"⚠️ Error in monthly archive task: {e}")
+            
+        except Exception as e:
+            print(f"⚠️ Error in monthly archive task loop: {e}")
+            # انتظر ساعة قبل إعادة المحاولة
+            await asyncio.sleep(3600)
+
 
 @app.get("/health")
 async def health_check():

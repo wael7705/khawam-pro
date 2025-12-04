@@ -225,6 +225,14 @@ export const adminAPI = {
     }),
     delete: (id: number) => api.delete(`/admin/orders/${id}`),
     deleteByStatus: (status: string) => api.delete(`/admin/orders/bulk/delete-by-status?status=${status}`),
+    // Archive
+    archive: {
+      getDaily: (date?: string) => api.get(`/admin/orders/archive/daily${date ? `?archive_date=${date}` : ''}`),
+      getMonthly: (year: number, month: number) => api.get(`/admin/orders/archive/monthly?year=${year}&month=${month}`),
+      getDates: () => api.get('/admin/orders/archive/dates'),
+      moveDaily: () => api.post('/admin/orders/archive/daily-move'),
+      moveMonthly: () => api.post('/admin/orders/archive/monthly-move'),
+    },
   },
   
   // Dashboard Statistics

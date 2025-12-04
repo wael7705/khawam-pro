@@ -1,9 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard, Image as ImageIcon } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard, Image as ImageIcon, Archive as ArchiveIcon } from 'lucide-react'
 const DashboardHome = lazy(() => import('./Dashboard/DashboardHome'))
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
+import Archive from './Dashboard/Archive'
 
 import ServicesManagement from './Dashboard/ServicesManagement'
 import WorksManagement from './Dashboard/WorksManagement'
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const allTabs = [
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard', adminOnly: true },
     { id: 'orders', name: 'الطلبات', icon: ShoppingCartIcon, path: '/dashboard/orders', adminOnly: false },
+    { id: 'archive', name: 'الأرشيف', icon: ArchiveIcon, path: '/dashboard/archive', adminOnly: false },
     { id: 'customers', name: 'العملاء', icon: Users, path: '/dashboard/customers', adminOnly: true },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services', adminOnly: true },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works', adminOnly: true },
@@ -74,8 +76,8 @@ export default function Dashboard() {
   // Filter tabs based on user type
   const tabs = allTabs.filter(tab => {
     if (isEmployee()) {
-      // Employee sees: home (الرئيسية), orders (الطلبات), and studio (الاستديو)
-      return tab.id === 'home' || tab.id === 'orders' || tab.id === 'studio'
+      // Employee sees: home (الرئيسية), orders (الطلبات), archive (الأرشيف), and studio (الاستديو)
+      return tab.id === 'home' || tab.id === 'orders' || tab.id === 'archive' || tab.id === 'studio'
     }
     if (isAdmin()) {
       // Admin sees all tabs (including dashboard home and studio)
@@ -204,10 +206,12 @@ export default function Dashboard() {
               />
             )}
             {isEmployee() && <Route path="/" element={<OrdersManagement />} />}
-            {isEmployee() && <Route path="/orders" element={<OrdersManagement />} />}
-            {isEmployee() && <Route path="/orders/:id" element={<OrderDetail />} />}
-            {isAdmin() && <Route path="/orders" element={<OrdersManagement />} />}
-            {isAdmin() && <Route path="/orders/:id" element={<OrderDetail />} />}
+                    {isEmployee() && <Route path="/orders" element={<OrdersManagement />} />}
+                    {isEmployee() && <Route path="/orders/:id" element={<OrderDetail />} />}
+                    {isEmployee() && <Route path="/archive" element={<Archive />} />}
+                    {isAdmin() && <Route path="/orders" element={<OrdersManagement />} />}
+                    {isAdmin() && <Route path="/orders/:id" element={<OrderDetail />} />}
+                    {isAdmin() && <Route path="/archive" element={<Archive />} />}
             {isAdmin() && <Route path="/customers" element={<CustomersManagement />} />}
 
             {isAdmin() && <Route path="/services" element={<ServicesManagement />} />}

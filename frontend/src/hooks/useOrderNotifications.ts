@@ -125,6 +125,26 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
         return
       }
 
+      // فلترة الإشعارات القديمة - فقط الطلبات التي تم إنشاؤها في آخر 10 دقائق
+      const createdAt = notification.data.created_at
+      if (createdAt) {
+        try {
+          const orderDate = new Date(createdAt)
+          const now = new Date()
+          const diffMinutes = (now.getTime() - orderDate.getTime()) / (1000 * 60)
+          
+          // تجاهل الطلبات الأقدم من 10 دقائق
+          if (diffMinutes > 10) {
+            console.log(`⏭️ Order ${orderId} is too old (${Math.floor(diffMinutes)} minutes), skipping notification`)
+            return
+          }
+        } catch (error) {
+          // إذا فشل تحليل التاريخ، تجاهل الإشعار
+          console.warn(`⚠️ Failed to parse order date: ${createdAt}`, error)
+          return
+        }
+      }
+
       knownOrderIdsRef.current.add(orderId)
       
       // تحويل إلى البنية المسطحة
@@ -203,7 +223,29 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
 
           // معالجة إشعارات الطلبات الجديدة
           if (data.event === 'order_created' && data.data) {
-            handleNewOrder(data as OrderNotification)
+            // فلترة إضافية: التأكد من أن الطلب جديد (تم إنشاؤه في آخر 10 دقائق)
+            const notification = data as OrderNotification
+            const createdAt = notification.data?.created_at
+            
+            if (createdAt) {
+              try {
+                const orderDate = new Date(createdAt)
+                const now = new Date()
+                const diffMinutes = (now.getTime() - orderDate.getTime()) / (1000 * 60)
+                
+                // تجاهل الطلبات الأقدم من 10 دقائق
+                if (diffMinutes > 10) {
+                  console.log(`⏭️ WebSocket: Order ${notification.data?.order_id} is too old (${Math.floor(diffMinutes)} minutes), skipping`)
+                  return
+                }
+              } catch (error) {
+                // إذا فشل تحليل التاريخ، تجاهل الإشعار
+                console.warn(`⚠️ WebSocket: Failed to parse order date: ${createdAt}`, error)
+                return
+              }
+            }
+            
+            handleNewOrder(notification)
           }
         } catch (error) {
           // فقط طباعة الأخطاء المهمة

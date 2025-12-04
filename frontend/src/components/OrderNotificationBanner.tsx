@@ -34,13 +34,30 @@ export default function OrderNotificationBanner({
   onDismiss,
   onViewOrder,
 }: OrderNotificationBannerProps) {
-  if (!notifications.length) {
+  // فلترة الإشعارات: فقط الطلبات التي تم إنشاؤها في آخر 10 دقائق
+  const filteredNotifications = notifications.filter((notification) => {
+    if (!notification.createdAt) return false
+    
+    try {
+      const orderDate = new Date(notification.createdAt)
+      const now = new Date()
+      const diffMinutes = (now.getTime() - orderDate.getTime()) / (1000 * 60)
+      
+      // فقط الطلبات التي تم إنشاؤها في آخر 10 دقائق
+      return diffMinutes <= 10
+    } catch (error) {
+      // إذا فشل تحليل التاريخ، تجاهل الإشعار
+      return false
+    }
+  })
+  
+  if (!filteredNotifications.length) {
     return null
   }
 
   return (
     <div className="order-notification-container">
-      {notifications.map((notification) => {
+      {filteredNotifications.map((notification) => {
         const showOrderButton = Boolean(onViewOrder && notification.orderId)
         const itemsLabel = notification.itemsCount ? `${notification.itemsCount} عنصر` : ''
         const amountLabel = notification.finalAmount ? `${notification.finalAmount.toLocaleString()} ل.س` : ''

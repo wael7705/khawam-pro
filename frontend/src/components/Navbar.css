@@ -121,3 +121,49 @@
     font-size: 12px;
   }
 }
+
+/* زر الطلبات السريع للموظفين */
+.btn-orders {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.btn-orders:hover {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+.btn-orders:active {
+  transform: translateY(0);
+}
+
+.btn-orders svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .btn-orders {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .btn-orders span {
+    display: none;
+  }
+  
+  .btn-orders svg {
+    margin: 0;
+  }
+}

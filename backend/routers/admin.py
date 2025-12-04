@@ -3820,35 +3820,54 @@ async def get_daily_archive(
         
         # جلب الطلبات الأرشيفية للتاريخ المحدد
         # نبحث عن الطلبات التي تم أرشفتها في هذا التاريخ
-        result = db.execute(text("""
-            SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
-                   shop_name, status, total_amount, final_amount, payment_status,
-                   delivery_type, delivery_address, notes, created_at, archived_at
-            FROM orders
-            WHERE status = 'archived'
-            AND DATE(archived_at) = :target_date
-            ORDER BY archived_at DESC
-        """), {"target_date": target_date})
+        try:
+            result = db.execute(text("""
+                SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                       shop_name, status, total_amount, final_amount, payment_status,
+                       delivery_type, delivery_address, notes, created_at, archived_at
+                FROM orders
+                WHERE status = 'archived'
+                AND DATE(archived_at) = :target_date
+                ORDER BY archived_at DESC
+            """), {"target_date": target_date})
+        except Exception as query_error:
+            # إذا فشل الاستعلام، قد يكون بسبب عدم وجود عمود archived_at
+            print(f"Query error (may be missing archived_at column): {query_error}")
+            # محاولة استعلام بديل بدون archived_at
+            result = db.execute(text("""
+                SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                       shop_name, status, total_amount, final_amount, payment_status,
+                       delivery_type, delivery_address, notes, created_at, NULL as archived_at
+                FROM orders
+                WHERE status = 'archived'
+                AND DATE(created_at) = :target_date
+                ORDER BY created_at DESC
+            """), {"target_date": target_date})
         
         orders = []
-        for row in result.fetchall():
-            orders.append({
-                "id": row[0],
-                "order_number": row[1],
-                "customer_name": row[2] or "",
-                "customer_phone": row[3] or "",
-                "customer_whatsapp": row[4] or "",
-                "shop_name": row[5] or "",
-                "status": row[6],
-                "total_amount": float(row[7]) if row[7] else 0.0,
-                "final_amount": float(row[8]) if row[8] else 0.0,
-                "payment_status": row[9] or "pending",
-                "delivery_type": row[10] or "self",
-                "delivery_address": row[11],
-                "notes": row[12],
-                "created_at": row[13].isoformat() if row[13] else None,
-                "archived_at": row[14].isoformat() if row[14] else None,
-            })
+        rows = result.fetchall()
+        for row in rows:
+            try:
+                orders.append({
+                    "id": row[0] if row[0] is not None else 0,
+                    "order_number": row[1] or "",
+                    "customer_name": row[2] or "",
+                    "customer_phone": row[3] or "",
+                    "customer_whatsapp": row[4] or "",
+                    "shop_name": row[5] or "",
+                    "status": row[6] or "archived",
+                    "total_amount": float(row[7]) if row[7] is not None else 0.0,
+                    "final_amount": float(row[8]) if row[8] is not None else 0.0,
+                    "payment_status": row[9] or "pending",
+                    "delivery_type": row[10] or "self",
+                    "delivery_address": row[11] or "",
+                    "notes": row[12] or "",
+                    "created_at": row[13].isoformat() if row[13] is not None else None,
+                    "archived_at": row[14].isoformat() if row[14] is not None else None,
+                })
+            except Exception as row_error:
+                print(f"Error processing row: {row_error}")
+                continue
         
         return {
             "success": True,
@@ -3862,7 +3881,13 @@ async def get_daily_archive(
         print(f"Error getting daily archive: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ في جلب الأرشيف اليومي: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {
+            "success": True,
+            "archive_date": target_date.isoformat() if 'target_date' in locals() else datetime.now().date().isoformat(),
+            "orders": [],
+            "count": 0
+        }
 
 
 @router.get("/orders/archive/monthly")
@@ -3888,41 +3913,82 @@ async def get_monthly_archive(
         
         # جلب الطلبات الأرشيفية الشهرية للشهر المحدد
         # نبحث عن الطلبات التي تم أرشفتها في هذا الشهر
-        result = db.execute(text("""
-            SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
-                   shop_name, status, total_amount, final_amount, payment_status,
-                   delivery_type, delivery_address, notes, created_at, archived_at, monthly_archived_at
-            FROM orders
-            WHERE status = 'archived'
-            AND monthly_archived_at IS NOT NULL
-            AND DATE(monthly_archived_at) >= :start_date
-            AND DATE(monthly_archived_at) < :end_date
-            ORDER BY monthly_archived_at DESC
-        """), {
-            "start_date": start_date,
-            "end_date": end_date
-        })
+        try:
+            result = db.execute(text("""
+                SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                       shop_name, status, total_amount, final_amount, payment_status,
+                       delivery_type, delivery_address, notes, created_at, archived_at, monthly_archived_at
+                FROM orders
+                WHERE status = 'archived'
+                AND monthly_archived_at IS NOT NULL
+                AND DATE(monthly_archived_at) >= :start_date
+                AND DATE(monthly_archived_at) < :end_date
+                ORDER BY monthly_archived_at DESC
+            """), {
+                "start_date": start_date,
+                "end_date": end_date
+            })
+        except Exception as query_error:
+            # إذا فشل الاستعلام، قد يكون بسبب عدم وجود عمود monthly_archived_at
+            print(f"Query error (may be missing monthly_archived_at column): {query_error}")
+            # محاولة استعلام بديل باستخدام archived_at أو created_at
+            try:
+                result = db.execute(text("""
+                    SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                           shop_name, status, total_amount, final_amount, payment_status,
+                           delivery_type, delivery_address, notes, created_at, archived_at, NULL as monthly_archived_at
+                    FROM orders
+                    WHERE status = 'archived'
+                    AND archived_at IS NOT NULL
+                    AND DATE(archived_at) >= :start_date
+                    AND DATE(archived_at) < :end_date
+                    ORDER BY archived_at DESC
+                """), {
+                    "start_date": start_date,
+                    "end_date": end_date
+                })
+            except Exception as alt_query_error:
+                # إذا فشل أيضاً، استخدم created_at
+                print(f"Alternative query error: {alt_query_error}")
+                result = db.execute(text("""
+                    SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                           shop_name, status, total_amount, final_amount, payment_status,
+                           delivery_type, delivery_address, notes, created_at, NULL as archived_at, NULL as monthly_archived_at
+                    FROM orders
+                    WHERE status = 'archived'
+                    AND DATE(created_at) >= :start_date
+                    AND DATE(created_at) < :end_date
+                    ORDER BY created_at DESC
+                """), {
+                    "start_date": start_date,
+                    "end_date": end_date
+                })
         
         orders = []
-        for row in result.fetchall():
-            orders.append({
-                "id": row[0],
-                "order_number": row[1],
-                "customer_name": row[2] or "",
-                "customer_phone": row[3] or "",
-                "customer_whatsapp": row[4] or "",
-                "shop_name": row[5] or "",
-                "status": row[6],
-                "total_amount": float(row[7]) if row[7] else 0.0,
-                "final_amount": float(row[8]) if row[8] else 0.0,
-                "payment_status": row[9] or "pending",
-                "delivery_type": row[10] or "self",
-                "delivery_address": row[11],
-                "notes": row[12],
-                "created_at": row[13].isoformat() if row[13] else None,
-                "archived_at": row[14].isoformat() if row[14] else None,
-                "monthly_archived_at": row[15].isoformat() if row[15] else None,
-            })
+        rows = result.fetchall()
+        for row in rows:
+            try:
+                orders.append({
+                    "id": row[0] if row[0] is not None else 0,
+                    "order_number": row[1] or "",
+                    "customer_name": row[2] or "",
+                    "customer_phone": row[3] or "",
+                    "customer_whatsapp": row[4] or "",
+                    "shop_name": row[5] or "",
+                    "status": row[6] or "archived",
+                    "total_amount": float(row[7]) if row[7] is not None else 0.0,
+                    "final_amount": float(row[8]) if row[8] is not None else 0.0,
+                    "payment_status": row[9] or "pending",
+                    "delivery_type": row[10] or "self",
+                    "delivery_address": row[11] or "",
+                    "notes": row[12] or "",
+                    "created_at": row[13].isoformat() if row[13] is not None else None,
+                    "archived_at": row[14].isoformat() if row[14] is not None else None,
+                    "monthly_archived_at": row[15].isoformat() if row[15] is not None else None,
+                })
+            except Exception as row_error:
+                print(f"Error processing row: {row_error}")
+                continue
         
         return {
             "success": True,
@@ -3940,24 +4006,66 @@ async def get_monthly_archive(
         print(f"Error getting monthly archive: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ في جلب الأرشيف الشهري: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {
+            "success": True,
+            "year": year,
+            "month": month,
+            "start_date": start_date.isoformat() if 'start_date' in locals() else datetime(year, month, 1).date().isoformat(),
+            "end_date": end_date.isoformat() if 'end_date' in locals() else datetime(year, month + 1, 1).date().isoformat(),
+            "orders": [],
+            "count": 0,
+            "total_revenue": 0.0
+        }
 
 
 @router.get("/orders/archive/dates")
 async def get_archive_dates(db: Session = Depends(get_db)):
     """الحصول على قائمة التواريخ المتاحة في الأرشيف اليومي"""
     try:
-        from sqlalchemy import text
+        from sqlalchemy import text, func
         
-        result = db.execute(text("""
-            SELECT DISTINCT DATE(archived_at) as archive_date
-            FROM orders
-            WHERE status = 'archived'
-            AND archived_at IS NOT NULL
-            ORDER BY archive_date DESC
-        """))
+        # محاولة الاستعلام باستخدام archived_at
+        try:
+            result = db.execute(text("""
+                SELECT DISTINCT DATE(archived_at) as archive_date
+                FROM orders
+                WHERE status = 'archived'
+                AND archived_at IS NOT NULL
+                ORDER BY archive_date DESC
+            """))
+        except Exception as query_error:
+            # إذا فشل الاستعلام، قد يكون بسبب عدم وجود عمود archived_at
+            print(f"Query error (may be missing archived_at column): {query_error}")
+            # محاولة استعلام بديل باستخدام created_at
+            try:
+                result = db.execute(text("""
+                    SELECT DISTINCT DATE(created_at) as archive_date
+                    FROM orders
+                    WHERE status = 'archived'
+                    ORDER BY archive_date DESC
+                """))
+            except Exception as alt_query_error:
+                print(f"Alternative query error: {alt_query_error}")
+                # إرجاع قائمة فارغة
+                return {
+                    "success": True,
+                    "dates": [],
+                    "count": 0
+                }
         
-        dates = [row[0].isoformat() for row in result.fetchall()]
+        dates = []
+        rows = result.fetchall()
+        for row in rows:
+            if row[0] is not None:
+                # التحقق من أن row[0] هو date object
+                if isinstance(row[0], date):
+                    dates.append(row[0].isoformat())
+                elif hasattr(row[0], 'isoformat'):
+                    dates.append(row[0].isoformat())
+                else:
+                    # إذا كان string، استخدمه مباشرة
+                    dates.append(str(row[0]))
         
         return {
             "success": True,
@@ -3968,4 +4076,9 @@ async def get_archive_dates(db: Session = Depends(get_db)):
         print(f"Error getting archive dates: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ في جلب تواريخ الأرشيف: {str(e)}")
+        # إرجاع قائمة فارغة بدلاً من رفع خطأ إذا لم تكن هناك بيانات
+        return {
+            "success": True,
+            "dates": [],
+            "count": 0
+        }

@@ -3528,7 +3528,13 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
               unit_price: unitPrice,
               total_price: safeTotalPrice,
               specifications: {
-                dimensions: length || width || height ? { length, width, height, widthUnit, heightUnit } : undefined,
+                dimensions: length || width || height ? { 
+                  length: length || null, 
+                  width: width || null, 
+                  height: height || null, 
+                  widthUnit: widthUnit || 'cm', 
+                  heightUnit: heightUnit || 'cm' 
+                } : undefined,
                 colors: selectedColors.length > 0 ? selectedColors : undefined,
                 work_type: workType || undefined,
                 notes: notes || undefined,
@@ -3553,7 +3559,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 heightUnit: heightUnit
               },
               colors: selectedColors,
-              design_files: uploadedFiles
+              design_files: uploadedFiles // سيتم تحويلها لاحقاً في ensureSerializedEntry
             }
           ],
           total_amount: safeTotalPrice,

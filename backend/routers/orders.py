@@ -827,8 +827,14 @@ async def create_order(
             specs = {}
             if item_data.specifications:
                 specs.update(item_data.specifications)
+            # دمج dimensions مع specifications.dimensions بدلاً من استبدالها
             if item_data.dimensions:
-                specs["dimensions"] = item_data.dimensions
+                if "dimensions" in specs and isinstance(specs["dimensions"], dict):
+                    # دمج dimensions الموجودة مع الجديدة
+                    specs["dimensions"].update(item_data.dimensions)
+                else:
+                    # إذا لم تكن موجودة، أضفها
+                    specs["dimensions"] = item_data.dimensions
             if item_data.colors:
                 specs["colors"] = item_data.colors
             

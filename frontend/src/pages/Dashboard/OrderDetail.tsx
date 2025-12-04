@@ -780,13 +780,8 @@ const collectAttachmentsFromSpecs = (specs?: Record<string, any>, existingAttach
   const existingUrls = new Set(existingAttachments.map(a => a.url).filter(Boolean))
   const existingFilenames = new Set(existingAttachments.map(a => a.filename).filter(Boolean))
 
-  // أولاً: ابحث في المفاتيح المعروفة للمرفقات (لكن نتجاهل design_files إذا كانت موجودة في design_files column)
+  // أولاً: ابحث في المفاتيح المعروفة للمرفقات
   ATTACHMENT_SPEC_KEYS.forEach((key) => {
-    // إذا كان المفتاح design_files وكانت هناك ملفات في design_files column، نتجاهله لتجنب التكرار
-    if (key === 'design_files' && existingAttachments.length > 0) {
-      console.log(`  ⏭️ Skipping design_files from specs (already in design_files column)`)
-      return
-    }
     const value = specs[key]
     if (!value) {
       console.log(`  ⏭️ Key "${key}" is empty or null`)
@@ -2264,7 +2259,7 @@ export default function OrderDetail() {
                               <div className="dimension-item">
                                 <span className="dimension-label">الطول:</span>
                                 <span className="dimension-value">
-                                      {specs.dimensions.length} {specs.dimensions.unit || 'سم'}
+                                      {specs.dimensions.length} {specs.dimensions.widthUnit || specs.dimensions.unit || 'سم'}
                                 </span>
                               </div>
                             )}
@@ -2272,7 +2267,7 @@ export default function OrderDetail() {
                               <div className="dimension-item">
                                 <span className="dimension-label">العرض:</span>
                                 <span className="dimension-value">
-                                      {specs.dimensions.width} {specs.dimensions.unit || 'سم'}
+                                      {specs.dimensions.width} {specs.dimensions.widthUnit || specs.dimensions.unit || 'سم'}
                                 </span>
                               </div>
                             )}
@@ -2280,14 +2275,20 @@ export default function OrderDetail() {
                               <div className="dimension-item">
                                 <span className="dimension-label">الارتفاع:</span>
                                 <span className="dimension-value">
-                                      {specs.dimensions.height} {specs.dimensions.unit || 'سم'}
+                                      {specs.dimensions.height} {specs.dimensions.heightUnit || specs.dimensions.unit || 'سم'}
                                 </span>
                               </div>
                             )}
-                                {specs.dimensions.unit && (
+                                {(specs.dimensions.widthUnit || specs.dimensions.heightUnit || specs.dimensions.unit) && (
                               <div className="dimension-item">
                                 <span className="dimension-label">وحدة القياس:</span>
-                                    <span className="dimension-value">{specs.dimensions.unit}</span>
+                                    <span className="dimension-value">
+                                      {specs.dimensions.widthUnit && specs.dimensions.heightUnit 
+                                        ? (specs.dimensions.widthUnit === specs.dimensions.heightUnit 
+                                            ? specs.dimensions.widthUnit 
+                                            : `العرض: ${specs.dimensions.widthUnit}, الارتفاع: ${specs.dimensions.heightUnit}`)
+                                        : (specs.dimensions.widthUnit || specs.dimensions.heightUnit || specs.dimensions.unit)}
+                                    </span>
                               </div>
                             )}
                           </div>

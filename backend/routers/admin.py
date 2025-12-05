@@ -362,34 +362,67 @@ async def delete_service(service_id: int, db: Session = Depends(get_db)):
     try:
         from sqlalchemy import text
         
+        # التحقق من وجود الخدمة
         service = db.query(Service).filter(Service.id == service_id).first()
         if not service:
             raise HTTPException(status_code=404, detail="Service not found")
         
+        # التحقق من وجود طلبات مرتبطة بالخدمة
+        orders_count = db.execute(text("""
+            SELECT COUNT(*) FROM order_items 
+            WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        
+        if orders_count > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"لا يمكن حذف الخدمة لأنها مرتبطة بـ {orders_count} طلب. يرجى حذف الطلبات المرتبطة أولاً أو تعطيل الخدمة بدلاً من حذفها."
+            )
+        
         # حذف المراحل المرتبطة بالخدمة أولاً
-        db.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), 
-                  {"service_id": service_id})
+        workflows_deleted = db.execute(text("""
+            DELETE FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id})
         db.commit()  # Commit بعد حذف workflows
+        print(f"✅ Deleted {workflows_deleted.rowcount} workflows for service {service_id}")
         
         # حذف الخدمة نهائياً من قاعدة البيانات
-        db.execute(text("DELETE FROM services WHERE id = :service_id"), 
-                  {"service_id": service_id})
+        service_deleted = db.execute(text("""
+            DELETE FROM services WHERE id = :service_id
+        """), {"service_id": service_id})
         db.commit()
         
-        # إبطال cache الخدمات
-        from cache import invalidate_cache, clear_cache
-        invalidate_cache('services')
-        clear_cache()  # مسح جميع الـ cache للتأكد
+        if service_deleted.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Service not found or already deleted")
         
-        return {"success": True, "message": "Service deleted permanently"}
+        print(f"✅ Deleted service {service_id} successfully")
+        
+        # إبطال cache الخدمات
+        try:
+            from cache import invalidate_cache, clear_cache
+            invalidate_cache('services')
+            clear_cache()  # مسح جميع الـ cache للتأكد
+        except Exception as cache_error:
+            print(f"⚠️ Warning: Failed to clear cache: {cache_error}")
+            # لا نرفع الخطأ لأن الحذف نجح
+        
+        return {"success": True, "message": "تم حذف الخدمة بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        print(f"Error deleting service {service_id}: {str(e)}")
+        error_msg = str(e)
+        print(f"❌ Error deleting service {service_id}: {error_msg}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"خطأ في حذف الخدمة: {str(e)}")
+        
+        # إرجاع رسالة خطأ واضحة
+        if "foreign key" in error_msg.lower() or "constraint" in error_msg.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="لا يمكن حذف الخدمة لأنها مرتبطة ببيانات أخرى في النظام. يرجى تعطيل الخدمة بدلاً من حذفها."
+            )
+        raise HTTPException(status_code=500, detail=f"خطأ في حذف الخدمة: {error_msg}")
 
 @router.post("/services/cleanup-duplicates")
 async def cleanup_duplicate_services(db: Session = Depends(get_db)):

@@ -43,15 +43,19 @@ export default function ServicesManagement() {
   }
 
   const deleteService = async (id: number) => {
-    if (confirm('هل أنت متأكد من حذف هذه الخدمة؟ سيتم حذفها نهائياً من قاعدة البيانات.')) {
+    const service = services.find(s => s.id === id)
+    const serviceName = service ? service.name_ar : 'هذه الخدمة'
+    
+    if (confirm(`هل أنت متأكد من حذف "${serviceName}"؟\n\nسيتم حذفها نهائياً من قاعدة البيانات.\n\nملاحظة: إذا كانت الخدمة مرتبطة بطلبات، لن يمكن حذفها. يمكنك تعطيلها بدلاً من ذلك.`)) {
       try {
         await adminAPI.services.delete(id)
         // إعادة تحميل الخدمات من السيرفر
         await loadServices()
-        alert('تم حذف الخدمة بنجاح')
+        alert('✅ تم حذف الخدمة بنجاح')
       } catch (error: any) {
-        console.error('Error deleting service:', error)
-        alert('فشل حذف الخدمة: ' + (error.response?.data?.detail || error.message || 'خطأ غير معروف'))
+        console.error('❌ Error deleting service:', error)
+        const errorMessage = error.response?.data?.detail || error.message || 'خطأ غير معروف'
+        alert(`❌ فشل حذف الخدمة:\n\n${errorMessage}\n\nإذا كانت الخدمة مرتبطة بطلبات، يمكنك تعطيلها بدلاً من حذفها.`)
       }
     }
   }

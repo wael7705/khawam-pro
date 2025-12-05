@@ -271,9 +271,9 @@ export default function OrdersManagement() {
       }
     } catch (error) {
       console.error('Error loading archived orders:', error)
-      setArchivedOrders([])
+        setArchivedOrders([])
+      }
     }
-  }
 
   const loadAvailableArchiveDates = async () => {
     try {

@@ -44,10 +44,10 @@ async function cleanupOldServiceWorkers() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      // تنظيف القديم أولاً
-      await cleanupOldServiceWorkers()
-      
-      // انتظر قليلاً ثم سجل الجديد
+    // تنظيف القديم أولاً
+    await cleanupOldServiceWorkers()
+    
+    // انتظر قليلاً ثم سجل الجديد
       setTimeout(async () => {
         try {
           const registration = await navigator.serviceWorker.register('/sw.js', { 
@@ -66,7 +66,7 @@ if ('serviceWorker' in navigator) {
                   console.log('🔄 New service worker available, reloading...')
                   // انتظر قليلاً قبل إعادة التحميل
                   setTimeout(() => {
-                    window.location.reload()
+                  window.location.reload()
                   }, 1000)
                 }
               })
@@ -75,7 +75,7 @@ if ('serviceWorker' in navigator) {
           
           // التحقق من التحديثات كل 60 ثانية (بعد التأكد من أن registration موجود)
           if (registration) {
-            setInterval(() => {
+          setInterval(() => {
               try {
                 registration.update().catch((err) => {
                   // تجاهل أخطاء التحديث - قد تكون طبيعية
@@ -84,7 +84,7 @@ if ('serviceWorker' in navigator) {
               } catch (err) {
                 // تجاهل الأخطاء
               }
-            }, 60000)
+          }, 60000)
           }
         } catch (error: any) {
           // تجاهل أخطاء التسجيل - قد تكون طبيعية في بعض الحالات

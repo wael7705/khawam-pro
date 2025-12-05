@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
         loop.create_task(_setup_banners_service())
         loop.create_task(_ensure_default_services())
         loop.create_task(_ensure_portfolio_images_column())
+        loop.create_task(_ensure_order_archive_columns())
         loop.create_task(_init_advanced_pricing_data())
         loop.create_task(_init_hero_slides_table())
         loop.create_task(_daily_archive_task())
@@ -1445,6 +1446,72 @@ async def _ensure_portfolio_images_column():
             print("✅ portfolio_works.images column already exists")
     except Exception as e:
         print(f"❌ Error ensuring portfolio_works.images column: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
+async def _ensure_order_archive_columns():
+    """التأكد من وجود أعمدة delivery_date و completed_at في جدول orders"""
+    import asyncio
+    await asyncio.sleep(10)  # انتظار حتى تكون قاعدة البيانات جاهزة
+    
+    conn = None
+    try:
+        print("🔄 Ensuring order archive columns (delivery_date, completed_at) exist...")
+        conn = engine.connect()
+        
+        from sqlalchemy import text
+        
+        # التحقق من وجود الأعمدة
+        check_cols = conn.execute(text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='orders' 
+            AND column_name IN ('delivery_date', 'completed_at')
+        """)).fetchall()
+        
+        existing_cols = [col[0] for col in check_cols]
+        
+        # إضافة delivery_date إذا لم يكن موجوداً
+        if 'delivery_date' not in existing_cols:
+            try:
+                conn.execute(text("""
+                    ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_date DATE
+                """))
+                conn.commit()
+                print("✅ Added 'delivery_date' column to orders table")
+            except Exception as alter_error:
+                print(f"⚠️ Error adding delivery_date column: {alter_error}")
+                conn.rollback()
+        else:
+            print("✅ orders.delivery_date column already exists")
+        
+        # إضافة completed_at إذا لم يكن موجوداً
+        if 'completed_at' not in existing_cols:
+            try:
+                conn.execute(text("""
+                    ALTER TABLE orders ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP
+                """))
+                conn.commit()
+                print("✅ Added 'completed_at' column to orders table")
+            except Exception as alter_error:
+                print(f"⚠️ Error adding completed_at column: {alter_error}")
+                conn.rollback()
+        else:
+            print("✅ orders.completed_at column already exists")
+            
+    except Exception as e:
+        print(f"❌ Error ensuring order archive columns: {str(e)}")
         import traceback
         traceback.print_exc()
         if conn:

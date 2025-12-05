@@ -2407,7 +2407,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
                 placeholder="0"
                   required={isPosterPrinting || isBannerPrinting || isFlexPrinting}
                   style={{ flex: 1 }}
-              />
+                />
                 <select 
                   value={heightUnit} 
                   onChange={(e) => setHeightUnit(e.target.value)} 

@@ -44,7 +44,7 @@ export default function Home() {
     } catch (error) {
       // فقط في وضع التطوير
       if (import.meta.env.DEV) {
-        console.error('Error loading hero slides:', error)
+      console.error('Error loading hero slides:', error)
       }
       // Fallback: استخدام اللوغو كسلايدة افتراضية
       setHeroSlides([fallbackSlide])

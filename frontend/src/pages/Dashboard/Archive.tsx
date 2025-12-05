@@ -18,6 +18,8 @@ interface Order {
   total_amount: number
   final_amount: number
   created_at: string
+  delivery_date?: string
+  completed_at?: string
   archived_at?: string
   payment_status?: string
 }
@@ -101,7 +103,7 @@ export default function Archive() {
       const headers = [
         'رقم الطلب', 'اسم العميل', 'رقم الهاتف', 'واتساب', 'اسم المتجر',
         'الحالة', 'نوع التوصيل', 'عنوان التوصيل', 'المبلغ الإجمالي',
-        'المبلغ النهائي', 'حالة الدفع', 'تاريخ الطلب', 'تاريخ الأرشفة'
+        'المبلغ النهائي', 'حالة الدفع', 'تاريخ الطلب', 'تاريخ التسليم'
       ]
       
       const rows = orders.map(order => [
@@ -117,7 +119,8 @@ export default function Archive() {
         order.final_amount?.toString() || '0',
         order.payment_status || 'pending',
         order.created_at ? new Date(order.created_at).toLocaleDateString('ar-SA') : '',
-        order.archived_at ? new Date(order.archived_at).toLocaleDateString('ar-SA') : ''
+        order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('ar-SA') : 
+        (order.completed_at ? new Date(order.completed_at).toLocaleDateString('ar-SA') : '')
       ])
       
       const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
@@ -320,7 +323,7 @@ export default function Archive() {
                   <th>المبلغ النهائي</th>
                   <th>حالة الدفع</th>
                   <th>تاريخ الطلب</th>
-                  <th>تاريخ الأرشفة</th>
+                  <th>تاريخ التسليم</th>
                   <th>الإجراءات</th>
                 </tr>
               </thead>
@@ -352,7 +355,8 @@ export default function Archive() {
                       </span>
                     </td>
                     <td>{order.created_at ? formatDate(order.created_at) : '-'}</td>
-                    <td>{order.archived_at ? formatDate(order.archived_at) : '-'}</td>
+                    <td>{order.delivery_date ? formatDate(order.delivery_date) : 
+                         (order.completed_at ? formatDate(order.completed_at) : '-')}</td>
                     <td>
                       <button
                         className="btn-view"

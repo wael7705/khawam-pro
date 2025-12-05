@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DECIMAL, TIMESTAMP, ForeignKey, ARRAY, JSON
+from sqlalchemy import Column, Integer, String, Text, Boolean, DECIMAL, TIMESTAMP, Date, ForeignKey, ARRAY, JSON
 from sqlalchemy.sql import func
 from database import Base
 
@@ -128,6 +128,8 @@ class Order(Base):
     delivery_address = Column(Text)
     delivery_latitude = Column(DECIMAL(10, 8))  # خط العرض
     delivery_longitude = Column(DECIMAL(11, 8))  # خط الطول
+    delivery_date = Column(Date, nullable=True)  # تاريخ التسليم
+    completed_at = Column(TIMESTAMP, nullable=True)  # تاريخ الإكمال
     notes = Column(Text)  # ملاحظات العميل
     staff_notes = Column(Text)  # ملاحظات الموظف
     rating = Column(Integer)  # التقييم (1-5 نجوم)

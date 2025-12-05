@@ -89,12 +89,18 @@ async def create_hero_slide(
 ):
     """إنشاء سلايدة جديدة"""
     try:
+        # التحقق من أن image_url غير فارغ
+        if not slide_data.image_url or not slide_data.image_url.strip():
+            raise HTTPException(status_code=400, detail="يجب إدخال رابط الصورة")
+        
+        image_url = slide_data.image_url.strip()
+        
         result = db.execute(text("""
             INSERT INTO hero_slides (image_url, is_logo, is_active, display_order)
             VALUES (:image_url, :is_logo, :is_active, :display_order)
             RETURNING id
         """), {
-            "image_url": slide_data.image_url,
+            "image_url": image_url,
             "is_logo": slide_data.is_logo,
             "is_active": slide_data.is_active,
             "display_order": slide_data.display_order
@@ -128,14 +134,26 @@ async def update_hero_slide(
         if not existing:
             raise HTTPException(status_code=404, detail="السلايدة غير موجودة")
         
+        # جلب الصورة الحالية من قاعدة البيانات لحمايتها
+        current_slide = db.execute(text("""
+            SELECT image_url FROM hero_slides WHERE id = :id
+        """), {"id": slide_id}).fetchone()
+        
+        current_image_url = current_slide[0] if current_slide else None
+        
         # بناء query التحديث
         update_fields = []
         params = {"id": slide_id}
         
         # تحديث image_url فقط إذا كانت قيمة جديدة وغير فارغة
+        # إذا لم تُرسل image_url أو كانت فارغة، نحتفظ بالصورة القديمة
         if slide_data.image_url is not None and slide_data.image_url.strip():
-            update_fields.append("image_url = :image_url")
-            params["image_url"] = slide_data.image_url.strip()
+            # تحديث الصورة فقط إذا كانت مختلفة
+            new_image_url = slide_data.image_url.strip()
+            if new_image_url != current_image_url:
+                update_fields.append("image_url = :image_url")
+                params["image_url"] = new_image_url
+        # إذا لم تُرسل image_url أو كانت فارغة، نحتفظ بالصورة القديمة (لا نحدثها)
         
         if slide_data.is_logo is not None:
             update_fields.append("is_logo = :is_logo")

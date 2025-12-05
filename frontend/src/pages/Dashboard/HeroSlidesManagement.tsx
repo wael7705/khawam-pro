@@ -66,9 +66,23 @@ export default function HeroSlidesManagement() {
       setSaving(true)
       
       if (editingSlide) {
-        // عند التحديث، نرسل جميع البيانات بما فيها image_url
-        // Backend سيتحقق من أن image_url غير فارغ قبل التحديث
-        await heroSlidesAPI.update(editingSlide.id, formData)
+        // عند التحديث، نرسل فقط الحقول التي تم تغييرها
+        // إذا لم تتغير image_url، نرسلها كما هي للحفاظ عليها
+        const updateData: any = {
+          is_logo: formData.is_logo,
+          is_active: formData.is_active,
+          display_order: formData.display_order,
+        }
+        
+        // إرسال image_url فقط إذا كانت موجودة (حتى لو لم تتغير)
+        if (formData.image_url && formData.image_url.trim()) {
+          updateData.image_url = formData.image_url.trim()
+        } else if (editingSlide.image_url) {
+          // إذا لم يكن هناك image_url جديد، نحتفظ بالقديم
+          updateData.image_url = editingSlide.image_url
+        }
+        
+        await heroSlidesAPI.update(editingSlide.id, updateData)
         showSuccess('تم تحديث السلايدة بنجاح')
       } else {
         await heroSlidesAPI.create(formData)

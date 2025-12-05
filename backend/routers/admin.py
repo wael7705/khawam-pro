@@ -3888,16 +3888,16 @@ async def get_daily_archive(
             print(f"Query error (may be missing delivery_date column): {query_error}")
             # محاولة استعلام بديل بدون delivery_date
             try:
-                result = db.execute(text("""
-                    SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
-                           shop_name, status, total_amount, final_amount, payment_status,
+            result = db.execute(text("""
+                SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                       shop_name, status, total_amount, final_amount, payment_status,
                            delivery_type, delivery_address, notes, created_at, 
                            NULL as delivery_date, NULL as completed_at, created_at as archived_at
-                    FROM orders
+                FROM orders
                     WHERE status = 'completed'
-                    AND DATE(created_at) = :target_date
-                    ORDER BY created_at DESC
-                """), {"target_date": target_date})
+                AND DATE(created_at) = :target_date
+                ORDER BY created_at DESC
+            """), {"target_date": target_date})
             except Exception as alt_error:
                 print(f"Alternative query error: {alt_error}")
                 # محاولة أخرى بدون completed_at
@@ -4158,12 +4158,12 @@ async def get_archive_dates(db: Session = Depends(get_db)):
                     """))
                 except Exception as final_error:
                     print(f"Final query error: {final_error}")
-                    # إرجاع قائمة فارغة
-                    return {
-                        "success": True,
-                        "dates": [],
-                        "count": 0
-                    }
+                # إرجاع قائمة فارغة
+                return {
+                    "success": True,
+                    "dates": [],
+                    "count": 0
+                }
         
         dates = []
         rows = result.fetchall()

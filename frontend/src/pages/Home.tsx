@@ -32,19 +32,42 @@ export default function Home() {
 
   const loadHeroSlides = async () => {
     try {
-      // جلب السلايدات مباشرة من API بدون cache
-      // إضافة timestamp لمنع cache من المتصفح
+      // جلب السلايدات مباشرة من API بدون cache - من قاعدة البيانات
       const response = await heroSlidesAPI.getAll(true) // فقط السلايدات النشطة
+      
       if (response.data.success && response.data.slides && response.data.slides.length > 0) {
-        setHeroSlides(response.data.slides)
+        // التأكد من أن الصور موجودة من قاعدة البيانات
+        const validSlides = response.data.slides.filter((slide: HeroSlide) => 
+          slide.image_url && slide.image_url.trim() && slide.is_active
+        )
+        
+        if (validSlides.length > 0) {
+          if (import.meta.env.DEV) {
+            console.log(`✅ تم جلب ${validSlides.length} سلايدة من قاعدة البيانات`)
+            validSlides.forEach((slide: HeroSlide) => {
+              const isBase64 = slide.image_url.startsWith('data:')
+              const isExternal = slide.image_url.startsWith('http')
+              console.log(`  - السلايدة ${slide.id}: ${isBase64 ? 'Base64 من قاعدة البيانات' : isExternal ? 'رابط خارجي' : 'مسار محلي'}`)
+            })
+          }
+          setHeroSlides(validSlides)
+        } else {
+          if (import.meta.env.DEV) {
+            console.warn('⚠️ لم توجد سلايدات صحيحة في قاعدة البيانات')
+          }
+          setHeroSlides([fallbackSlide])
+        }
       } else {
-        // إذا لم توجد سلايدات، استخدم fallback
+        // إذا لم توجد سلايدات في قاعدة البيانات، استخدم fallback
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ لا توجد سلايدات في قاعدة البيانات')
+        }
         setHeroSlides([fallbackSlide])
       }
     } catch (error) {
       // فقط في وضع التطوير
       if (import.meta.env.DEV) {
-      console.error('Error loading hero slides:', error)
+        console.error('❌ خطأ في جلب السلايدات من قاعدة البيانات:', error)
       }
       // Fallback: استخدام اللوغو كسلايدة افتراضية
       setHeroSlides([fallbackSlide])

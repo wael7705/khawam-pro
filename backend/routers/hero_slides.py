@@ -61,16 +61,23 @@ async def get_hero_slides(
         
         slides = []
         for row in result:
-            slides.append({
-                "id": row[0],
-                "image_url": row[1],
-                "is_logo": row[2],
-                "is_active": row[3],
-                "display_order": row[4],
-                "created_at": row[5].isoformat() if row[5] else None,
-                "updated_at": row[6].isoformat() if row[6] else None,
-            })
+            image_url = row[1] if row[1] else None
+            # التأكد من أن image_url موجود ومحفوظ في قاعدة البيانات
+            if image_url:
+                slides.append({
+                    "id": row[0],
+                    "image_url": image_url,  # من قاعدة البيانات - يمكن أن يكون base64 data URL أو رابط
+                    "is_logo": row[2],
+                    "is_active": row[3],
+                    "display_order": row[4],
+                    "created_at": row[5].isoformat() if row[5] else None,
+                    "updated_at": row[6].isoformat() if row[6] else None,
+                })
+            else:
+                # إذا لم يكن هناك image_url، نتجاهل السلايدة
+                print(f"⚠️ Warning: Hero slide {row[0]} has no image_url, skipping")
         
+        print(f"✅ Retrieved {len(slides)} hero slides from database")
         return {
             "success": True,
             "slides": slides,

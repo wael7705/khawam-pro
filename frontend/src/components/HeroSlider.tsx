@@ -16,6 +16,11 @@ const resolveImageUrl = (url: string): string => {
   
   const trimmedUrl = url.trim()
   
+  // إذا كان base64 data URL (يبدأ بـ data:)، استخدمه مباشرة - هذا من قاعدة البيانات
+  if (trimmedUrl.startsWith('data:')) {
+    return trimmedUrl
+  }
+  
   // إذا كان URL مطلق (يبدأ بـ http:// أو https://)، استخدمه كما هو
   if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
     return trimmedUrl
@@ -280,9 +285,20 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                   console.warn('⚠️ Failed to load hero slide image:', {
                     resolved: imageUrl,
                     original: originalUrl,
+                    isBase64: originalUrl?.startsWith('data:'),
+                    isExternal: originalUrl?.startsWith('http'),
                     index: index,
                     slideId: slide.id
                   })
+                }
+                
+                // إذا كان data URL، حاول استخدامه مباشرة
+                if (originalUrl && originalUrl.startsWith('data:') && originalUrl !== imageUrl) {
+                  if (import.meta.env.DEV) {
+                    console.log('🔄 Retrying with original data URL from database')
+                  }
+                  target.src = originalUrl
+                  return
                 }
                 
                 // محاولة استخدام URL الأصلي مباشرة إذا كان مختلفاً
@@ -297,6 +313,9 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                 // إضافة السلايد إلى قائمة الفاشلة فقط بعد فشل جميع المحاولات
                 setTimeout(() => {
                   if (target.complete && target.naturalWidth === 0) {
+                    if (import.meta.env.DEV) {
+                      console.error(`❌ Failed to load slide ${slide.id} after all retries`)
+                    }
                     setFailedImages(prev => new Set(prev).add(slide.id))
                   }
                 }, 1000)

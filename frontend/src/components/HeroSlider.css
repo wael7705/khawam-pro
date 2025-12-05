@@ -5,7 +5,12 @@
   min-height: 550px;
   max-height: 650px;
   overflow: hidden;
-  background: var(--bg-light);
+  /* خلفية شفافة زجاجية (glassmorphism) */
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  /* إضافة حدود زجاجية */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   z-index: 999;
   margin-top: 0;
   padding-top: 0;
@@ -16,12 +21,15 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 
               0 10px 30px rgba(0, 0, 0, 0.2),
               inset 0 -80px 120px -40px rgba(255, 255, 255, 0.15);
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
 }
 
-/* الوضع الليلي */
+/* الوضع الليلي - خلفية شفافة زجاجية داكنة */
 [data-theme="dark"] .hero-slider {
-  background: var(--bg-dark);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .hero-slides-container {
@@ -38,6 +46,17 @@
   height: 100%;
   position: relative;
   overflow: hidden;
+  /* طبقة خلفية شفافة زجاجية */
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* طبقة خلفية زجاجية للوضع الليلي */
+[data-theme="dark"] .hero-slide {
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .hero-slide img {
@@ -46,7 +65,8 @@
   object-fit: contain;
   object-position: center;
   display: block;
-  background: var(--bg-light);
+  /* خلفية شفافة للصورة */
+  background: transparent;
   /* 
    * القياس الموصى به للصور في Hero Slider:
    * 1920 × 1080 بكسل (نسبة 16:9)
@@ -59,9 +79,9 @@
   transition: opacity 0.3s ease;
 }
 
-/* الوضع الليلي */
+/* الوضع الليلي - صورة بدون خلفية */
 [data-theme="dark"] .hero-slide img {
-  background: var(--bg-dark);
+  background: transparent;
 }
 
 /* معالجة خاصة للوغو - عرض أفضل */
@@ -69,7 +89,7 @@
   object-fit: contain;
   object-position: center;
   padding: 40px;
-  background: var(--bg-light);
+  background: transparent;
   max-width: 100%;
   max-height: 100%;
   display: block !important;
@@ -77,9 +97,9 @@
   opacity: 1 !important;
 }
 
-/* الوضع الليلي للوغو */
+/* الوضع الليلي للوغو - شفاف */
 [data-theme="dark"] .hero-slide.logo-slide img {
-  background: var(--bg-dark);
+  background: transparent;
 }
 
 /* إضافة ظل ضوئي في أسفل السلايد لانتشار خط الفصل */

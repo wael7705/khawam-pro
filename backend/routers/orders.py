@@ -880,7 +880,7 @@ async def create_order(
                     specs["dimensions"].update(item_data.dimensions)
                 else:
                     # إذا لم تكن موجودة، أضفها
-                specs["dimensions"] = item_data.dimensions
+                    specs["dimensions"] = item_data.dimensions
             if item_data.colors:
                 specs["colors"] = item_data.colors
             

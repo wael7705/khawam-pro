@@ -3888,16 +3888,16 @@ async def get_daily_archive(
             print(f"Query error (may be missing delivery_date column): {query_error}")
             # محاولة استعلام بديل بدون delivery_date
             try:
-            result = db.execute(text("""
-                SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
-                       shop_name, status, total_amount, final_amount, payment_status,
-                           delivery_type, delivery_address, notes, created_at, 
+                result = db.execute(text("""
+                    SELECT id, order_number, customer_name, customer_phone, customer_whatsapp,
+                           shop_name, status, total_amount, final_amount, payment_status,
+                           delivery_type, delivery_address, notes, created_at,
                            NULL as delivery_date, NULL as completed_at, created_at as archived_at
-                FROM orders
+                    FROM orders
                     WHERE status = 'completed'
-                AND DATE(created_at) = :target_date
-                ORDER BY created_at DESC
-            """), {"target_date": target_date})
+                    AND DATE(created_at) = :target_date
+                    ORDER BY created_at DESC
+                """), {"target_date": target_date})
             except Exception as alt_error:
                 print(f"Alternative query error: {alt_error}")
                 # محاولة أخرى بدون completed_at

@@ -7,9 +7,12 @@ interface SimpleChartProps {
   height?: number
 }
 
-export const SimplePieChart: React.FC<{ data: Array<{ name: string; value: number }> }> = ({ data }) => {
+export const SimplePieChart: React.FC<{ 
+  data: Array<{ name: string; value: number }>
+  colors?: string[]
+}> = ({ data, colors: customColors }) => {
   const total = data.reduce((sum, item) => sum + item.value, 0)
-  const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b']
+  const colors = customColors || ['#DC2626', '#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6']
   
   let currentAngle = 0
   

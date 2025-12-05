@@ -357,7 +357,7 @@ export default function DashboardHome() {
           </div>
           {topServices.length > 0 ? (
             <div className="chart-container">
-              <SimplePieChart data={serviceChartData} />
+              <SimplePieChart data={serviceChartData} colors={COLORS} />
               <div className="services-legend">
                 {serviceChartData.map((entry, index) => {
                   const service = topServices[index]

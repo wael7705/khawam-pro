@@ -99,59 +99,47 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     restartAutoPlay()
   }, [activeSlides.length, currentIndex, restartAutoPlay])
 
-  // تحميل جميع الصور مسبقاً (preload) لضمان جاهزيتها
+  // تحميل الصور المهمة فقط (تحسين الأداء - تقليل التأخير)
   useEffect(() => {
     if (activeSlides.length === 0) return
 
-    // إضافة preload links إلى head
     const preloadLinks: HTMLLinkElement[] = []
-    const imageObjects: HTMLImageElement[] = []
     
-    activeSlides.forEach((slide, index) => {
+    // تحميل الصورة الحالية والصورة التالية فقط (لتحسين الأداء)
+    const slidesToPreload = Math.min(2, activeSlides.length)
+    
+    for (let i = 0; i < slidesToPreload; i++) {
+      const slideIndex = (currentIndex + i) % activeSlides.length
+      const slide = activeSlides[slideIndex]
+      
       try {
         const imageUrl = resolveImageUrl(slide.image_url)
-        if (!imageUrl) return
+        if (!imageUrl) continue
         
-        // إنشاء preload link للصورتين الأوليين فقط (لتحسين الأداء)
-        if (index < 2) {
+        // Preload link فقط للصورة الحالية
+        if (i === 0) {
           const link = document.createElement('link')
           link.rel = 'preload'
           link.as = 'image'
           link.href = imageUrl
-          if (index === 0) {
-            link.setAttribute('fetchPriority', 'high')
-          }
+          link.setAttribute('fetchPriority', 'high')
           document.head.appendChild(link)
           preloadLinks.push(link)
         }
         
-        // إنشاء Image object لتحميل الصورة في الخلفية
-        const img = new Image()
-        img.src = imageUrl
-        imageObjects.push(img)
-        
-        img.onload = () => {
-          // لا نطبع console.log في الإنتاج لتقليل الضوضاء
-          if (import.meta.env.DEV) {
-            console.log(`✅ Preloaded slide ${index + 1}/${activeSlides.length}`)
-          }
-        }
-        
-        img.onerror = () => {
-          // فقط في وضع التطوير
-          if (import.meta.env.DEV) {
-            console.warn(`⚠️ Failed to preload slide ${index + 1}/${activeSlides.length}`)
-          }
+        // تحميل الصورة التالية في الخلفية (بدون preload link)
+        if (i === 1) {
+          const img = new Image()
+          img.src = imageUrl
         }
       } catch (error) {
-        // تجاهل الأخطاء في preload - الصورة ستُحمل عند الحاجة
         if (import.meta.env.DEV) {
-          console.warn('Error preloading slide:', error)
+          console.warn(`Error preloading slide ${slideIndex}:`, error)
         }
       }
-    })
+    }
     
-    // تنظيف preload links عند إلغاء التحميل
+    // تنظيف preload links
     return () => {
       preloadLinks.forEach(link => {
         try {
@@ -163,7 +151,7 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
         }
       })
     }
-  }, [activeSlides])
+  }, [activeSlides, currentIndex])
 
   // إعداد auto-play عند تحميل المكون أو تغيير الإعدادات
   useEffect(() => {
@@ -179,16 +167,16 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     }
   }, [restartAutoPlay])
 
-  const goToSlide = (index: number) => {
+  const goToSlide = useCallback((index: number) => {
     if (index === currentIndex || index < 0 || index >= activeSlides.length) return
     setIsTransitioning(true)
     setCurrentIndex(index)
     setTimeout(() => setIsTransitioning(false), 600)
     // إعادة تشغيل auto-play بعد التمرير اليدوي
     restartAutoPlay()
-  }
+  }, [currentIndex, activeSlides.length, restartAutoPlay])
 
-  const goToPrevious = () => {
+  const goToPrevious = useCallback(() => {
     if (activeSlides.length <= 1) return
     const newIndex = currentIndex === 0 ? activeSlides.length - 1 : currentIndex - 1
     setIsTransitioning(true)
@@ -196,9 +184,9 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     setTimeout(() => setIsTransitioning(false), 600)
     // إعادة تشغيل auto-play
     restartAutoPlay()
-  }
+  }, [currentIndex, activeSlides.length, restartAutoPlay])
 
-  const goToNext = () => {
+  const goToNext = useCallback(() => {
     if (activeSlides.length <= 1) return
     const newIndex = (currentIndex + 1) % activeSlides.length
     setIsTransitioning(true)
@@ -206,7 +194,23 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     setTimeout(() => setIsTransitioning(false), 600)
     // إعادة تشغيل auto-play
     restartAutoPlay()
-  }
+  }, [currentIndex, activeSlides.length, restartAutoPlay])
+
+  // إضافة دعم لوحة المفاتيح للتنقل
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeSlides.length <= 1) return
+      
+      if (e.key === 'ArrowLeft') {
+        goToPrevious()
+      } else if (e.key === 'ArrowRight') {
+        goToNext()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [goToPrevious, goToNext, activeSlides.length])
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
@@ -267,8 +271,8 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
               <img 
                 src={imageUrl}
                 alt={slide.is_logo ? "خوام للطباعة والتصميم" : "سلايدة"}
-                loading="eager"
-                fetchPriority={index === 0 ? 'high' : index === 1 ? 'high' : 'auto'}
+                loading={index <= 1 ? 'eager' : 'lazy'}
+                fetchPriority={index === 0 ? 'high' : index === 1 ? 'high' : 'low'}
                 style={{
                   width: '100%',
                   height: '100%',

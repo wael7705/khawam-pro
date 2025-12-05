@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, RefreshCw, Package, Users, Clock, Award, Sparkles } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
 import DashboardStats from '../../components/DashboardStats'
@@ -49,6 +50,7 @@ interface ServiceAnalytics {
 }
 
 export default function DashboardHome() {
+  const navigate = useNavigate()
   const [stats, setStats] = useState<DashboardStats>({
     low_stock: 0,
     total_services: 0,
@@ -283,7 +285,12 @@ export default function DashboardHome() {
           </div>
         </div>
 
-        <div className="stat-card gradient-card-warning">
+        <div 
+          className="stat-card gradient-card-warning"
+          onClick={() => navigate('/dashboard/orders')}
+          style={{ cursor: 'pointer' }}
+          title="انقر للانتقال إلى قسم الطلبات"
+        >
           <div className="stat-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#EF4444' }}>
             <ShoppingCart size={24} />
           </div>

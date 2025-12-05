@@ -253,8 +253,11 @@ export default function Orders() {
         return
       }
       try {
-        const response = await ordersAPI.getAll()
+        // التأكد من تمرير my_orders=true بشكل صريح لعرض طلبات العميل فقط
+        const response = await ordersAPI.getAll(true)
+        console.log('📦 Orders API Response:', response)
         const normalized = normalizeOrdersResponse(response.data)
+        console.log('✅ Normalized orders:', normalized.length, 'orders')
         setOrders(normalized)
         if (!normalized.length) {
           console.warn('Orders API returned no data. Raw payload:', response.data)
@@ -413,8 +416,10 @@ export default function Orders() {
     return String(value)
   }
 
-  const renderSpecifications = (specs?: Record<string, any>) => {
-    if (!specs || Object.keys(specs).length === 0) return null
+  // Helper to filter specifications based on service workflow
+  const getFilteredSpecs = (specs?: Record<string, any>, serviceName?: string) => {
+    if (!specs || Object.keys(specs).length === 0) return {}
+    
     const excludedKeys = new Set([
       'design_files',
       'files',
@@ -424,12 +429,65 @@ export default function Orders() {
       'clothing_product_code',
       'clothing_color_code',
     ])
+    
+    // Always allow these core fields
+    const alwaysAllowed = new Set(['dimensions', 'notes', 'quantity'])
+    
+    // Service-specific filtering - only show data relevant to this service
+    const serviceKey = (serviceName || '').toLowerCase()
+    const filtered: Record<string, any> = {}
+    
+    Object.entries(specs).forEach(([key, value]) => {
+      // Skip excluded keys
+      if (excludedKeys.has(key)) return
+      
+      // Always allow core fields
+      if (alwaysAllowed.has(key)) {
+        filtered[key] = value
+        return
+      }
+      
+      // Service-specific filtering
+      if (serviceKey.includes('فينيل') || serviceKey.includes('vinyl')) {
+        // Vinyl: only show vinyl-specific fields
+        if (['vinyl_type', 'vinyl_color', 'print_type_choice', 'dimensions'].includes(key)) {
+          filtered[key] = value
+        }
+      } else if (serviceKey.includes('فليكس') || serviceKey.includes('flex')) {
+        // Flex: only show flex-specific fields
+        if (['flex_type', 'print_type_choice', 'dimensions'].includes(key)) {
+          filtered[key] = value
+        }
+      } else if (serviceKey.includes('بانرات') || serviceKey.includes('roll up')) {
+        // Banners: only show banner-specific fields
+        if (['rollup_source', 'print_type_choice', 'dimensions'].includes(key)) {
+          filtered[key] = value
+        }
+      } else if (serviceKey.includes('ملابس') || serviceKey.includes('clothing')) {
+        // Clothing: only show clothing-specific fields
+        if (['clothing_source', 'clothing_product', 'clothing_color', 'clothing_size', 'work_type'].includes(key)) {
+          filtered[key] = value
+        }
+      } else {
+        // For other services, allow common fields
+        if (!['flex_type', 'vinyl_type', 'rollup_source'].includes(key)) {
+          filtered[key] = value
+        }
+      }
+    })
+    
+    return filtered
+  }
+
+  const renderSpecifications = (specs?: Record<string, any>, serviceName?: string) => {
+    const filteredSpecs = getFilteredSpecs(specs, serviceName)
+    if (!filteredSpecs || Object.keys(filteredSpecs).length === 0) return null
+    
     return (
       <div className="order-item-specs">
         <h4>التفاصيل:</h4>
         <ul>
-          {Object.entries(specs)
-            .filter(([key]) => !excludedKeys.has(key))
+          {Object.entries(filteredSpecs)
             .map(([key, value]) => (
               <li key={key}>
                 <div className="spec-label">{translateSpecKey(key)}:</div>
@@ -604,7 +662,7 @@ export default function Orders() {
                       <strong>{item.service_name || item.product_name || `عنصر ${index + 1}`}</strong>
                       <span>الكمية: {item.quantity || 1}</span>
                     </div>
-                    {renderSpecifications(item.specifications)}
+                    {renderSpecifications(item.specifications, item.service_name)}
                   </div>
                 ))}
               </div>

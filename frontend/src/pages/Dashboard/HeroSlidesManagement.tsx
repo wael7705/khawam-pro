@@ -395,12 +395,16 @@ export default function HeroSlidesManagement() {
                     type="text"
                     value={formData.image_url}
                     onChange={(e) => handleImageUrlChange(e.target.value)}
-                    placeholder="https://example.com/image.jpg أو /path/to/image.jpg"
+                    placeholder="/hero-slides/slide-1.jpg أو https://example.com/image.jpg"
                     className="image-url-input"
                     required
                   />
                 </div>
-                <small>يمكنك رفع صورة من جهازك أو إدخال رابط صورة</small>
+                <small>
+                  يمكنك رفع صورة من جهازك أو إدخال رابط صورة.
+                  <br />
+                  <strong>للاستخدام المحلي:</strong> ضع الصورة في <code>frontend/public/hero-slides/</code> ثم أدخل المسار مثل: <code>/hero-slides/slide-1.jpg</code>
+                </small>
               </div>
 
               <div className="form-group">

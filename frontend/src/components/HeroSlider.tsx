@@ -26,21 +26,19 @@ const resolveImageUrl = (url: string): string => {
     return trimmedUrl
   }
   
-  // إذا كان مسار نسبي (يبدأ بـ /)، أضف base URL
+  // إذا كان مسار نسبي (يبدأ بـ /)، استخدمه مباشرة
+  // Vite/React Router سيتعامل مع المسارات من public folder تلقائياً
+  // مثل: /hero-slides/slide-1.jpg أو /logo.jpg
   if (trimmedUrl.startsWith('/')) {
-    // محاولة استخدام window.location.origin أولاً (يعمل في الإنتاج)
-    if (typeof window !== 'undefined' && window.location.origin) {
-      return `${window.location.origin}${trimmedUrl}`
-    }
-    
-    // Fallback: استخدام VITE_API_URL
-    const apiUrl = import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'
-    // إزالة /api من نهاية URL إذا كان موجوداً
-    const baseUrl = apiUrl.replace(/\/api$/, '')
-    return `${baseUrl}${trimmedUrl}`
+    return trimmedUrl
   }
   
   // إذا كان مسار نسبي بدون /، أضف / في البداية
+  // إذا كان يبدأ بـ hero-slides، أضف / في البداية
+  if (trimmedUrl.startsWith('hero-slides/')) {
+    return `/${trimmedUrl}`
+  }
+  
   return `/${trimmedUrl}`
 }
 

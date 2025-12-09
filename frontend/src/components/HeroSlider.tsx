@@ -30,7 +30,9 @@ const resolveImageUrl = (url: string): string => {
   // Vite/React Router سيتعامل مع المسارات من public folder تلقائياً
   // مثل: /hero-slides/slide-1.jpg أو /logo.jpg
   if (trimmedUrl.startsWith('/')) {
-    return trimmedUrl
+    // إزالة أي query parameters موجودة (مثل _retry) قبل إرجاع المسار
+    const cleanUrl = trimmedUrl.split('?')[0]
+    return cleanUrl
   }
   
   // إذا كان مسار نسبي بدون /، أضف / في البداية
@@ -46,9 +48,10 @@ interface HeroSliderProps {
   slides: HeroSlide[]
   autoPlay?: boolean
   autoPlayInterval?: number
+  loading?: boolean
 }
 
-export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval = 10000 }: HeroSliderProps) {
+export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval = 10000, loading = false }: HeroSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set())
@@ -239,7 +242,27 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     return (
       <section className="hero-slider">
         <div className="hero-slide">
-          <img src="/logo.jpg" alt="خوام للطباعة والتصميم" />
+          {loading ? (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255, 255, 255, 0.1)',
+            }}>
+              <div style={{
+                width: '50px',
+                height: '50px',
+                border: '4px solid rgba(220, 38, 38, 0.2)',
+                borderTop: '4px solid #dc2626',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }}></div>
+            </div>
+          ) : (
+            <img src="/logo.jpg" alt="خوام للطباعة والتصميم" />
+          )}
         </div>
       </section>
     )
@@ -281,35 +304,54 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
               onError={(e) => {
                 const target = e.target as HTMLImageElement
                 const originalUrl = slide.image_url
+                let retryCount = (target as any).__retryCount || 0
+                const maxRetries = 3
                 
                 // فقط في وضع التطوير
                 if (import.meta.env.DEV) {
-                  console.warn('⚠️ Failed to load hero slide image:', {
+                  console.warn(`⚠️ Failed to load hero slide image (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
                     resolved: imageUrl,
                     original: originalUrl,
                     isBase64: originalUrl?.startsWith('data:'),
                     isExternal: originalUrl?.startsWith('http'),
+                    isLocal: originalUrl?.startsWith('/'),
                     index: index,
                     slideId: slide.id
                   })
                 }
                 
-                // إذا كان data URL، حاول استخدامه مباشرة
-                if (originalUrl && originalUrl.startsWith('data:') && originalUrl !== imageUrl) {
-                  if (import.meta.env.DEV) {
-                    console.log('🔄 Retrying with original data URL from database')
+                // إعادة المحاولة
+                if (retryCount < maxRetries) {
+                  (target as any).__retryCount = retryCount + 1
+                  
+                  // محاولة 1: إذا كان data URL، استخدمه مباشرة
+                  if (retryCount === 0 && originalUrl && originalUrl.startsWith('data:') && originalUrl !== imageUrl) {
+                    if (import.meta.env.DEV) {
+                      console.log('🔄 Retry 1: Using original data URL')
+                    }
+                    target.src = originalUrl
+                    return
                   }
-                  target.src = originalUrl
-                  return
-                }
-                
-                // محاولة استخدام URL الأصلي مباشرة إذا كان مختلفاً
-                if (originalUrl && originalUrl !== imageUrl && (originalUrl.startsWith('http') || originalUrl.startsWith('/'))) {
-                  if (import.meta.env.DEV) {
-                    console.log('🔄 Retrying with original URL')
+                  
+                  // محاولة 2: إذا كان مسار محلي، أضف timestamp
+                  if (retryCount === 1 && originalUrl && originalUrl.startsWith('/')) {
+                    const retryUrl = `${originalUrl}${originalUrl.includes('?') ? '&' : '?'}_retry=${Date.now()}`
+                    if (import.meta.env.DEV) {
+                      console.log('🔄 Retry 2: Adding timestamp to local path')
+                    }
+                    target.src = retryUrl
+                    return
                   }
-                  target.src = resolveImageUrl(originalUrl)
-                  return
+                  
+                  // محاولة 3: استخدام URL الأصلي مباشرة
+                  if (retryCount === 2) {
+                    const retryUrl = resolveImageUrl(originalUrl)
+                    if (import.meta.env.DEV) {
+                      console.log('🔄 Retry 3: Using resolved URL')
+                    }
+                    target.src = retryUrl
+                    return
+                  }
                 }
                 
                 // إضافة السلايد إلى قائمة الفاشلة فقط بعد فشل جميع المحاولات
@@ -320,9 +362,12 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                     }
                     setFailedImages(prev => new Set(prev).add(slide.id))
                   }
-                }, 1000)
+                }, 2000)
                 
-                target.onerror = null // منع الحلقة اللانهائية
+                // منع الحلقة اللانهائية بعد المحاولات
+                if (retryCount >= maxRetries) {
+                  target.onerror = null
+                }
               }}
               onLoad={() => {
                 // لا نطبع console.log في الإنتاج لتقليل الضوضاء

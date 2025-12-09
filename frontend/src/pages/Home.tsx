@@ -15,16 +15,28 @@ interface HeroSlide {
 }
 
 export default function Home() {
-  // Fallback slide - يظهر فوراً قبل تحميل السلايدات
-  const fallbackSlide: HeroSlide = {
-    id: 0,
-    image_url: '/logo.jpg',
-    is_logo: true,
-    is_active: true,
-    display_order: 0
-  }
+  // Fallback slides - سلايدات افتراضية محلية تظهر دائماً
+  const defaultSlides: HeroSlide[] = [
+    {
+      id: -1, // ID سالب للتمييز عن السلايدات من قاعدة البيانات
+      image_url: '/logo.jpg',
+      is_logo: true,
+      is_active: true,
+      display_order: 0
+    },
+    // يمكن إضافة المزيد من السلايدات المحلية هنا
+    // مثال:
+    // {
+    //   id: -2,
+    //   image_url: '/hero-slides/slide-1.jpg',
+    //   is_logo: false,
+    //   is_active: true,
+    //   display_order: 1
+    // }
+  ]
 
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([fallbackSlide])
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultSlides)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadHeroSlides()
@@ -33,6 +45,8 @@ export default function Home() {
   const loadHeroSlides = async (retryCount = 0) => {
     const maxRetries = 3
     try {
+      setLoading(true)
+      
       // جلب السلايدات مباشرة من API بدون cache - من قاعدة البيانات
       const response = await heroSlidesAPI.getAll(true) // فقط السلايدات النشطة
       
@@ -40,6 +54,9 @@ export default function Home() {
       if (!response || !response.data) {
         throw new Error('استجابة غير صحيحة من API')
       }
+      
+      // دمج السلايدات من قاعدة البيانات مع السلايدات المحلية
+      let allSlides: HeroSlide[] = [...defaultSlides]
       
       if (response.data.success && response.data.slides && Array.isArray(response.data.slides) && response.data.slides.length > 0) {
         // التأكد من أن الصور موجودة من قاعدة البيانات
@@ -60,20 +77,28 @@ export default function Home() {
               console.log(`  - السلايدة ${slide.id}: ${isBase64 ? 'Base64 من قاعدة البيانات' : isExternal ? 'رابط خارجي' : 'مسار محلي'}`)
             })
           }
-          setHeroSlides(validSlides)
+          
+          // دمج السلايدات: السلايدات المحلية أولاً، ثم من قاعدة البيانات
+          // ترتيب حسب display_order و is_logo
+          allSlides = [...defaultSlides, ...validSlides].sort((a, b) => {
+            // اللوغو دائماً أولاً
+            if (a.is_logo && !b.is_logo) return -1
+            if (!a.is_logo && b.is_logo) return 1
+            // ثم حسب display_order
+            return a.display_order - b.display_order
+          })
         } else {
           if (import.meta.env.DEV) {
-            console.warn('⚠️ لم توجد سلايدات صحيحة في قاعدة البيانات')
+            console.warn('⚠️ لم توجد سلايدات صحيحة في قاعدة البيانات - استخدام السلايدات المحلية فقط')
           }
-          setHeroSlides([fallbackSlide])
         }
       } else {
-        // إذا لم توجد سلايدات في قاعدة البيانات، استخدم fallback
         if (import.meta.env.DEV) {
-          console.warn('⚠️ لا توجد سلايدات في قاعدة البيانات')
+          console.warn('⚠️ لا توجد سلايدات في قاعدة البيانات - استخدام السلايدات المحلية فقط')
         }
-        setHeroSlides([fallbackSlide])
       }
+      
+      setHeroSlides(allSlides)
     } catch (error: any) {
       // معالجة أفضل للأخطاء مع retry logic
       if (import.meta.env.DEV) {
@@ -103,15 +128,17 @@ export default function Home() {
         return loadHeroSlides(retryCount + 1)
       }
       
-      // Fallback: استخدام اللوغو كسلايدة افتراضية
-      setHeroSlides([fallbackSlide])
+      // Fallback: استخدام السلايدات المحلية فقط
+      setHeroSlides(defaultSlides)
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <div className="home-page">
-      {/* Hero Slider Section - يظهر فوراً مع fallback slide */}
-      <HeroSlider slides={heroSlides} />
+      {/* Hero Slider Section - يظهر فوراً مع السلايدات المحلية */}
+      <HeroSlider slides={heroSlides} loading={loading} />
 
       {/* Services Promo */}
       <section className="section services-promo">

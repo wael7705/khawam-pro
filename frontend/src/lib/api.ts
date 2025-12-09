@@ -77,7 +77,7 @@ export const servicesAPI = {
 }
 
 // Hero Slides API
-export const heroSlidesAPI = {
+  export const heroSlidesAPI = {
   getAll: (is_active?: boolean) => {
     const params = is_active !== undefined ? { is_active } : {}
     // إضافة timestamp لمنع cache من المتصفح

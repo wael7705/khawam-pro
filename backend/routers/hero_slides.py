@@ -255,6 +255,10 @@ async def upload_hero_slide_image(file: UploadFile = File(...)):
     try:
         import base64
         
+        # التحقق من وجود الملف
+        if not file:
+            raise HTTPException(status_code=400, detail="لم يتم إرسال ملف")
+        
         # التحقق من نوع الملف
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="الملف يجب أن يكون صورة")
@@ -262,10 +266,16 @@ async def upload_hero_slide_image(file: UploadFile = File(...)):
         # قراءة محتوى الملف
         content = await file.read()
         
+        # التحقق من أن الملف غير فارغ
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="الملف فارغ")
+        
         # التحقق من حجم الملف (حد أقصى 10MB)
         max_size = 10 * 1024 * 1024  # 10MB
         if len(content) > max_size:
             raise HTTPException(status_code=400, detail="حجم الصورة كبير جداً (الحد الأقصى 10MB)")
+        
+        original_size = len(content)
         
         # ضغط الصورة إذا كانت كبيرة (أكبر من 2MB)
         if len(content) > 2 * 1024 * 1024:
@@ -285,30 +295,44 @@ async def upload_hero_slide_image(file: UploadFile = File(...)):
                 output = io.BytesIO()
                 img.save(output, format='JPEG', quality=85, optimize=True)
                 content = output.getvalue()
-                file.content_type = 'image/jpeg'
-                print(f"✅ Compressed image from {len(content) / 1024 / 1024:.2f}MB to {len(output.getvalue()) / 1024 / 1024:.2f}MB")
+                mime_type = 'image/jpeg'
+                print(f"✅ Compressed image from {original_size / 1024 / 1024:.2f}MB to {len(content) / 1024 / 1024:.2f}MB")
             except Exception as compress_error:
                 print(f"⚠️ Failed to compress image, using original: {compress_error}")
                 # استخدم الملف الأصلي إذا فشل الضغط
+                mime_type = file.content_type or 'image/jpeg'
+        else:
+            mime_type = file.content_type or 'image/jpeg'
         
         # تحويل الصورة إلى base64 data URL
-        base64_content = base64.b64encode(content).decode('utf-8')
-        mime_type = file.content_type or 'image/jpeg'
-        data_url = f"data:{mime_type};base64,{base64_content}"
-        
-        # إرجاع data URL مباشرة (سيتم حفظه في قاعدة البيانات)
-        return {
-            "success": True,
-            "url": data_url,
-            "image_url": data_url,
-            "data_url": data_url,
-            "mime_type": mime_type,
-            "size_bytes": len(content)
-        }
+        try:
+            base64_content = base64.b64encode(content).decode('utf-8')
+            data_url = f"data:{mime_type};base64,{base64_content}"
+            
+            # التحقق من أن data_url تم إنشاؤه بنجاح
+            if not data_url or len(data_url) < 100:
+                raise ValueError("فشل في إنشاء data URL")
+            
+            print(f"✅ Successfully converted image to base64 (size: {len(data_url)} chars)")
+            
+            # إرجاع data URL مباشرة (سيتم حفظه في قاعدة البيانات)
+            return {
+                "success": True,
+                "url": data_url,
+                "image_url": data_url,
+                "data_url": data_url,
+                "mime_type": mime_type,
+                "size_bytes": len(content),
+                "original_size_bytes": original_size
+            }
+        except Exception as base64_error:
+            print(f"❌ Error encoding to base64: {base64_error}")
+            raise HTTPException(status_code=500, detail=f"خطأ في تحويل الصورة إلى base64: {str(base64_error)}")
+            
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error uploading hero slide image: {e}")
+        print(f"❌ Error uploading hero slide image: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في رفع الصورة: {str(e)}")

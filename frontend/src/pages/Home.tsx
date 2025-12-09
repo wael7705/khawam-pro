@@ -30,15 +30,25 @@ export default function Home() {
     loadHeroSlides()
   }, [])
 
-  const loadHeroSlides = async () => {
+  const loadHeroSlides = async (retryCount = 0) => {
+    const maxRetries = 3
     try {
       // جلب السلايدات مباشرة من API بدون cache - من قاعدة البيانات
       const response = await heroSlidesAPI.getAll(true) // فقط السلايدات النشطة
       
-      if (response.data.success && response.data.slides && response.data.slides.length > 0) {
+      // التحقق من بنية الاستجابة
+      if (!response || !response.data) {
+        throw new Error('استجابة غير صحيحة من API')
+      }
+      
+      if (response.data.success && response.data.slides && Array.isArray(response.data.slides) && response.data.slides.length > 0) {
         // التأكد من أن الصور موجودة من قاعدة البيانات
         const validSlides = response.data.slides.filter((slide: HeroSlide) => 
-          slide.image_url && slide.image_url.trim() && slide.is_active
+          slide && 
+          slide.image_url && 
+          typeof slide.image_url === 'string' &&
+          slide.image_url.trim() && 
+          slide.is_active === true
         )
         
         if (validSlides.length > 0) {
@@ -64,11 +74,35 @@ export default function Home() {
         }
         setHeroSlides([fallbackSlide])
       }
-    } catch (error) {
-      // فقط في وضع التطوير
+    } catch (error: any) {
+      // معالجة أفضل للأخطاء مع retry logic
       if (import.meta.env.DEV) {
         console.error('❌ خطأ في جلب السلايدات من قاعدة البيانات:', error)
+        if (error.response) {
+          console.error('  - Status:', error.response.status)
+          console.error('  - Data:', error.response.data)
+        } else if (error.request) {
+          console.error('  - Request:', error.request)
+        } else {
+          console.error('  - Message:', error.message)
+        }
       }
+      
+      // Retry logic للأخطاء الشبكية
+      if (retryCount < maxRetries && (
+        error.code === 'ERR_NETWORK' ||
+        error.code === 'ERR_CONNECTION_RESET' ||
+        error.message?.includes('Network Error') ||
+        error.message?.includes('timeout')
+      )) {
+        if (import.meta.env.DEV) {
+          console.log(`🔄 إعادة المحاولة ${retryCount + 1}/${maxRetries}...`)
+        }
+        // انتظر قبل إعادة المحاولة (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return loadHeroSlides(retryCount + 1)
+      }
+      
       // Fallback: استخدام اللوغو كسلايدة افتراضية
       setHeroSlides([fallbackSlide])
     }

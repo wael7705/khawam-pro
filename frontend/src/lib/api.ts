@@ -76,8 +76,8 @@ export const servicesAPI = {
   },
 }
 
-  // Portfolio API
-  export const heroSlidesAPI = {
+// Hero Slides API
+export const heroSlidesAPI = {
   getAll: (is_active?: boolean) => {
     const params = is_active !== undefined ? { is_active } : {}
     // إضافة timestamp لمنع cache من المتصفح
@@ -98,6 +98,14 @@ export const servicesAPI = {
   delete: (id: number) => api.delete(`/hero-slides/${id}`),
   reorder: (slide_orders: Array<{ id: number; display_order: number }>) =>
     api.post('/hero-slides/reorder', slide_orders),
+  upload: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/hero-slides/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
 }
 
 export const portfolioAPI = {

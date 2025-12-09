@@ -216,34 +216,21 @@ export default function HeroSlidesManagement() {
     try {
       setUploading(true)
       
-      // رفع الصورة
-      const formData = new FormData()
-      formData.append('file', file)
+      // رفع الصورة باستخدام API
+      const data = await heroSlidesAPI.upload(file)
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api'}/hero-slides/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
-        },
-        body: formData
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'خطأ في رفع الصورة')
-      }
-
-      const data = await response.json()
-      
-      if (data.success && data.url) {
-        setFormData(prev => ({ ...prev, image_url: data.url }))
+      if (data.success && (data.url || data.image_url || data.data_url)) {
+        // استخدام أي من الحقول المتاحة (url, image_url, data_url)
+        const imageUrl = data.url || data.image_url || data.data_url
+        setFormData(prev => ({ ...prev, image_url: imageUrl }))
         showSuccess('تم رفع الصورة بنجاح')
       } else {
-        throw new Error('فشل رفع الصورة')
+        throw new Error('فشل رفع الصورة - لم يتم إرجاع رابط الصورة')
       }
     } catch (error: any) {
       console.error('Error uploading image:', error)
-      showError(error.message || 'خطأ في رفع الصورة')
+      const errorMessage = error.response?.data?.detail || error.message || 'خطأ في رفع الصورة'
+      showError(errorMessage)
     } finally {
       setUploading(false)
       // إعادة تعيين input الملف

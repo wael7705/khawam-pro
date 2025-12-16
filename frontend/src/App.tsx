@@ -18,6 +18,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { ToastContainer } from './components/Toast'
 import { subscribe, getToasts, removeToast } from './utils/toast'
 import type { Toast } from './utils/toast'
+import { initAnalytics, stopTimeTracking } from './utils/analytics'
 import './App.css'
 
 function App() {
@@ -36,8 +37,21 @@ function App() {
     // Initialize with existing toasts
     setToasts(getToasts())
     
-    return unsubscribe
-  }, [])
+    // Initialize analytics (only on public pages)
+    if (!location.pathname.startsWith('/dashboard') && 
+        !location.pathname.startsWith('/login') && 
+        !location.pathname.startsWith('/register')) {
+      initAnalytics()
+    }
+    
+    return () => {
+      unsubscribe()
+      // Stop time tracking on unmount
+      if (!location.pathname.startsWith('/dashboard')) {
+        stopTimeTracking(location.pathname)
+      }
+    }
+  }, [location.pathname])
 
   return (
     <div className="app">

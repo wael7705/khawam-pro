@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, R
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect
 from database import get_db
-from models import Product, Service, PortfolioWork, Order, OrderItem, ProductCategory
+from models import Product, Service, PortfolioWork, Order, OrderItem, ProductCategory, OrderStatusHistory, User
+from routers.auth import get_current_active_user
 from typing import Optional
 from pydantic import BaseModel, Field, validator
 from utils import handle_error, success_response, validate_price, validate_string
@@ -1885,10 +1886,11 @@ async def get_order_details(order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"خطأ في جلب تفاصيل الطلب: {str(e)}")
 
 @router.put("/orders/{order_id}/status")
-async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db: Session = Depends(get_db)):
+async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_active_user)):
     """Update order status with optional cancellation reason"""
     try:
         from sqlalchemy import text
+        from models import OrderStatusHistory
         
         status = status_data.status
         cancellation_reason = status_data.cancellation_reason
@@ -1902,8 +1904,24 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
         if not order:
             raise HTTPException(status_code=404, detail="الطلب غير موجود")
         
+        # Save old status for history
+        old_status = order.status
+        
         # Update status
         order.status = status
+        
+        # Record status change in history
+        try:
+            status_history = OrderStatusHistory(
+                order_id=order_id,
+                status=status,
+                changed_by=current_user.id if current_user else None,
+                notes=cancellation_reason or status_data.rejection_reason or None
+            )
+            db.add(status_history)
+        except Exception as history_error:
+            print(f"Warning: Could not record status history: {history_error}")
+            # Don't fail the status update if history recording fails
         
         # If completing order, set delivery_date and completed_at
         if status == 'completed':

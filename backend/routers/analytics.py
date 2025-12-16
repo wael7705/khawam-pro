@@ -1,0 +1,418 @@
+"""
+Analytics router for tracking visitors and page views
+"""
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
+from sqlalchemy import text, func, and_, or_
+from database import get_db
+from models import VisitorTracking, PageView, User
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
+from routers.auth import get_current_active_user, get_current_user_optional
+
+router = APIRouter()
+
+class TrackVisitRequest(BaseModel):
+    session_id: str
+    page_path: str
+    referrer: Optional[str] = None
+    user_agent: Optional[str] = None
+    device_type: Optional[str] = None
+    browser: Optional[str] = None
+    os: Optional[str] = None
+    ip_address: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    entry_page: bool = False
+    exit_page: bool = False
+
+class TrackPageViewRequest(BaseModel):
+    session_id: str
+    page_path: str
+    time_spent: int = 0
+    scroll_depth: int = 0
+    actions: Optional[Dict[str, Any]] = None
+
+def parse_user_agent(user_agent: Optional[str]) -> Dict[str, Optional[str]]:
+    """Parse user agent to extract browser and OS"""
+    if not user_agent:
+        return {"browser": None, "os": None, "device_type": None}
+    
+    user_agent_lower = user_agent.lower()
+    
+    # Detect browser
+    browser = None
+    if "chrome" in user_agent_lower and "edg" not in user_agent_lower:
+        browser = "Chrome"
+    elif "firefox" in user_agent_lower:
+        browser = "Firefox"
+    elif "safari" in user_agent_lower and "chrome" not in user_agent_lower:
+        browser = "Safari"
+    elif "edg" in user_agent_lower:
+        browser = "Edge"
+    elif "opera" in user_agent_lower:
+        browser = "Opera"
+    
+    # Detect OS
+    os_name = None
+    if "windows" in user_agent_lower:
+        os_name = "Windows"
+    elif "mac" in user_agent_lower or "darwin" in user_agent_lower:
+        os_name = "macOS"
+    elif "linux" in user_agent_lower:
+        os_name = "Linux"
+    elif "android" in user_agent_lower:
+        os_name = "Android"
+    elif "ios" in user_agent_lower or "iphone" in user_agent_lower or "ipad" in user_agent_lower:
+        os_name = "iOS"
+    
+    # Detect device type
+    device_type = None
+    if "mobile" in user_agent_lower or "android" in user_agent_lower or "iphone" in user_agent_lower:
+        device_type = "mobile"
+    elif "tablet" in user_agent_lower or "ipad" in user_agent_lower:
+        device_type = "tablet"
+    else:
+        device_type = "desktop"
+    
+    return {"browser": browser, "os": os_name, "device_type": device_type}
+
+@router.post("/track")
+async def track_visit(
+    request: TrackVisitRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Track a visitor visit"""
+    try:
+        # Parse user agent if not provided
+        if not request.browser or not request.os:
+            parsed = parse_user_agent(request.user_agent)
+            if not request.browser:
+                request.browser = parsed["browser"]
+            if not request.os:
+                request.os = parsed["os"]
+            if not request.device_type:
+                request.device_type = parsed["device_type"]
+        
+        # Check if visitor exists
+        existing_visitor = db.query(VisitorTracking).filter(
+            VisitorTracking.session_id == request.session_id
+        ).order_by(VisitorTracking.created_at.desc()).first()
+        
+        visit_count = 1
+        if existing_visitor:
+            visit_count = existing_visitor.visit_count + 1
+        
+        # Create new visitor tracking entry
+        visitor = VisitorTracking(
+            session_id=request.session_id,
+            user_id=current_user.id if current_user else None,
+            page_path=request.page_path,
+            referrer=request.referrer,
+            user_agent=request.user_agent,
+            device_type=request.device_type,
+            browser=request.browser,
+            os=request.os,
+            ip_address=request.ip_address,
+            country=request.country,
+            city=request.city,
+            entry_page=request.entry_page,
+            exit_page=request.exit_page,
+            visit_count=visit_count
+        )
+        
+        db.add(visitor)
+        db.commit()
+        db.refresh(visitor)
+        
+        return {"success": True, "visitor_id": visitor.id}
+    except Exception as e:
+        db.rollback()
+        print(f"Error tracking visit: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error tracking visit: {str(e)}")
+
+@router.post("/page-view")
+async def track_page_view(
+    request: TrackPageViewRequest,
+    db: Session = Depends(get_db)
+):
+    """Track a page view"""
+    try:
+        # Get visitor_id from session_id
+        visitor = db.query(VisitorTracking).filter(
+            VisitorTracking.session_id == request.session_id
+        ).order_by(VisitorTracking.created_at.desc()).first()
+        
+        visitor_id = visitor.id if visitor else None
+        
+        page_view = PageView(
+            visitor_id=visitor_id,
+            session_id=request.session_id,
+            page_path=request.page_path,
+            time_spent=request.time_spent,
+            scroll_depth=request.scroll_depth,
+            actions=request.actions
+        )
+        
+        db.add(page_view)
+        db.commit()
+        db.refresh(page_view)
+        
+        return {"success": True, "page_view_id": page_view.id}
+    except Exception as e:
+        db.rollback()
+        print(f"Error tracking page view: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error tracking page view: {str(e)}")
+
+@router.get("/stats")
+async def get_analytics_stats(
+    period: str = Query("day", description="Period: day, week, month"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """Get analytics statistics"""
+    try:
+        # Calculate date range
+        now = datetime.now()
+        if period == "day":
+            start_date = now - timedelta(days=1)
+        elif period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now - timedelta(days=30)
+        else:
+            start_date = now - timedelta(days=1)
+        
+        # Total visitors
+        total_visitors = db.query(func.count(func.distinct(VisitorTracking.session_id))).filter(
+            VisitorTracking.created_at >= start_date
+        ).scalar() or 0
+        
+        # Total page views
+        total_page_views = db.query(func.count(PageView.id)).filter(
+            PageView.created_at >= start_date
+        ).scalar() or 0
+        
+        # Unique pages
+        unique_pages = db.query(func.count(func.distinct(PageView.page_path))).filter(
+            PageView.created_at >= start_date
+        ).scalar() or 0
+        
+        # Average time on site
+        avg_time = db.query(func.avg(PageView.time_spent)).filter(
+            PageView.created_at >= start_date
+        ).scalar() or 0
+        
+        return {
+            "period": period,
+            "total_visitors": total_visitors,
+            "total_page_views": total_page_views,
+            "unique_pages": unique_pages,
+            "average_time_on_site": round(float(avg_time), 2) if avg_time else 0
+        }
+    except Exception as e:
+        print(f"Error getting analytics stats: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting stats: {str(e)}")
+
+@router.get("/exit-rates")
+async def get_exit_rates(
+    period: str = Query("day", description="Period: day, week, month"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """Get exit rates by page"""
+    try:
+        # Calculate date range
+        now = datetime.now()
+        if period == "day":
+            start_date = now - timedelta(days=1)
+        elif period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now - timedelta(days=30)
+        else:
+            start_date = now - timedelta(days=1)
+        
+        # Get exit rates by page
+        exit_stats = db.execute(text("""
+            SELECT 
+                page_path,
+                COUNT(*) as total_visits,
+                SUM(CASE WHEN exit_page = true THEN 1 ELSE 0 END) as exits,
+                ROUND(
+                    (SUM(CASE WHEN exit_page = true THEN 1 ELSE 0 END)::float / COUNT(*)::float) * 100, 
+                    2
+                ) as exit_rate
+            FROM visitor_tracking
+            WHERE created_at >= :start_date
+            GROUP BY page_path
+            ORDER BY exit_rate DESC
+        """), {"start_date": start_date}).fetchall()
+        
+        result = []
+        for row in exit_stats:
+            result.append({
+                "page_path": row[0],
+                "total_visits": row[1],
+                "exits": row[2],
+                "exit_rate": float(row[3]) if row[3] else 0
+            })
+        
+        return {"period": period, "exit_rates": result}
+    except Exception as e:
+        print(f"Error getting exit rates: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting exit rates: {str(e)}")
+
+@router.get("/pages")
+async def get_page_stats(
+    period: str = Query("day", description="Period: day, week, month"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """Get statistics for each page"""
+    try:
+        # Calculate date range
+        now = datetime.now()
+        if period == "day":
+            start_date = now - timedelta(days=1)
+        elif period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now - timedelta(days=30)
+        else:
+            start_date = now - timedelta(days=1)
+        
+        # Get page statistics
+        page_stats = db.execute(text("""
+            SELECT 
+                page_path,
+                COUNT(*) as views,
+                AVG(time_spent) as avg_time_spent,
+                AVG(scroll_depth) as avg_scroll_depth
+            FROM page_views
+            WHERE created_at >= :start_date
+            GROUP BY page_path
+            ORDER BY views DESC
+        """), {"start_date": start_date}).fetchall()
+        
+        result = []
+        for row in page_stats:
+            result.append({
+                "page_path": row[0],
+                "views": row[1],
+                "avg_time_spent": round(float(row[2]), 2) if row[2] else 0,
+                "avg_scroll_depth": round(float(row[3]), 2) if row[3] else 0
+            })
+        
+        return {"period": period, "pages": result}
+    except Exception as e:
+        print(f"Error getting page stats: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting page stats: {str(e)}")
+
+@router.get("/visitors")
+async def get_visitor_count(
+    period: str = Query("day", description="Period: day, week, month"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """Get visitor count"""
+    try:
+        # Calculate date range
+        now = datetime.now()
+        if period == "day":
+            start_date = now - timedelta(days=1)
+        elif period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now - timedelta(days=30)
+        else:
+            start_date = now - timedelta(days=1)
+        
+        # Get unique visitors
+        unique_visitors = db.query(func.count(func.distinct(VisitorTracking.session_id))).filter(
+            VisitorTracking.created_at >= start_date
+        ).scalar() or 0
+        
+        # Get total visits
+        total_visits = db.query(func.count(VisitorTracking.id)).filter(
+            VisitorTracking.created_at >= start_date
+        ).scalar() or 0
+        
+        return {
+            "period": period,
+            "unique_visitors": unique_visitors,
+            "total_visits": total_visits
+        }
+    except Exception as e:
+        print(f"Error getting visitor count: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting visitor count: {str(e)}")
+
+@router.get("/funnels")
+async def get_funnel_analysis(
+    period: str = Query("day", description="Period: day, week, month"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user)
+):
+    """Get funnel analysis - user journey through the site"""
+    try:
+        # Calculate date range
+        now = datetime.now()
+        if period == "day":
+            start_date = now - timedelta(days=1)
+        elif period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now - timedelta(days=30)
+        else:
+            start_date = now - timedelta(days=1)
+        
+        # Get common page paths
+        common_paths = ["/", "/services", "/portfolio", "/contact", "/orders"]
+        
+        # Get visitor flow
+        funnel_data = []
+        for i, path in enumerate(common_paths):
+            if i == 0:
+                # Entry point
+                count = db.query(func.count(func.distinct(VisitorTracking.session_id))).filter(
+                    and_(
+                        VisitorTracking.page_path == path,
+                        VisitorTracking.entry_page == True,
+                        VisitorTracking.created_at >= start_date
+                    )
+                ).scalar() or 0
+            else:
+                # Subsequent pages
+                count = db.query(func.count(func.distinct(PageView.session_id))).filter(
+                    and_(
+                        PageView.page_path == path,
+                        PageView.created_at >= start_date
+                    )
+                ).scalar() or 0
+            
+            funnel_data.append({
+                "page": path,
+                "visitors": count
+            })
+        
+        return {"period": period, "funnel": funnel_data}
+    except Exception as e:
+        print(f"Error getting funnel analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error getting funnel: {str(e)}")
+

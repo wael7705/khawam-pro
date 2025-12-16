@@ -58,23 +58,35 @@ export default function Home() {
       // دمج السلايدات من قاعدة البيانات مع السلايدات المحلية
       let allSlides: HeroSlide[] = [...defaultSlides]
       
-      if (response.data.success && response.data.slides && Array.isArray(response.data.slides) && response.data.slides.length > 0) {
+      // معالجة أفضل للاستجابة - دعم أشكال مختلفة
+      let slidesFromDB: HeroSlide[] = []
+      
+      if (response.data.success && response.data.slides && Array.isArray(response.data.slides)) {
+        slidesFromDB = response.data.slides
+      } else if (Array.isArray(response.data)) {
+        slidesFromDB = response.data
+      }
+      
+      if (slidesFromDB.length > 0) {
         // التأكد من أن الصور موجودة من قاعدة البيانات
-        const validSlides = response.data.slides.filter((slide: HeroSlide) => 
-          slide && 
-          slide.image_url && 
-          typeof slide.image_url === 'string' &&
-          slide.image_url.trim() && 
-          slide.is_active === true
-        )
+        const validSlides = slidesFromDB.filter((slide: any) => {
+          if (!slide || !slide.image_url) return false
+          const imageUrl = typeof slide.image_url === 'string' ? slide.image_url.trim() : ''
+          if (!imageUrl) return false
+          
+          // التحقق من أن الصورة نشطة
+          const isActive = slide.is_active !== false // default true
+          
+          return isActive
+        })
         
         if (validSlides.length > 0) {
           if (import.meta.env.DEV) {
             console.log(`✅ تم جلب ${validSlides.length} سلايدة من قاعدة البيانات`)
-            validSlides.forEach((slide: HeroSlide) => {
+            validSlides.forEach((slide: any) => {
               const isBase64 = slide.image_url.startsWith('data:')
               const isExternal = slide.image_url.startsWith('http')
-              console.log(`  - السلايدة ${slide.id}: ${isBase64 ? 'Base64 من قاعدة البيانات' : isExternal ? 'رابط خارجي' : 'مسار محلي'}`)
+              console.log(`  - السلايدة ${slide.id} (display_order: ${slide.display_order || 0}): ${isBase64 ? 'Base64' : isExternal ? 'رابط خارجي' : 'مسار محلي'}`)
             })
           }
           
@@ -85,8 +97,12 @@ export default function Home() {
             if (a.is_logo && !b.is_logo) return -1
             if (!a.is_logo && b.is_logo) return 1
             // ثم حسب display_order
-            return a.display_order - b.display_order
+            return (a.display_order || 0) - (b.display_order || 0)
           })
+          
+          if (import.meta.env.DEV) {
+            console.log(`✅ إجمالي السلايدات بعد الدمج: ${allSlides.length}`)
+          }
         } else {
           if (import.meta.env.DEV) {
             console.warn('⚠️ لم توجد سلايدات صحيحة في قاعدة البيانات - استخدام السلايدات المحلية فقط')

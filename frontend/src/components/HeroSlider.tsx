@@ -104,9 +104,8 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
   useEffect(() => {
     if (activeSlides.length === 0) return
 
-    const preloadLinks: HTMLLinkElement[] = []
-    
     // تحميل الصورة الحالية والصورة التالية فقط (لتحسين الأداء)
+    // لا نستخدم preload links لتجنب التحذيرات - نستخدم Image objects فقط
     const slidesToPreload = Math.min(2, activeSlides.length)
     
     for (let i = 0; i < slidesToPreload; i++) {
@@ -117,40 +116,19 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
         const imageUrl = resolveImageUrl(slide.image_url)
         if (!imageUrl) continue
         
-        // Preload link فقط للصورة الحالية
+        // تحميل الصورة في الخلفية باستخدام Image object
+        // هذا أفضل من preload links لأنه لا يسبب تحذيرات
+        const img = new Image()
+        img.src = imageUrl
+        img.loading = 'eager' // تحميل فوري للصورة الحالية
         if (i === 0) {
-          const link = document.createElement('link')
-          link.rel = 'preload'
-          link.as = 'image'
-          link.href = imageUrl
-          link.setAttribute('fetchPriority', 'high')
-          document.head.appendChild(link)
-          preloadLinks.push(link)
-        }
-        
-        // تحميل الصورة التالية في الخلفية (بدون preload link)
-        if (i === 1) {
-          const img = new Image()
-          img.src = imageUrl
+          img.fetchPriority = 'high' // أولوية عالية للصورة الحالية
         }
       } catch (error) {
         if (import.meta.env.DEV) {
           console.warn(`Error preloading slide ${slideIndex}:`, error)
         }
       }
-    }
-    
-    // تنظيف preload links
-    return () => {
-      preloadLinks.forEach(link => {
-        try {
-          if (link.parentNode) {
-            link.parentNode.removeChild(link)
-          }
-        } catch (error) {
-          // تجاهل أخطاء التنظيف
-        }
-      })
     }
   }, [activeSlides, currentIndex])
 

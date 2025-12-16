@@ -1748,7 +1748,7 @@ app.add_middleware(
 )
 
 # Include routers
-from routers import auth, services, orders, portfolio, products, admin, studio, service_workflows, pricing, advanced_pricing, hero_slides
+from routers import auth, services, orders, portfolio, products, admin, studio, service_workflows, pricing, advanced_pricing, hero_slides, analytics
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(services.router, prefix="/api/services", tags=["services"])
@@ -1761,6 +1761,7 @@ app.include_router(service_workflows.router, prefix="/api/workflows", tags=["wor
 app.include_router(pricing.router, prefix="/api", tags=["pricing"])
 app.include_router(advanced_pricing.router, prefix="/api", tags=["advanced-pricing"])
 app.include_router(hero_slides.router, prefix="/api", tags=["hero-slides"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 
 # Static files
 # إنشاء مجلدات uploads إذا لم تكن موجودة

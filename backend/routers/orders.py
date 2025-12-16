@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect, or_, func
 from database import get_db
-from models import Order, OrderItem, User
+from models import Order, OrderItem, User, OrderStatusHistory
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Tuple
 from decimal import Decimal
@@ -2110,3 +2110,122 @@ async def get_order(order_id: int, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"خطأ في جلب الطلب: {str(e)}")
+
+@router.get("/{order_id}/status-history")
+async def get_order_status_history(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Get status history for an order"""
+    try:
+        # Check if order exists and user has access
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        # Check access: customer can only see their own orders
+        if current_user:
+            from routers.auth import _get_user_type_name
+            user_role = _get_user_type_name(current_user.user_type_id, db) if current_user.user_type_id else None
+            if user_role == "عميل":
+                if order.customer_id != current_user.id:
+                    raise HTTPException(status_code=403, detail="ليس لديك صلاحية لعرض هذا الطلب")
+        
+        # Get status history
+        history = db.query(OrderStatusHistory).filter(
+            OrderStatusHistory.order_id == order_id
+        ).order_by(OrderStatusHistory.created_at.asc()).all()
+        
+        # If no history exists, create initial entry from order
+        if not history:
+            initial_status = OrderStatusHistory(
+                order_id=order_id,
+                status=order.status,
+                changed_by=None,
+                notes=None
+            )
+            db.add(initial_status)
+            db.commit()
+            history = [initial_status]
+        
+        return {
+            "order_id": order_id,
+            "status_history": [
+                {
+                    "id": h.id,
+                    "status": h.status,
+                    "changed_by": h.changed_by,
+                    "notes": h.notes,
+                    "created_at": h.created_at.isoformat() if h.created_at else None
+                }
+                for h in history
+            ]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching status history: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب تاريخ الحالة: {str(e)}")
+
+@router.get("/{order_id}/reorder-data")
+async def get_reorder_data(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Get order data for reordering"""
+    try:
+        # Check if order exists and user has access
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="الطلب غير موجود")
+        
+        # Check access: customer can only see their own orders
+        if current_user:
+            from routers.auth import _get_user_type_name
+            user_role = _get_user_type_name(current_user.user_type_id, db) if current_user.user_type_id else None
+            if user_role == "عميل":
+                if order.customer_id != current_user.id:
+                    raise HTTPException(status_code=403, detail="ليس لديك صلاحية لعرض هذا الطلب")
+        
+        # Get order items
+        items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+        
+        # Serialize order data
+        order_data = {
+            "order_id": order.id,
+            "order_number": order.order_number,
+            "customer_name": order.customer_name,
+            "customer_phone": order.customer_phone,
+            "customer_whatsapp": order.customer_whatsapp,
+            "shop_name": order.shop_name,
+            "delivery_type": order.delivery_type,
+            "delivery_address": order.delivery_address,
+            "delivery_latitude": float(order.delivery_latitude) if order.delivery_latitude else None,
+            "delivery_longitude": float(order.delivery_longitude) if order.delivery_longitude else None,
+            "notes": order.notes,
+            "items": [
+                {
+                    "product_id": item.product_id,
+                    "service_name": item.product_name or item.service_name,
+                    "quantity": item.quantity,
+                    "unit_price": float(item.unit_price) if item.unit_price else 0,
+                    "total_price": float(item.total_price) if item.total_price else 0,
+                    "specifications": item.specifications if isinstance(item.specifications, dict) else (json.loads(item.specifications) if isinstance(item.specifications, str) else {}),
+                    "design_files": item.design_files if isinstance(item.design_files, list) else []
+                }
+                for item in items
+            ]
+        }
+        
+        return order_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching reorder data: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب بيانات إعادة الطلب: {str(e)}")

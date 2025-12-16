@@ -283,3 +283,50 @@ class PricingRule(Base):
     
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+class VisitorTracking(Base):
+    """تتبع الزوار والزيارات"""
+    __tablename__ = "visitor_tracking"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(255), nullable=False, index=True)  # معرف الجلسة
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # المستخدم المسجل (إن وجد)
+    page_path = Column(String(500), nullable=False)  # مسار الصفحة
+    referrer = Column(Text, nullable=True)  # الصفحة المرجعية
+    user_agent = Column(Text, nullable=True)  # معلومات المتصفح
+    device_type = Column(String(50), nullable=True)  # desktop, mobile, tablet
+    browser = Column(String(100), nullable=True)  # Chrome, Firefox, Safari, etc.
+    os = Column(String(100), nullable=True)  # Windows, macOS, Linux, iOS, Android
+    ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
+    country = Column(String(100), nullable=True)
+    city = Column(String(100), nullable=True)
+    time_on_page = Column(Integer, default=0)  # الوقت على الصفحة بالثواني
+    exit_page = Column(Boolean, default=False)  # هل هذه صفحة الخروج؟
+    entry_page = Column(Boolean, default=False)  # هل هذه صفحة الدخول؟
+    visit_count = Column(Integer, default=1)  # عدد الزيارات لهذا المستخدم
+    created_at = Column(TIMESTAMP, server_default=func.now(), index=True)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+class PageView(Base):
+    """تتبع مشاهدات الصفحات"""
+    __tablename__ = "page_views"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    visitor_id = Column(Integer, ForeignKey("visitor_tracking.id"), nullable=True, index=True)
+    session_id = Column(String(255), nullable=False, index=True)  # معرف الجلسة
+    page_path = Column(String(500), nullable=False, index=True)  # مسار الصفحة
+    time_spent = Column(Integer, default=0)  # الوقت على الصفحة بالثواني
+    scroll_depth = Column(Integer, default=0)  # عمق التمرير (0-100)
+    actions = Column(JSON, nullable=True)  # الأحداث (clicks, form submissions, etc.)
+    created_at = Column(TIMESTAMP, server_default=func.now(), index=True)
+
+class OrderStatusHistory(Base):
+    """تاريخ تغييرات حالة الطلب"""
+    __tablename__ = "order_status_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+    status = Column(String(20), nullable=False)  # الحالة الجديدة
+    changed_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # المستخدم الذي غيّر الحالة
+    notes = Column(Text, nullable=True)  # ملاحظات التغيير
+    created_at = Column(TIMESTAMP, server_default=func.now(), index=True)

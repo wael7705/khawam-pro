@@ -23,13 +23,14 @@ export default function FeaturedWorksSection() {
     loadWorks()
   }, [])
 
-  const loadWorks = async () => {
+  const loadWorks = async (retryCount = 0) => {
+    const maxRetries = 3
     try {
       const allWorks = await fetchWithCache<Work[]>(
         'portfolio:all',
         async () => {
           const response = await portfolioAPI.getAll()
-          return response.data
+          return response.data || []
         },
         15 * 60 * 1000 // Cache for 15 minutes
       )
@@ -37,8 +38,25 @@ export default function FeaturedWorksSection() {
       // تصفية الأعمال المميزة فقط
       const featured = allWorks.filter(work => work.is_featured).slice(0, 6)
       setWorks(featured)
-    } catch (error) {
-      console.error('Error loading featured works:', error)
+    } catch (error: any) {
+      // Retry logic للأخطاء الشبكية
+      if (retryCount < maxRetries && (
+        error.code === 'ERR_NETWORK' ||
+        error.code === 'ERR_CONNECTION_RESET' ||
+        error.message?.includes('Network Error') ||
+        error.message?.includes('timeout')
+      )) {
+        if (import.meta.env.DEV) {
+          console.log(`🔄 إعادة المحاولة ${retryCount + 1}/${maxRetries} لجلب الأعمال المميزة...`)
+        }
+        // انتظر قبل إعادة المحاولة (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return loadWorks(retryCount + 1)
+      }
+      
+      if (import.meta.env.DEV) {
+        console.error('Error loading featured works:', error)
+      }
       setWorks([])
     } finally {
       setLoading(false)

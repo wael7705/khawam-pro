@@ -1,0 +1,231 @@
+.reorder-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.reorder-modal {
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.reorder-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.reorder-modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.reorder-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #6b7280);
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.reorder-modal-close:hover {
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.reorder-modal-content {
+  padding: 1.5rem;
+}
+
+.reorder-modal-loading,
+.reorder-modal-error {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+}
+
+.reorder-summary {
+  background: var(--bg-secondary, #f9fafb);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.reorder-summary h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.reorder-summary-item {
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.reorder-summary-item strong {
+  color: var(--text-primary, #111827);
+  margin-left: 0.5rem;
+}
+
+.reorder-options {
+  margin-bottom: 1.5rem;
+}
+
+.reorder-options h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.reorder-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.reorder-option:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.reorder-option input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+.reorder-option span {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.reorder-option-content {
+  margin-right: 2.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--card-bg, #fff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.reorder-option-content input,
+.reorder-option-content textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #111827);
+}
+
+.reorder-option-content textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.btn-location-picker {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.btn-location-picker:hover {
+  background: var(--primary-hover, #2563eb);
+}
+
+.reorder-modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary-color, #3b82f6);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover, #2563eb);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary, #f9fafb);
+  color: var(--text-primary, #111827);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+@media (max-width: 768px) {
+  .reorder-modal {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+  }
+
+  .reorder-modal-header {
+    padding: 1rem;
+  }
+
+  .reorder-modal-content {
+    padding: 1rem;
+  }
+}
+

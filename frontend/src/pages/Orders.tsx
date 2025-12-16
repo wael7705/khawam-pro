@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
 import type { AxiosError } from 'axios'
-import { Download, ExternalLink, FileText } from 'lucide-react'
+import { Download, ExternalLink, FileText, RotateCcw } from 'lucide-react'
 import { ordersAPI } from '../lib/api'
 import { isAuthenticated } from '../lib/auth'
 import { Link } from 'react-router-dom'
+import OrderStatusTimeline from '../components/OrderStatusTimeline'
+import ReorderModal from '../components/ReorderModal'
 import './Orders.css'
 
 type OrderItem = {
@@ -677,7 +679,22 @@ export default function Orders() {
               >
                 {variant === 'done' ? 'اطلب نسخة عن الفاتورة' : 'متابعة عبر واتساب'}
               </a>
+              {variant === 'done' && (
+                <button
+                  className="order-card__action reorder-btn"
+                  onClick={() => setReorderModalOpen(order.id)}
+                >
+                  <RotateCcw size={16} />
+                  إعادة الطلب
+                </button>
+              )}
             </div>
+            
+            {variant === 'active' && (
+              <div className="order-card__timeline">
+                <OrderStatusTimeline orderId={order.id} />
+              </div>
+            )}
           </div>
 
           <div className="order-card__attachments-panel">
@@ -751,6 +768,19 @@ export default function Orders() {
           </div>
         )}
       </div>
+      
+      {reorderModalOpen && (
+        <ReorderModal
+          isOpen={true}
+          onClose={() => setReorderModalOpen(null)}
+          orderId={reorderModalOpen}
+          onReorderSuccess={() => {
+            setReorderModalOpen(null)
+            // Reload orders
+            window.location.reload()
+          }}
+        />
+      )}
     </div>
   )
 }

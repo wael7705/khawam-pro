@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
 import { LayoutDashboard, ShoppingCart as ShoppingCartIcon, Palette, Briefcase, Edit, ChevronLeft, ChevronRight, Users, Sparkles, Home as HomeIcon, DollarSign, CreditCard, Image as ImageIcon, Archive as ArchiveIcon } from 'lucide-react'
 const DashboardHome = lazy(() => import('./Dashboard/DashboardHome'))
+const Analytics = lazy(() => import('./Dashboard/Analytics'))
 import OrdersManagement from './Dashboard/OrdersManagement'
 import OrderDetail from './Dashboard/OrderDetail'
 import Archive from './Dashboard/Archive'
@@ -64,12 +65,14 @@ export default function Dashboard() {
     { id: 'home', name: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard', adminOnly: true },
     { id: 'orders', name: 'الطلبات', icon: ShoppingCartIcon, path: '/dashboard/orders', adminOnly: false },
     { id: 'archive', name: 'الأرشيف', icon: ArchiveIcon, path: '/dashboard/archive', adminOnly: false },
+    { id: 'analytics', name: 'التحليلات', icon: Sparkles, path: '/dashboard/analytics', adminOnly: true },
     { id: 'customers', name: 'العملاء', icon: Users, path: '/dashboard/customers', adminOnly: true },
     { id: 'services', name: 'الخدمات', icon: Palette, path: '/dashboard/services', adminOnly: true },
     { id: 'works', name: 'الأعمال', icon: Briefcase, path: '/dashboard/works', adminOnly: true },
     { id: 'hero-slides', name: 'سلايدات Hero', icon: ImageIcon, path: '/dashboard/hero-slides', adminOnly: true },
     { id: 'pricing', name: 'إدارة مالية', icon: DollarSign, path: '/dashboard/pricing', adminOnly: true },
     { id: 'payments', name: 'إعدادات الدفع', icon: CreditCard, path: '/dashboard/payments', adminOnly: true },
+    { id: 'analytics', name: 'التحليلات', icon: Sparkles, path: '/dashboard/analytics', adminOnly: true },
     { id: 'studio', name: 'الاستديو', icon: Sparkles, path: '/dashboard/studio', adminOnly: false },
   ]
 
@@ -220,6 +223,7 @@ export default function Dashboard() {
             {isAdmin() && <Route path="/pricing" element={<PricingManagement />} />}
             {isAdmin() && <Route path="/pricing/wizard" element={<PricingWizard />} />}
             {isAdmin() && <Route path="/payments" element={<PaymentSettings />} />}
+            {isAdmin() && <Route path="/analytics" element={<Suspense fallback={<div>جاري التحميل...</div>}><Analytics /></Suspense>} />}
             {isEmployee() && <Route path="/studio" element={<Studio />} />}
             {isAdmin() && <Route path="/studio" element={<Studio />} />}
             {isAdmin() && <Route path="/profile" element={<ProfileSettings />} />}

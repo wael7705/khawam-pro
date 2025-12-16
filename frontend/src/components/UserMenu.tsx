@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { User, LogIn, LogOut, Settings, ChevronDown, UserPlus } from 'lucide-react'
 import { isAuthenticated, getUserData, authAPI as authAPIFromAuth } from '../lib/auth'
 import { authAPI } from '../lib/api'
+import LoginIcon from './LoginIcon'
 import './UserMenu.css'
 
 export default function UserMenu() {
@@ -115,7 +116,7 @@ export default function UserMenu() {
             <ChevronDown size={16} />
           </>
         ) : (
-          <LogIn size={24} />
+          <LoginIcon size={24} />
         )}
       </button>
 
@@ -166,7 +167,7 @@ export default function UserMenu() {
             <>
               <div className="login-section">
                 <Link to="/login" className="menu-item primary" onClick={() => setIsOpen(false)}>
-                  <LogIn size={18} />
+                  <LoginIcon size={18} />
                   <span>تسجيل الدخول</span>
                 </Link>
                 <Link to="/register" className="menu-item secondary" onClick={() => setIsOpen(false)}>

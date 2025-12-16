@@ -5,7 +5,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 0, // لا timeout - لإلغاء timeout بسبب رداءة الإنترنت
+  timeout: 30000, // 30 ثانية timeout - معقول للشبكات البطيئة
 })
 
   // Add request interceptor to include auth token - مع دعم Token مخصص
@@ -132,6 +132,8 @@ export const ordersAPI = {
     api.get(`/orders/${orderId}/attachments/${encodeURIComponent(fileKey)}`, {
       responseType: 'blob',
     }),
+  getStatusHistory: (orderId: number) => api.get(`/orders/${orderId}/status-history`),
+  getReorderData: (orderId: number) => api.get(`/orders/${orderId}/reorder-data`),
 }
 
 // Studio API
@@ -368,6 +370,17 @@ export const fileAnalysisAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   }
+}
+
+// Analytics API
+export const analyticsAPI = {
+  track: (data: any) => api.post('/analytics/track', data),
+  trackPageView: (data: any) => api.post('/analytics/page-view', data),
+  getStats: (period: string = 'day') => api.get(`/analytics/stats?period=${period}`),
+  getExitRates: (period: string = 'day') => api.get(`/analytics/exit-rates?period=${period}`),
+  getPages: (period: string = 'day') => api.get(`/analytics/pages?period=${period}`),
+  getVisitors: (period: string = 'day') => api.get(`/analytics/visitors?period=${period}`),
+  getFunnels: (period: string = 'day') => api.get(`/analytics/funnels?period=${period}`),
 }
 
 export default api

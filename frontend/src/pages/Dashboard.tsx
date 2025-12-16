@@ -139,7 +139,7 @@ export default function Dashboard() {
           </div>
           
           <button className="sidebar-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? 'توسيع الشريط الجانبي' : 'طي الشريط الجانبي'}>
-            {sidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            {sidebarCollapsed ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
           </button>
           
           <nav className="sidebar-nav">
@@ -152,7 +152,7 @@ export default function Dashboard() {
                   onClick={() => handleTabClick(tab)}
                   title={sidebarCollapsed ? tab.name : ''}
                 >
-                  <Icon size={20} />
+                  <Icon size={24} />
                   {!sidebarCollapsed && <span>{tab.name}</span>}
                 </button>
               )
@@ -163,7 +163,7 @@ export default function Dashboard() {
                 onClick={() => navigate('/dashboard/orders')}
                 title={sidebarCollapsed ? 'الذهاب للطلبات' : ''}
               >
-                <ShoppingCartIcon size={20} />
+                <ShoppingCartIcon size={24} />
                 {!sidebarCollapsed && <span>الذهاب مباشرة للطلبات</span>}
               </button>
             )}
@@ -173,13 +173,13 @@ export default function Dashboard() {
             <div className="sidebar-footer">
               {/* Show "Go to Website" button for all users */}
                 <Link to="/" className="go-to-website-btn">
-                  <HomeIcon size={18} />
+                  <HomeIcon size={20} />
                 <span>العودة إلى الصفحة الرئيسية</span>
                 </Link>
               {isAdmin() && (
                 <button className="language-btn">
                   <span>EN</span>
-                  <Edit size={16} />
+                  <Edit size={18} />
                 </button>
               )}
             </div>
@@ -189,7 +189,7 @@ export default function Dashboard() {
           {sidebarCollapsed && (
             <div className="sidebar-collapsed-footer">
               <Link to="/" className="go-to-website-btn-collapsed" title="العودة إلى الصفحة الرئيسية">
-                <HomeIcon size={20} />
+                <HomeIcon size={22} />
               </Link>
             </div>
           )}

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import HeroSlider from '../components/HeroSlider'
 import ServicesShowcaseSection from './components/ServicesShowcaseSection'
 import FeaturedWorksSection from './components/FeaturedWorksSection'
+import HomeStatsSection from './components/HomeStatsSection'
 import { heroSlidesAPI } from '../lib/api'
 import './Home.css'
 
@@ -181,6 +182,9 @@ export default function Home() {
 
       {/* Featured Works Section */}
       <FeaturedWorksSection />
+
+      {/* Home Stats Section - إحصائيات الصفحة الرئيسية */}
+      <HomeStatsSection />
     </div>
   )
 }

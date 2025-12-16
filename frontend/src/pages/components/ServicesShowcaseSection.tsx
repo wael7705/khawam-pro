@@ -1,11 +1,26 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import React from 'react'
 import '../Home.css'
 
 export default function ServicesShowcaseSection() {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
+
+  // Pre-check if image exists on mount
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/khawam_services.png'
+    img.onload = () => {
+      console.log('✅ Services image exists and is accessible')
+      setImageError(false)
+    }
+    img.onerror = () => {
+      console.error('❌ Services image not found at /khawam_services.png')
+      // Don't set error immediately - let the actual img tag try first
+    }
+  }, [])
 
   return (
     <section className="section services-showcase-section">
@@ -33,19 +48,23 @@ export default function ServicesShowcaseSection() {
                 className="services-showcase-image"
                 loading="eager"
                 style={{ 
-                  display: 'block',
+                  display: imageLoaded ? 'block' : 'none',
                   width: '100%',
+                  maxWidth: '500px',
                   height: 'auto',
+                  minHeight: '200px',
                   objectFit: 'contain',
-                  opacity: imageLoaded ? 1 : 0.3,
+                  opacity: imageLoaded ? 1 : 0,
                   transition: 'opacity 0.5s ease-in-out',
-                  visibility: 'visible',
+                  visibility: imageLoaded ? 'visible' : 'hidden',
                 }}
                 onLoad={() => {
+                  console.log('✅ Services image loaded successfully')
                   setImageLoaded(true)
                   setImageError(false)
                 }}
-                onError={() => {
+                onError={(e) => {
+                  console.error('❌ Services image failed to load:', e)
                   setImageError(true)
                   setImageLoaded(false)
                 }}
@@ -64,6 +83,8 @@ export default function ServicesShowcaseSection() {
                   justifyContent: 'center',
                   color: '#666',
                   fontSize: '1.2rem',
+                  position: 'relative',
+                  zIndex: 1,
                 }}
               >
                 <span>خدماتنا</span>
@@ -72,8 +93,11 @@ export default function ServicesShowcaseSection() {
             
             {!imageLoaded && !imageError && (
               <div 
+                className="services-showcase-image-loading"
                 style={{
                   position: 'absolute',
+                  top: 0,
+                  left: 0,
                   width: '100%',
                   maxWidth: '500px',
                   minHeight: '200px',
@@ -82,6 +106,7 @@ export default function ServicesShowcaseSection() {
                   justifyContent: 'center',
                   background: 'rgba(255, 255, 255, 0.5)',
                   borderRadius: '20px',
+                  zIndex: 1,
                 }}
               >
                 <div style={{

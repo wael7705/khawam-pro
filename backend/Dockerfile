@@ -52,6 +52,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy all backend files to /app
 COPY backend/ .
 
+# Copy database migration script to backend folder for easy access
+COPY database/migration_analytics_and_orders.py /app/migration_analytics_and_orders.py
+
 # Copy frontend dist files from frontend-builder stage
 COPY --from=frontend-builder /frontend/dist /app/static
 

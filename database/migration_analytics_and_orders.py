@@ -22,13 +22,21 @@ DATABASE_URL = (
 )
 
 if not DATABASE_URL:
-    DATABASE_URL = "postgresql://postgres@localhost:5432/khawam_local"
-    print("⚠️ Warning: Using default localhost DATABASE_URL")
+    # Try to get from database.py if available
+    try:
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../backend')
+        from database import engine
+        DATABASE_URL = str(engine.url)
+        print(f"✅ Using DATABASE_URL from database.py")
+    except:
+        DATABASE_URL = "postgresql://postgres@localhost:5432/khawam_local"
+        print("⚠️ Warning: Using default localhost DATABASE_URL")
 
 # Fix for Railway PostgreSQL connection
-if DATABASE_URL.startswith("postgres://"):
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-elif DATABASE_URL.startswith("postgresql+psycopg2://"):
+elif DATABASE_URL and DATABASE_URL.startswith("postgresql+psycopg2://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql://", 1)
 
 def run_migration():
@@ -168,12 +176,17 @@ def run_migration():
         
         db.close()
         
+        print("✅ Migration completed successfully!")
+        return True
     except Exception as e:
         print(f"❌ Migration failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        db.rollback()
-        raise
+        try:
+            db.rollback()
+        except:
+            pass
+        return False
 
 if __name__ == "__main__":
     run_migration()

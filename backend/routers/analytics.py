@@ -3,7 +3,7 @@ Analytics router for tracking visitors and page views
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func, and_, or_
+from sqlalchemy import text, func, and_, or_, inspect as sql_inspect
 from database import get_db
 from models import VisitorTracking, PageView, User
 from pydantic import BaseModel
@@ -86,6 +86,15 @@ async def track_visit(
 ):
     """Track a visitor visit"""
     try:
+        # التحقق من وجود جدول visitor_tracking
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'visitor_tracking' not in tables:
+            # الجدول غير موجود - إرجاع success بدون حفظ (graceful degradation)
+            print("⚠️ visitor_tracking table not found - skipping tracking")
+            return {"success": True, "message": "Tracking table not available", "visitor_id": None}
+        
         # Parse user agent if not provided
         if not request.browser or not request.os:
             parsed = parse_user_agent(request.user_agent)
@@ -130,10 +139,13 @@ async def track_visit(
         return {"success": True, "visitor_id": visitor.id}
     except Exception as e:
         db.rollback()
-        print(f"Error tracking visit: {str(e)}")
+        # لا نرفع خطأ - نرجع success لتجنب كسر الموقع
+        # Analytics ليس حرجاً - الموقع يجب أن يعمل حتى لو فشل التتبع
+        print(f"⚠️ Error tracking visit (non-critical): {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error tracking visit: {str(e)}")
+        # إرجاع success حتى لو فشل - Analytics ليس حرجاً
+        return {"success": True, "message": "Tracking failed but site continues", "error": str(e)[:100]}
 
 @router.post("/page-view")
 async def track_page_view(
@@ -142,6 +154,15 @@ async def track_page_view(
 ):
     """Track a page view"""
     try:
+        # التحقق من وجود جدول page_views
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'page_views' not in tables:
+            # الجدول غير موجود - إرجاع success بدون حفظ
+            print("⚠️ page_views table not found - skipping tracking")
+            return {"success": True, "message": "Tracking table not available", "page_view_id": None}
+        
         # Get visitor_id from session_id
         visitor = db.query(VisitorTracking).filter(
             VisitorTracking.session_id == request.session_id
@@ -165,10 +186,10 @@ async def track_page_view(
         return {"success": True, "page_view_id": page_view.id}
     except Exception as e:
         db.rollback()
-        print(f"Error tracking page view: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error tracking page view: {str(e)}")
+        # لا نرفع خطأ - Analytics ليس حرجاً
+        print(f"⚠️ Error tracking page view (non-critical): {str(e)}")
+        # إرجاع success حتى لو فشل
+        return {"success": True, "message": "Tracking failed but site continues", "error": str(e)[:100]}
 
 @router.get("/stats")
 async def get_analytics_stats(
@@ -178,6 +199,21 @@ async def get_analytics_stats(
 ):
     """Get analytics statistics"""
     try:
+        # التحقق من وجود الجداول
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'visitor_tracking' not in tables or 'page_views' not in tables:
+            # الجداول غير موجودة - إرجاع بيانات فارغة
+            return {
+                "period": period,
+                "total_visitors": 0,
+                "total_page_views": 0,
+                "unique_pages": 0,
+                "average_time_on_site": 0,
+                "message": "Analytics tables not available - run migration first"
+            }
+        
         # Calculate date range
         now = datetime.now()
         if period == "day":
@@ -217,10 +253,18 @@ async def get_analytics_stats(
             "average_time_on_site": round(float(avg_time), 2) if avg_time else 0
         }
     except Exception as e:
-        print(f"Error getting analytics stats: {str(e)}")
+        print(f"⚠️ Error getting analytics stats: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error getting stats: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {
+            "period": period,
+            "total_visitors": 0,
+            "total_page_views": 0,
+            "unique_pages": 0,
+            "average_time_on_site": 0,
+            "error": str(e)[:100]
+        }
 
 @router.get("/exit-rates")
 async def get_exit_rates(
@@ -230,6 +274,13 @@ async def get_exit_rates(
 ):
     """Get exit rates by page"""
     try:
+        # التحقق من وجود الجدول
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'visitor_tracking' not in tables:
+            return {"period": period, "exit_rates": [], "message": "Analytics table not available"}
+        
         # Calculate date range
         now = datetime.now()
         if period == "day":
@@ -268,10 +319,11 @@ async def get_exit_rates(
         
         return {"period": period, "exit_rates": result}
     except Exception as e:
-        print(f"Error getting exit rates: {str(e)}")
+        print(f"⚠️ Error getting exit rates: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error getting exit rates: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {"period": period, "exit_rates": [], "error": str(e)[:100]}
 
 @router.get("/pages")
 async def get_page_stats(
@@ -281,6 +333,13 @@ async def get_page_stats(
 ):
     """Get statistics for each page"""
     try:
+        # التحقق من وجود الجدول
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'page_views' not in tables:
+            return {"period": period, "pages": [], "message": "Analytics table not available"}
+        
         # Calculate date range
         now = datetime.now()
         if period == "day":
@@ -316,10 +375,11 @@ async def get_page_stats(
         
         return {"period": period, "pages": result}
     except Exception as e:
-        print(f"Error getting page stats: {str(e)}")
+        print(f"⚠️ Error getting page stats: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error getting page stats: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {"period": period, "pages": [], "error": str(e)[:100]}
 
 @router.get("/visitors")
 async def get_visitor_count(
@@ -329,6 +389,18 @@ async def get_visitor_count(
 ):
     """Get visitor count"""
     try:
+        # التحقق من وجود الجدول
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'visitor_tracking' not in tables:
+            return {
+                "period": period,
+                "unique_visitors": 0,
+                "total_visits": 0,
+                "message": "Analytics table not available"
+            }
+        
         # Calculate date range
         now = datetime.now()
         if period == "day":
@@ -356,10 +428,16 @@ async def get_visitor_count(
             "total_visits": total_visits
         }
     except Exception as e:
-        print(f"Error getting visitor count: {str(e)}")
+        print(f"⚠️ Error getting visitor count: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error getting visitor count: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {
+            "period": period,
+            "unique_visitors": 0,
+            "total_visits": 0,
+            "error": str(e)[:100]
+        }
 
 @router.get("/funnels")
 async def get_funnel_analysis(
@@ -369,6 +447,17 @@ async def get_funnel_analysis(
 ):
     """Get funnel analysis - user journey through the site"""
     try:
+        # التحقق من وجود الجداول
+        inspector = sql_inspect(db.bind)
+        tables = [table['name'] for table in inspector.get_table_names()]
+        
+        if 'visitor_tracking' not in tables or 'page_views' not in tables:
+            return {
+                "period": period,
+                "funnel": [],
+                "message": "Analytics tables not available"
+            }
+        
         # Calculate date range
         now = datetime.now()
         if period == "day":
@@ -411,8 +500,9 @@ async def get_funnel_analysis(
         
         return {"period": period, "funnel": funnel_data}
     except Exception as e:
-        print(f"Error getting funnel analysis: {str(e)}")
+        print(f"⚠️ Error getting funnel analysis: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error getting funnel: {str(e)}")
+        # إرجاع بيانات فارغة بدلاً من رفع خطأ
+        return {"period": period, "funnel": [], "error": str(e)[:100]}
 

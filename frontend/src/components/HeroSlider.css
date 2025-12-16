@@ -230,11 +230,12 @@
     height: calc(50vh + 80px);
     min-height: 400px;
     max-height: 500px;
-    margin-bottom: -80px;
+    margin-bottom: 0;
+    position: relative;
   }
   
   .hero-slider::after {
-    height: 80px;
+    height: 60px;
   }
 
   /* إخفاء أزرار التنقل في الشاشات الصغيرة */

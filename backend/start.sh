@@ -11,6 +11,14 @@ if [ -n "$DATABASE_URL" ]; then
     echo "⏳ Checking database connection..."
     # Try to connect to database (timeout after 5 seconds, don't fail)
     timeout 5 bash -c 'python -c "from database import engine; engine.connect(); print(\"✅ Database connection OK\")" 2>&1' || echo "⚠️ Database not ready yet, app will retry on first query..."
+    
+    # Run database migrations automatically
+    echo "🔄 Running database migrations..."
+    if [ -f "/app/migration_analytics_and_orders.py" ]; then
+        python /app/migration_analytics_and_orders.py || echo "⚠️ Migration failed - continuing anyway (non-critical)"
+    else
+        echo "⚠️ Migration script not found - skipping (non-critical)"
+    fi
 else
     echo "⚠️ DATABASE_URL not set - app may not work correctly"
 fi

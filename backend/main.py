@@ -1791,6 +1791,15 @@ if os.path.exists(static_dir):
         async def serve_logo():
             return FileResponse(logo_path, media_type="image/jpeg")
     
+    # Serve services image
+    services_image_path = os.path.join(static_dir, "khawam_services.png")
+    if os.path.exists(services_image_path):
+        @app.get("/khawam_services.png")
+        async def serve_services_image():
+            return FileResponse(services_image_path, media_type="image/png")
+    else:
+        print(f"⚠️ Warning: khawam_services.png not found at {services_image_path}")
+    
     # Serve index.html for all non-API routes (SPA fallback)
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):

@@ -7,19 +7,60 @@ import '../Home.css'
 export default function ServicesShowcaseSection() {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [imageSrc, setImageSrc] = useState('/khawam_services.png')
 
-  // Pre-check if image exists on mount
+  // Pre-check if image exists on mount - جرب عدة مسارات
   useEffect(() => {
-    const img = new Image()
-    img.src = '/khawam_services.png'
-    img.onload = () => {
-      console.log('✅ Services image exists and is accessible')
-      setImageError(false)
+    // في Vite، ملفات public تُنسخ إلى root dist
+    // المسار الصحيح هو /khawam_services.png (من root)
+    const tryImagePaths = [
+      '/khawam_services.png',  // المسار الأساسي من public folder
+    ]
+
+    let currentPathIndex = 0
+    let attempts = 0
+    const maxAttempts = 3
+
+    const tryNextPath = () => {
+      if (currentPathIndex >= tryImagePaths.length || attempts >= maxAttempts) {
+        console.error('❌ Services image not found after all attempts')
+        // لا نضع error هنا - دع img tag يحاول
+        return
+      }
+
+      attempts++
+      const img = new Image()
+      const path = tryImagePaths[currentPathIndex]
+      
+      img.onload = () => {
+        console.log(`✅ Services image found at: ${path}`)
+        setImageSrc(path)
+        setImageError(false)
+      }
+      
+      img.onerror = () => {
+        console.warn(`⚠️ Image not found at: ${path} (attempt ${attempts}/${maxAttempts})`)
+        // إعادة المحاولة بعد قليل
+        if (attempts < maxAttempts) {
+          setTimeout(() => {
+            tryNextPath()
+          }, 1000 * attempts)
+        } else {
+          currentPathIndex++
+          attempts = 0
+          if (currentPathIndex < tryImagePaths.length) {
+            tryNextPath()
+          }
+        }
+      }
+      
+      img.src = path
     }
-    img.onerror = () => {
-      console.error('❌ Services image not found at /khawam_services.png')
-      // Don't set error immediately - let the actual img tag try first
-    }
+
+    // بدء المحاولة بعد قليل للتأكد من أن الصفحة تحمّلت
+    setTimeout(() => {
+      tryNextPath()
+    }, 500)
   }, [])
 
   return (
@@ -43,10 +84,11 @@ export default function ServicesShowcaseSection() {
           >
             {!imageError ? (
               <img 
-                src="/khawam_services.png"
+                src={imageSrc}
                 alt="خدمات الطباعة الحديثة والمتقنة"
                 className="services-showcase-image"
                 loading="eager"
+                crossOrigin="anonymous"
                 style={{ 
                   display: imageLoaded ? 'block' : 'none',
                   width: '100%',
@@ -59,12 +101,17 @@ export default function ServicesShowcaseSection() {
                   visibility: imageLoaded ? 'visible' : 'hidden',
                 }}
                 onLoad={() => {
-                  console.log('✅ Services image loaded successfully')
+                  console.log('✅ Services image loaded successfully from:', imageSrc)
                   setImageLoaded(true)
                   setImageError(false)
                 }}
                 onError={(e) => {
-                  console.error('❌ Services image failed to load:', e)
+                  console.error('❌ Services image failed to load from:', imageSrc, e)
+                  console.error('   Full error:', e)
+                  console.error('   Image target:', e.target)
+                  console.error('   Current location:', window.location.href)
+                  
+                  // بعد عدة محاولات، أظهر placeholder
                   setImageError(true)
                   setImageLoaded(false)
                 }}

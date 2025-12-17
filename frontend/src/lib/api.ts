@@ -381,6 +381,7 @@ export const analyticsAPI = {
   getPages: (period: string = 'day') => api.get(`/analytics/pages?period=${period}`),
   getVisitors: (period: string = 'day') => api.get(`/analytics/visitors?period=${period}`),
   getFunnels: (period: string = 'day') => api.get(`/analytics/funnels?period=${period}`),
+  test: () => api.get('/analytics/test'), // Test endpoint to check tables
 }
 
 export default api

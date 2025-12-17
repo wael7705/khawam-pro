@@ -48,7 +48,7 @@ export async function trackVisit(
     const sessionId = getSessionId()
     const userAgent = navigator.userAgent
     
-    // Get IP address (will be set by backend)
+    // Get IP address from request (will be set by backend)
     const response = await fetch(`${API_BASE_URL}/analytics/track`, {
       method: 'POST',
       headers: {
@@ -64,9 +64,21 @@ export async function trackVisit(
       }),
     })
     
-    return await response.json()
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.warn('Failed to track visit:', response.status, response.statusText, errorText)
+    } else {
+      const data = await response.json()
+      if (import.meta.env.DEV) {
+        console.log('✅ Visit tracked:', pagePath, entryPage ? '(entry)' : exitPage ? '(exit)' : '', data)
+      }
+      return data
+    }
+    
+    return null
   } catch (error) {
     console.warn('Failed to track visit:', error)
+    return null
   }
 }
 
@@ -133,7 +145,7 @@ export function stopTimeTracking(pagePath: string) {
   trackVisit(pagePath, document.referrer || null, false, true)
 }
 
-// Initialize analytics
+// Initialize analytics - deprecated, use trackPageView directly
 export function initAnalytics() {
   const pagePath = window.location.pathname
   const referrer = document.referrer || null
@@ -148,13 +160,21 @@ export function initAnalytics() {
   window.addEventListener('beforeunload', () => {
     stopTimeTracking(pagePath)
   })
-  
-  // Track page changes (for SPA)
-  window.addEventListener('popstate', () => {
-    stopTimeTracking(pagePath)
-    const newPath = window.location.pathname
-    trackVisit(newPath, pagePath, true, false)
+}
+
+// Track page change (for React Router)
+let currentPagePath = window.location.pathname
+
+export function trackPageChange(newPath: string) {
+  // Stop tracking for previous page
+  if (currentPagePath !== newPath) {
+    stopTimeTracking(currentPagePath)
+    
+    // Start tracking for new page
+    currentPagePath = newPath
+    const referrer = window.location.pathname
+    trackVisit(newPath, referrer, true, false)
     startTimeTracking(newPath)
-  })
+  }
 }
 

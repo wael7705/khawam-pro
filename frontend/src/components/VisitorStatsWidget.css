@@ -1,0 +1,160 @@
+.visitor-stats-widget {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.1);
+}
+
+[data-theme="dark"] .visitor-stats-widget {
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.visitor-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.visitor-stats-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+[data-theme="dark"] .visitor-stats-header h2 {
+  -webkit-text-fill-color: #f3f4f6;
+  background: none;
+}
+
+.visitor-period-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.visitor-period-selector button {
+  padding: 8px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+[data-theme="dark"] .visitor-period-selector button {
+  background: #1f2937;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f3f4f6;
+}
+
+.visitor-period-selector button:hover {
+  border-color: #DC2626;
+  color: #DC2626;
+}
+
+.visitor-period-selector button.active {
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.visitor-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.visitor-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.05), rgba(239, 68, 68, 0.05));
+  border-radius: 16px;
+  border: 2px solid transparent;
+  transition: all 0.3s;
+}
+
+[data-theme="dark"] .visitor-stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.visitor-stat-card:hover {
+  border-color: rgba(220, 38, 38, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+}
+
+.visitor-stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+.visitor-stat-info {
+  flex: 1;
+}
+
+.visitor-stat-label {
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .visitor-stat-label {
+  color: #9ca3af;
+}
+
+.visitor-stat-info h3 {
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+[data-theme="dark"] .visitor-stat-info h3 {
+  -webkit-text-fill-color: #f3f4f6;
+  background: none;
+}
+
+.visitor-stats-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+}
+
+[data-theme="dark"] .visitor-stats-loading {
+  color: #9ca3af;
+}
+
+@media (max-width: 768px) {
+  .visitor-stats-widget {
+    padding: 24px;
+  }
+
+  .visitor-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

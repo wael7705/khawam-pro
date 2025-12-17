@@ -81,19 +81,72 @@ def parse_user_agent(user_agent: Optional[str]) -> Dict[str, Optional[str]]:
 @router.post("/track")
 async def track_visit(
     request: TrackVisitRequest,
+    request_obj: Request,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Track a visitor visit"""
     try:
+        # Get IP address from request
+        ip_address = request_obj.client.host if request_obj.client else None
+        if not ip_address or ip_address == "127.0.0.1":
+            # Try to get from headers (for Railway/proxy)
+            forwarded_for = request_obj.headers.get("X-Forwarded-For")
+            if forwarded_for:
+                ip_address = forwarded_for.split(",")[0].strip()
+            else:
+                real_ip = request_obj.headers.get("X-Real-IP")
+                if real_ip:
+                    ip_address = real_ip
+        
+        if not request.ip_address:
+            request.ip_address = ip_address
+        
         # التحقق من وجود جدول visitor_tracking
         inspector = sql_inspect(db.bind)
         tables = [table['name'] for table in inspector.get_table_names()]
         
         if 'visitor_tracking' not in tables:
-            # الجدول غير موجود - إرجاع success بدون حفظ (graceful degradation)
-            print("⚠️ visitor_tracking table not found - skipping tracking")
-            return {"success": True, "message": "Tracking table not available", "visitor_id": None}
+            # الجدول غير موجود - محاولة إنشائه تلقائياً
+            print("⚠️ visitor_tracking table not found - attempting to create...")
+            try:
+                from sqlalchemy import text
+                db.execute(text("""
+                    CREATE TABLE IF NOT EXISTS visitor_tracking (
+                        id SERIAL PRIMARY KEY,
+                        session_id VARCHAR(255) NOT NULL,
+                        user_id INTEGER REFERENCES users(id),
+                        page_path VARCHAR(500) NOT NULL,
+                        referrer TEXT,
+                        user_agent TEXT,
+                        device_type VARCHAR(50),
+                        browser VARCHAR(100),
+                        os VARCHAR(100),
+                        ip_address VARCHAR(45),
+                        country VARCHAR(100),
+                        city VARCHAR(100),
+                        time_on_page INTEGER DEFAULT 0,
+                        exit_page BOOLEAN DEFAULT FALSE,
+                        entry_page BOOLEAN DEFAULT FALSE,
+                        visit_count INTEGER DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                db.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_visitor_tracking_session_id 
+                    ON visitor_tracking(session_id)
+                """))
+                db.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_visitor_tracking_created_at 
+                    ON visitor_tracking(created_at)
+                """))
+                db.commit()
+                print("✅ visitor_tracking table created successfully")
+            except Exception as create_error:
+                db.rollback()
+                print(f"⚠️ Failed to create visitor_tracking table: {create_error}")
+                return {"success": True, "message": "Tracking table not available", "visitor_id": None}
         
         # Parse user agent if not provided
         if not request.browser or not request.os:
@@ -159,9 +212,36 @@ async def track_page_view(
         tables = [table['name'] for table in inspector.get_table_names()]
         
         if 'page_views' not in tables:
-            # الجدول غير موجود - إرجاع success بدون حفظ
-            print("⚠️ page_views table not found - skipping tracking")
-            return {"success": True, "message": "Tracking table not available", "page_view_id": None}
+            # الجدول غير موجود - محاولة إنشائه تلقائياً
+            print("⚠️ page_views table not found - attempting to create...")
+            try:
+                from sqlalchemy import text
+                db.execute(text("""
+                    CREATE TABLE IF NOT EXISTS page_views (
+                        id SERIAL PRIMARY KEY,
+                        visitor_id INTEGER REFERENCES visitor_tracking(id),
+                        session_id VARCHAR(255) NOT NULL,
+                        page_path VARCHAR(500) NOT NULL,
+                        time_spent INTEGER DEFAULT 0,
+                        scroll_depth INTEGER DEFAULT 0,
+                        actions JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                db.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_page_views_session_id 
+                    ON page_views(session_id)
+                """))
+                db.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_page_views_created_at 
+                    ON page_views(created_at)
+                """))
+                db.commit()
+                print("✅ page_views table created successfully")
+            except Exception as create_error:
+                db.rollback()
+                print(f"⚠️ Failed to create page_views table: {create_error}")
+                return {"success": True, "message": "Page views table not available", "page_view_id": None}
         
         # Get visitor_id from session_id
         visitor = db.query(VisitorTracking).filter(

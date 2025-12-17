@@ -47,136 +47,181 @@ def run_migration():
         db = SessionLocal()
         
         print("🔄 Starting migration...")
+        print(f"📊 Database URL: {DATABASE_URL[:50]}...")
+        
+        # Check if tables exist first
+        print("🔍 Checking existing tables...")
+        existing_tables = db.execute(text("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """)).fetchall()
+        existing_table_names = [t[0] for t in existing_tables]
+        print(f"📋 Found {len(existing_table_names)} existing tables")
         
         # Create visitor_tracking table
-        print("📊 Creating visitor_tracking table...")
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS visitor_tracking (
-                id SERIAL PRIMARY KEY,
-                session_id VARCHAR(255) NOT NULL,
-                user_id INTEGER REFERENCES users(id),
-                page_path VARCHAR(500) NOT NULL,
-                referrer TEXT,
-                user_agent TEXT,
-                device_type VARCHAR(50),
-                browser VARCHAR(100),
-                os VARCHAR(100),
-                ip_address VARCHAR(45),
-                country VARCHAR(100),
-                city VARCHAR(100),
-                time_on_page INTEGER DEFAULT 0,
-                exit_page BOOLEAN DEFAULT FALSE,
-                entry_page BOOLEAN DEFAULT FALSE,
-                visit_count INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
+        if 'visitor_tracking' not in existing_table_names:
+            print("📊 Creating visitor_tracking table...")
+            db.execute(text("""
+                CREATE TABLE visitor_tracking (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) NOT NULL,
+                    user_id INTEGER REFERENCES users(id),
+                    page_path VARCHAR(500) NOT NULL,
+                    referrer TEXT,
+                    user_agent TEXT,
+                    device_type VARCHAR(50),
+                    browser VARCHAR(100),
+                    os VARCHAR(100),
+                    ip_address VARCHAR(45),
+                    country VARCHAR(100),
+                    city VARCHAR(100),
+                    time_on_page INTEGER DEFAULT 0,
+                    exit_page BOOLEAN DEFAULT FALSE,
+                    entry_page BOOLEAN DEFAULT FALSE,
+                    visit_count INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            print("✅ visitor_tracking table created")
+        else:
+            print("✅ visitor_tracking table already exists")
         
         # Create indexes for visitor_tracking
         print("📊 Creating indexes for visitor_tracking...")
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_visitor_tracking_session_id 
-            ON visitor_tracking(session_id)
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_visitor_tracking_user_id 
-            ON visitor_tracking(user_id)
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_visitor_tracking_created_at 
-            ON visitor_tracking(created_at)
-        """))
+        try:
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_visitor_tracking_session_id 
+                ON visitor_tracking(session_id)
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_visitor_tracking_user_id 
+                ON visitor_tracking(user_id)
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_visitor_tracking_created_at 
+                ON visitor_tracking(created_at)
+            """))
+            print("✅ Indexes for visitor_tracking created")
+        except Exception as e:
+            print(f"⚠️ Warning creating indexes for visitor_tracking: {e}")
         
         # Create page_views table
-        print("📊 Creating page_views table...")
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS page_views (
-                id SERIAL PRIMARY KEY,
-                visitor_id INTEGER REFERENCES visitor_tracking(id),
-                session_id VARCHAR(255) NOT NULL,
-                page_path VARCHAR(500) NOT NULL,
-                time_spent INTEGER DEFAULT 0,
-                scroll_depth INTEGER DEFAULT 0,
-                actions JSONB,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
+        if 'page_views' not in existing_table_names:
+            print("📊 Creating page_views table...")
+            db.execute(text("""
+                CREATE TABLE page_views (
+                    id SERIAL PRIMARY KEY,
+                    visitor_id INTEGER REFERENCES visitor_tracking(id),
+                    session_id VARCHAR(255) NOT NULL,
+                    page_path VARCHAR(500) NOT NULL,
+                    time_spent INTEGER DEFAULT 0,
+                    scroll_depth INTEGER DEFAULT 0,
+                    actions JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            print("✅ page_views table created")
+        else:
+            print("✅ page_views table already exists")
         
         # Create indexes for page_views
         print("📊 Creating indexes for page_views...")
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_page_views_visitor_id 
-            ON page_views(visitor_id)
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_page_views_session_id 
-            ON page_views(session_id)
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_page_views_page_path 
-            ON page_views(page_path)
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_page_views_created_at 
-            ON page_views(created_at)
-        """))
+        try:
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_page_views_visitor_id 
+                ON page_views(visitor_id)
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_page_views_session_id 
+                ON page_views(session_id)
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_page_views_page_path 
+                ON page_views(page_path)
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_page_views_created_at 
+                ON page_views(created_at)
+            """))
+            print("✅ Indexes for page_views created")
+        except Exception as e:
+            print(f"⚠️ Warning creating indexes for page_views: {e}")
         
         # Create order_status_history table
-        print("📊 Creating order_status_history table...")
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS order_status_history (
-                id SERIAL PRIMARY KEY,
-                order_id INTEGER NOT NULL REFERENCES orders(id),
-                status VARCHAR(20) NOT NULL,
-                changed_by INTEGER REFERENCES users(id),
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
+        if 'order_status_history' not in existing_table_names:
+            print("📊 Creating order_status_history table...")
+            db.execute(text("""
+                CREATE TABLE order_status_history (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER NOT NULL REFERENCES orders(id),
+                    status VARCHAR(20) NOT NULL,
+                    changed_by INTEGER REFERENCES users(id),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            print("✅ order_status_history table created")
+        else:
+            print("✅ order_status_history table already exists")
         
         # Create indexes for order_status_history
         print("📊 Creating indexes for order_status_history...")
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_order_status_history_order_id 
-            ON order_status_history(order_id)
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_order_status_history_created_at 
-            ON order_status_history(created_at)
-        """))
+        try:
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_order_status_history_order_id 
+                ON order_status_history(order_id)
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_order_status_history_created_at 
+                ON order_status_history(created_at)
+            """))
+            print("✅ Indexes for order_status_history created")
+        except Exception as e:
+            print(f"⚠️ Warning creating indexes for order_status_history: {e}")
         
-        # Migrate existing orders to order_status_history
-        print("📊 Migrating existing orders to order_status_history...")
-        db.execute(text("""
-            INSERT INTO order_status_history (order_id, status, created_at)
-            SELECT id, status, created_at
-            FROM orders
-            WHERE NOT EXISTS (
-                SELECT 1 FROM order_status_history 
-                WHERE order_status_history.order_id = orders.id
-            )
-        """))
+        # Migrate existing orders to order_status_history (only if table exists)
+        if 'orders' in existing_table_names and 'order_status_history' in existing_table_names:
+            print("📊 Migrating existing orders to order_status_history...")
+            try:
+                result = db.execute(text("""
+                    INSERT INTO order_status_history (order_id, status, created_at)
+                    SELECT id, status, created_at
+                    FROM orders
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM order_status_history 
+                        WHERE order_status_history.order_id = orders.id
+                    )
+                """))
+                print(f"✅ Migrated {result.rowcount} orders to order_status_history")
+            except Exception as e:
+                print(f"⚠️ Warning migrating orders: {e}")
         
         db.commit()
-        print("✅ Migration completed successfully!")
+        print("✅ Migration commit successful!")
         
         # Verify tables were created
         print("\n📋 Verifying tables...")
-        tables = db.execute(text("""
+        final_tables = db.execute(text("""
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
             AND table_name IN ('visitor_tracking', 'page_views', 'order_status_history')
         """)).fetchall()
         
-        print(f"✅ Found {len(tables)} tables:")
-        for table in tables:
-            print(f"   - {table[0]}")
+        print(f"✅ Found {len(final_tables)} analytics tables:")
+        for table in final_tables:
+            # Count rows in each table
+            try:
+                count = db.execute(text(f"SELECT COUNT(*) FROM {table[0]}")).scalar()
+                print(f"   - {table[0]}: {count} rows")
+            except:
+                print(f"   - {table[0]}: (unable to count)")
         
         db.close()
         
-        print("✅ Migration completed successfully!")
+        print("\n✅ Migration completed successfully!")
         return True
     except Exception as e:
         print(f"❌ Migration failed: {str(e)}")

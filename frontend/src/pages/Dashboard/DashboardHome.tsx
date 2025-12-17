@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, RefreshCw, Package, Users, Clock, Award, Sparkles } from 'lucide-react'
 import { adminAPI } from '../../lib/api'
 import DashboardStats from '../../components/DashboardStats'
+import VisitorStatsWidget from '../../components/VisitorStatsWidget'
 import { SimplePieChart, SimpleBarChart } from '../../components/SimpleChart'
 import './DashboardHome.css'
 
@@ -349,6 +350,9 @@ export default function DashboardHome() {
 
       {/* Performance Stats Widgets */}
       <DashboardStats />
+
+      {/* Visitor Stats - إحصائيات الزوار */}
+      <VisitorStatsWidget />
 
       {/* Charts Section */}
       <div className="charts-grid">

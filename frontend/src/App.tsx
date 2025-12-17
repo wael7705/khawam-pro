@@ -18,7 +18,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { ToastContainer } from './components/Toast'
 import { subscribe, getToasts, removeToast } from './utils/toast'
 import type { Toast } from './utils/toast'
-import { initAnalytics, stopTimeTracking } from './utils/analytics'
+import { trackVisit, startTimeTracking, stopTimeTracking } from './utils/analytics'
 import './App.css'
 
 function App() {
@@ -38,16 +38,25 @@ function App() {
     setToasts(getToasts())
     
     // Initialize analytics (only on public pages)
-    if (!location.pathname.startsWith('/dashboard') && 
-        !location.pathname.startsWith('/login') && 
-        !location.pathname.startsWith('/register')) {
-      initAnalytics()
+    const isPublicPage = !location.pathname.startsWith('/dashboard') && 
+                         !location.pathname.startsWith('/login') && 
+                         !location.pathname.startsWith('/register') &&
+                         !location.pathname.startsWith('/location-picker') &&
+                         !location.pathname.startsWith('/rate-order')
+    
+    if (isPublicPage) {
+      const pagePath = location.pathname
+      const referrer = document.referrer || null
+      
+      // Track page view immediately
+      trackVisit(pagePath, referrer, true, false)
+      startTimeTracking(pagePath)
     }
     
     return () => {
       unsubscribe()
       // Stop time tracking on unmount
-      if (!location.pathname.startsWith('/dashboard')) {
+      if (isPublicPage) {
         stopTimeTracking(location.pathname)
       }
     }

@@ -2771,35 +2771,72 @@ async def get_performance_stats(db: Session = Depends(get_db)):
         from datetime import datetime, timedelta
         
         # 1. Performance Rate (معدل الأداء)
-        # حساب نسبة الطلبات المكتملة من إجمالي الطلبات
+        # حساب نسبة الطلبات المكتملة من إجمالي الطلبات في آخر 30 يوم
         try:
+            # حساب معدل الأداء بناءً على آخر 30 يوم فقط
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            
             total_orders_count = db.execute(text("""
-                SELECT COUNT(*) FROM orders
-            """)).scalar() or 0
+                SELECT COUNT(*) FROM orders 
+                WHERE created_at >= :thirty_days_ago
+            """), {"thirty_days_ago": thirty_days_ago}).scalar() or 0
             
             completed_orders_count = db.execute(text("""
-                SELECT COUNT(*) FROM orders WHERE status = 'completed'
-            """)).scalar() or 0
+                SELECT COUNT(*) FROM orders 
+                WHERE status = 'completed' AND created_at >= :thirty_days_ago
+            """), {"thirty_days_ago": thirty_days_ago}).scalar() or 0
             
-            performance_rate = (completed_orders_count / total_orders_count * 100) if total_orders_count > 0 else 0
+            # إذا لم يكن هناك طلبات في آخر 30 يوم، المعدل = 0
+            if total_orders_count == 0:
+                performance_rate = 0.0
+            else:
+                performance_rate = (completed_orders_count / total_orders_count * 100)
             
-            # مقارنة مع الأسبوع الماضي
+            # مقارنة مع الأسبوع الماضي (آخر 7 أيام من آخر 30 يوم)
             week_ago = datetime.now() - timedelta(days=7)
             last_week_total = db.execute(text("""
-                SELECT COUNT(*) FROM orders WHERE created_at < :week_ago
-            """), {"week_ago": week_ago}).scalar() or 0
+                SELECT COUNT(*) FROM orders 
+                WHERE created_at >= :week_ago AND created_at < :now
+            """), {"week_ago": week_ago, "now": datetime.now()}).scalar() or 0
             
             last_week_completed = db.execute(text("""
                 SELECT COUNT(*) FROM orders 
-                WHERE status = 'completed' AND created_at < :week_ago
-            """), {"week_ago": week_ago}).scalar() or 0
+                WHERE status = 'completed' 
+                AND created_at >= :week_ago AND created_at < :now
+            """), {"week_ago": week_ago, "now": datetime.now()}).scalar() or 0
             
-            last_week_performance = (last_week_completed / last_week_total * 100) if last_week_total > 0 else 0
-            performance_change = round(performance_rate - last_week_performance, 1)
+            if last_week_total == 0:
+                last_week_performance = 0.0
+            else:
+                last_week_performance = (last_week_completed / last_week_total * 100)
+            
+            # مقارنة مع الأسبوع السابق (من 7-14 يوم مضى)
+            two_weeks_ago = datetime.now() - timedelta(days=14)
+            previous_week_total = db.execute(text("""
+                SELECT COUNT(*) FROM orders 
+                WHERE created_at >= :two_weeks_ago AND created_at < :week_ago
+            """), {"two_weeks_ago": two_weeks_ago, "week_ago": week_ago}).scalar() or 0
+            
+            previous_week_completed = db.execute(text("""
+                SELECT COUNT(*) FROM orders 
+                WHERE status = 'completed' 
+                AND created_at >= :two_weeks_ago AND created_at < :week_ago
+            """), {"two_weeks_ago": two_weeks_ago, "week_ago": week_ago}).scalar() or 0
+            
+            if previous_week_total == 0:
+                previous_week_performance = 0.0
+            else:
+                previous_week_performance = (previous_week_completed / previous_week_total * 100)
+            
+            # حساب التغيير مقارنة بالأسبوع السابق
+            performance_change = round(last_week_performance - previous_week_performance, 1)
+            
         except Exception as e:
             print(f"Error calculating performance rate: {e}")
-            performance_rate = 95.0
-            performance_change = 2.0
+            import traceback
+            traceback.print_exc()
+            performance_rate = 0.0
+            performance_change = 0.0
         
         # 2. Today's Orders (طلبات اليوم)
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)

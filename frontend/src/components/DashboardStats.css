@@ -14,22 +14,24 @@
 }
 
 .stat-widget {
-  background: #1a1a1a;
+  background: white;
   border-radius: 16px;
   padding: 24px;
   position: relative;
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.1);
 }
 
 .stat-widget:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 30px rgba(220, 38, 38, 0.2);
+  border-color: rgba(220, 38, 38, 0.3);
 }
 
 .stat-widget.highlighted {
-  border: 2px solid #10B981;
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  border: 2px solid #DC2626;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
 }
 
 .widget-header {
@@ -46,34 +48,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
 }
 
 .widget-icon.performance {
-  background: rgba(220, 38, 38, 0.2);
+  background: rgba(249, 115, 22, 0.15);
   color: #F97316;
 }
 
 .widget-icon.orders {
-  background: rgba(139, 92, 246, 0.2);
-  color: #8B5CF6;
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
 }
 
 .widget-icon.total {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10B981;
+  background: rgba(220, 38, 38, 0.15);
+  color: #DC2626;
 }
 
 .widget-icon.profits {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3B82F6;
+  background: rgba(249, 115, 22, 0.15);
+  color: #F97316;
 }
 
 .widget-header h3 {
   margin: 0;
   font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  color: #6b7280;
 }
 
 .widget-value {
@@ -81,22 +83,38 @@
   font-weight: 700;
   margin-bottom: 8px;
   line-height: 1.2;
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .widget-value.performance {
-  color: #F97316;
+  background: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .widget-value.orders {
-  color: #8B5CF6;
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .widget-value.total {
-  color: #10B981;
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .widget-value.profits {
-  color: #60A5FA;
+  background: linear-gradient(135deg, #F97316 0%, #FB923C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .widget-change {
@@ -112,6 +130,49 @@
 }
 
 .widget-change.negative {
+  color: #EF4444;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .stat-widget {
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .stat-widget:hover {
+  border-color: rgba(220, 38, 38, 0.3);
+  box-shadow: 0 8px 30px rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="dark"] .stat-widget.highlighted {
+  border-color: #DC2626;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
+}
+
+[data-theme="dark"] .widget-header h3 {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .widget-value,
+[data-theme="dark"] .widget-value.performance,
+[data-theme="dark"] .widget-value.orders,
+[data-theme="dark"] .widget-value.total,
+[data-theme="dark"] .widget-value.profits {
+  -webkit-text-fill-color: #f3f4f6;
+  background: none;
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .widget-change {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .widget-change.positive {
+  color: #10B981;
+}
+
+[data-theme="dark"] .widget-change.negative {
   color: #EF4444;
 }
 

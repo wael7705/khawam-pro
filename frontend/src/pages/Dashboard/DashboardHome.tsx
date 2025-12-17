@@ -348,9 +348,6 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* Performance Stats Widgets */}
-      <DashboardStats />
-
       {/* Visitor Stats - إحصائيات الزوار */}
       <VisitorStatsWidget />
 
@@ -542,6 +539,9 @@ export default function DashboardHome() {
           )}
         </div>
       </div>
+
+      {/* Performance Stats Widgets - في أسفل الصفحة */}
+      <DashboardStats />
     </div>
   )
 }

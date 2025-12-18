@@ -165,6 +165,12 @@
   color: var(--text-secondary);
   word-break: break-all;
   margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* عدد الأسطر */
+  -webkit-box-orient: vertical;
+  max-height: 2.5em; /* ارتفاع أقصى لسطرين */
 }
 
 .slide-meta {

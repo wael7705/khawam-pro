@@ -23,6 +23,32 @@ export default function HeroSlidesManagement() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // دالة لتنسيق عرض image_url (إخفاء الترميز وعرض اسم بسيط)
+  const formatImageUrl = (url: string): string => {
+    if (!url) return 'لا يوجد رابط'
+    
+    // إذا كان base64 data URL، إخفاء الترميز وعرض اسم بسيط
+    if (url.startsWith('data:')) {
+      return 'صورة مرفوعة'
+    }
+    
+    // إذا كان رابط خارجي، استخرج اسم الملف أو اعرض الرابط مقطوعاً
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        const urlObj = new URL(url)
+        const pathname = urlObj.pathname
+        const filename = pathname.split('/').pop() || urlObj.hostname
+        return filename.length > 50 ? `${filename.substring(0, 50)}...` : filename
+      } catch {
+        return url.length > 50 ? `${url.substring(0, 50)}...` : url
+      }
+    }
+    
+    // إذا كان مسار محلي، استخرج اسم الملف فقط
+    const filename = url.split('/').pop() || url
+    return filename
+  }
+
   const [formData, setFormData] = useState({
     image_url: '',
     is_logo: false,
@@ -39,12 +65,13 @@ export default function HeroSlidesManagement() {
       setLoading(true)
       const response = await heroSlidesAPI.getAll()
       if (response.data.success) {
-        const sortedSlides = (response.data.slides || []).sort((a: HeroSlide, b: HeroSlide) => {
-          if (a.is_logo && !b.is_logo) return -1
-          if (!a.is_logo && b.is_logo) return 1
-          return a.display_order - b.display_order
-        })
-        setSlides(sortedSlides)
+        // استخدام الترتيب كما هو من قاعدة البيانات (display_order) بدون تغيير
+        // فقط نضع اللوغو أولاً
+        const slides = response.data.slides || []
+        const logoSlides = slides.filter((s: HeroSlide) => s.is_logo)
+        const otherSlides = slides.filter((s: HeroSlide) => !s.is_logo)
+        // الحفاظ على الترتيب الأصلي من قاعدة البيانات
+        setSlides([...logoSlides, ...otherSlides])
       }
     } catch (error) {
       console.error('Error loading hero slides:', error)
@@ -295,9 +322,13 @@ export default function HeroSlidesManagement() {
               </div>
               
               <div className="slide-info">
-                <div className="slide-url">{slide.image_url}</div>
+                <div className="slide-url" title={slide.image_url}>
+                  {formatImageUrl(slide.image_url)}
+                </div>
                 <div className="slide-meta">
                   <span>الترتيب: {slide.display_order}</span>
+                  <span>ID: {slide.id}</span>
+                  <span>نشط: {slide.is_active ? 'نعم' : 'لا'}</span>
                 </div>
               </div>
 

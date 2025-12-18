@@ -24,15 +24,14 @@ export default function Home() {
       is_active: true,
       display_order: 0
     },
-    // يمكن إضافة المزيد من السلايدات المحلية هنا
-    // مثال:
-    // {
-    //   id: -2,
-    //   image_url: '/hero-slides/slide-1.jpg',
-    //   is_logo: false,
-    //   is_active: true,
-    //   display_order: 1
-    // }
+    // سلايد fallback عند فشل تحميل السلايدات من قاعدة البيانات
+    {
+      id: -2,
+      image_url: '/hero-slides/slide-1.jpg',
+      is_logo: false,
+      is_active: true,
+      display_order: 1
+    }
   ]
 
   const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultSlides)
@@ -70,12 +69,25 @@ export default function Home() {
       if (slidesFromDB.length > 0) {
         // التأكد من أن الصور موجودة من قاعدة البيانات
         const validSlides = slidesFromDB.filter((slide: any) => {
-          if (!slide || !slide.image_url) return false
+          if (!slide || !slide.image_url) {
+            if (import.meta.env.DEV) {
+              console.warn(`⚠️ السلايدة ${slide?.id} لا تحتوي على image_url`)
+            }
+            return false
+          }
           const imageUrl = typeof slide.image_url === 'string' ? slide.image_url.trim() : ''
-          if (!imageUrl) return false
+          if (!imageUrl) {
+            if (import.meta.env.DEV) {
+              console.warn(`⚠️ السلايدة ${slide.id} image_url فارغ`)
+            }
+            return false
+          }
           
           // التحقق من أن الصورة نشطة
           const isActive = slide.is_active !== false // default true
+          if (!isActive && import.meta.env.DEV) {
+            console.warn(`⚠️ السلايدة ${slide.id} غير نشطة (is_active: ${slide.is_active})`)
+          }
           
           return isActive
         })
@@ -83,25 +95,34 @@ export default function Home() {
         if (validSlides.length > 0) {
           if (import.meta.env.DEV) {
             console.log(`✅ تم جلب ${validSlides.length} سلايدة من قاعدة البيانات`)
+            console.log('📊 معلومات السلايدات:')
             validSlides.forEach((slide: any) => {
               const isBase64 = slide.image_url.startsWith('data:')
               const isExternal = slide.image_url.startsWith('http')
-              console.log(`  - السلايدة ${slide.id} (display_order: ${slide.display_order || 0}): ${isBase64 ? 'Base64' : isExternal ? 'رابط خارجي' : 'مسار محلي'}`)
+              const urlType = isBase64 ? 'Base64' : isExternal ? 'رابط خارجي' : 'مسار محلي'
+              console.log(`  - السلايدة ${slide.id}:`)
+              console.log(`    - display_order: ${slide.display_order || 0}`)
+              console.log(`    - is_logo: ${slide.is_logo || false}`)
+              console.log(`    - is_active: ${slide.is_active !== false}`)
+              console.log(`    - نوع الصورة: ${urlType}`)
             })
           }
           
           // دمج السلايدات: السلايدات المحلية أولاً، ثم من قاعدة البيانات
-          // ترتيب حسب display_order و is_logo
-          allSlides = [...defaultSlides, ...validSlides].sort((a, b) => {
-            // اللوغو دائماً أولاً
-            if (a.is_logo && !b.is_logo) return -1
-            if (!a.is_logo && b.is_logo) return 1
-            // ثم حسب display_order
-            return (a.display_order || 0) - (b.display_order || 0)
-          })
+          // نستخدم الترتيب كما هو من قاعدة البيانات (display_order) بدون تغيير
+          // ملاحظة: نستخدم فقط اللوغو من defaultSlides، والباقي من قاعدة البيانات
+          const logoSlides = defaultSlides.filter(s => s.is_logo)
+          
+          // الحفاظ على الترتيب من قاعدة البيانات كما هو
+          // فقط نضع اللوغو أولاً، ثم السلايدات الأخرى بالترتيب الذي جاءت به من قاعدة البيانات
+          allSlides = [...logoSlides, ...validSlides]
           
           if (import.meta.env.DEV) {
             console.log(`✅ إجمالي السلايدات بعد الدمج: ${allSlides.length}`)
+            console.log('📋 ترتيب السلايدات النهائي (كما هو من قاعدة البيانات):')
+            allSlides.forEach((slide, index) => {
+              console.log(`  ${index + 1}. ID: ${slide.id}, display_order: ${slide.display_order}, is_logo: ${slide.is_logo}, is_active: ${slide.is_active}`)
+            })
           }
         } else {
           if (import.meta.env.DEV) {
@@ -144,7 +165,14 @@ export default function Home() {
         return loadHeroSlides(retryCount + 1)
       }
       
-      // Fallback: استخدام السلايدات المحلية فقط
+      // Fallback: استخدام السلايدات المحلية فقط (اللوغو + slide-1.jpg)
+      if (import.meta.env.DEV) {
+        console.log('🔄 استخدام السلايدات المحلية كـ fallback')
+        console.log(`  - السلايدات المحلية: ${defaultSlides.length}`)
+        defaultSlides.forEach(slide => {
+          console.log(`    - ${slide.image_url} (is_logo: ${slide.is_logo}, display_order: ${slide.display_order})`)
+        })
+      }
       setHeroSlides(defaultSlides)
     } finally {
       setLoading(false)

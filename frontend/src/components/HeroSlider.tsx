@@ -59,15 +59,16 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
   const touchStartX = useRef<number>(0)
   const touchEndX = useRef<number>(0)
 
-  // تصفية السلايدات النشطة فقط وترتيبها
+  // تصفية السلايدات النشطة فقط (الحفاظ على الترتيب كما هو من قاعدة البيانات)
   const activeSlides = slides
     .filter(slide => slide.is_active && !failedImages.has(slide.id))
+    // فقط نضع اللوغو أولاً، والباقي بالترتيب الأصلي
     .sort((a, b) => {
       // اللوغو دائماً أولاً
       if (a.is_logo && !b.is_logo) return -1
       if (!a.is_logo && b.is_logo) return 1
-      // ثم حسب display_order
-      return a.display_order - b.display_order
+      // الباقي بالترتيب الأصلي (لا نغير الترتيب)
+      return 0
     })
 
   // دالة لإعادة تشغيل auto-play

@@ -15,26 +15,19 @@ interface HeroSlide {
 }
 
 export default function Home() {
-  // Fallback slides - سلايدات افتراضية محلية تظهر دائماً
+  // Fallback slides - سلايدات افتراضية محلية (فقط للطوارئ)
+  // ملاحظة: هذه السلايدات لن تُستخدم إذا كانت السلايدات من قاعدة البيانات موجودة
   const defaultSlides: HeroSlide[] = [
     {
       id: -1, // ID سالب للتمييز عن السلايدات من قاعدة البيانات
-      image_url: '/logo.jpg',
-      is_logo: true,
-      is_active: true,
-      display_order: 0
-    },
-    // سلايد fallback عند فشل تحميل السلايدات من قاعدة البيانات
-    {
-      id: -2,
-      image_url: '/hero-slides/slide-1.jpg',
+      image_url: '/hero-slides/slide-1.jpg', // استخدام slide-1.jpg كـ fallback
       is_logo: false,
       is_active: true,
-      display_order: 1
+      display_order: 0
     }
   ]
 
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultSlides)
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -108,29 +101,9 @@ export default function Home() {
             })
           }
           
-          // دمج السلايدات: السلايدات المحلية أولاً، ثم من قاعدة البيانات
-          // نستخدم الترتيب كما هو من قاعدة البيانات (display_order) بدون تغيير
-          // ملاحظة: نستخدم فقط اللوغو من defaultSlides، والباقي من قاعدة البيانات
-          const logoSlides = defaultSlides.filter(s => s.is_logo)
-          const fallbackSlides = defaultSlides.filter(s => !s.is_logo) // slide-1.jpg كـ fallback
-          
-          // التحقق من وجود لوغو في السلايدات من قاعدة البيانات
-          const hasLogoInDB = validSlides.some((s: any) => s.is_logo)
-          
-          // الحفاظ على الترتيب من قاعدة البيانات كما هو
-          // فقط نضع اللوغو المحلي أولاً إذا لم يكن هناك لوغو في قاعدة البيانات
-          if (hasLogoInDB) {
-            // إذا كان هناك لوغو في قاعدة البيانات، استخدم السلايدات من قاعدة البيانات فقط
-            allSlides = validSlides
-          } else {
-            // إذا لم يكن هناك لوغو في قاعدة البيانات، أضف اللوغو المحلي أولاً
-            allSlides = [...logoSlides, ...validSlides]
-          }
-          
-          // إذا لم توجد سلايدات من قاعدة البيانات، استخدم السلايدات المحلية كاملة
-          if (validSlides.length === 0) {
-            allSlides = defaultSlides
-          }
+          // استخدام السلايدات من قاعدة البيانات مباشرة (بدون السلايدات المحلية)
+          // السلايدات المحلية ستُستخدم فقط كـ fallback عند فشل تحميل السلايدات من قاعدة البيانات
+          allSlides = validSlides
           
           if (import.meta.env.DEV) {
             console.log(`✅ إجمالي السلايدات بعد الدمج: ${allSlides.length}`)
@@ -154,14 +127,23 @@ export default function Home() {
       if (import.meta.env.DEV) {
         console.log('🔍 التحقق النهائي من السلايدات قبل التعيين:')
         console.log(`  - عدد السلايدات: ${allSlides.length}`)
-        allSlides.forEach((slide, idx) => {
-          console.log(`  ${idx + 1}. ID: ${slide.id}, URL: ${slide.image_url.substring(0, 50)}..., is_active: ${slide.is_active}, is_logo: ${slide.is_logo}`)
-        })
+        if (allSlides.length > 0) {
+          allSlides.forEach((slide, idx) => {
+            const urlPreview = slide.image_url.length > 50 
+              ? slide.image_url.substring(0, 50) + '...' 
+              : slide.image_url
+            console.log(`  ${idx + 1}. ID: ${slide.id}, URL: ${urlPreview}, is_active: ${slide.is_active}, is_logo: ${slide.is_logo}`)
+          })
+        } else {
+          console.warn('⚠️ لا توجد سلايدات من قاعدة البيانات')
+        }
       }
       
       // التأكد من وجود سلايدات على الأقل
       if (allSlides.length === 0) {
-        console.warn('⚠️ لا توجد سلايدات - استخدام السلايدات المحلية الافتراضية')
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ لا توجد سلايدات - استخدام السلايدات المحلية الافتراضية')
+        }
         allSlides = defaultSlides
       }
       
@@ -195,14 +177,15 @@ export default function Home() {
         return loadHeroSlides(retryCount + 1)
       }
       
-      // Fallback: استخدام السلايدات المحلية فقط (اللوغو + slide-1.jpg)
+      // Fallback: استخدام السلايدات المحلية فقط عند فشل تحميل السلايدات من قاعدة البيانات
       if (import.meta.env.DEV) {
-        console.log('🔄 استخدام السلايدات المحلية كـ fallback')
+        console.warn('⚠️ فشل تحميل السلايدات من قاعدة البيانات - استخدام السلايدات المحلية كـ fallback')
         console.log(`  - السلايدات المحلية: ${defaultSlides.length}`)
         defaultSlides.forEach(slide => {
           console.log(`    - ${slide.image_url} (is_logo: ${slide.is_logo}, display_order: ${slide.display_order})`)
         })
       }
+      // استخدام السلايدات المحلية فقط عند فشل التحميل من قاعدة البيانات
       setHeroSlides(defaultSlides)
     } finally {
       setLoading(false)

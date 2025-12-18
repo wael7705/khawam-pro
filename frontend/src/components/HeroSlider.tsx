@@ -61,7 +61,11 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
 
   // تصفية السلايدات النشطة فقط (الحفاظ على الترتيب كما هو من قاعدة البيانات)
   const activeSlides = slides
-    .filter(slide => slide.is_active && !failedImages.has(slide.id))
+    .filter(slide => {
+      const isActive = slide.is_active !== false // default true
+      const notFailed = !failedImages.has(slide.id)
+      return isActive && notFailed
+    })
     // فقط نضع اللوغو أولاً، والباقي بالترتيب الأصلي
     .sort((a, b) => {
       // اللوغو دائماً أولاً
@@ -70,6 +74,17 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
       // الباقي بالترتيب الأصلي (لا نغير الترتيب)
       return 0
     })
+  
+  // تسجيل معلومات السلايدات النشطة
+  if (import.meta.env.DEV && slides.length > 0) {
+    console.log(`📸 السلايدات: ${slides.length} إجمالي، ${activeSlides.length} نشطة`)
+    if (activeSlides.length === 0 && slides.length > 0) {
+      console.warn('⚠️ جميع السلايدات غير نشطة أو فشلت في التحميل')
+      slides.forEach(slide => {
+        console.log(`  - ID: ${slide.id}, is_active: ${slide.is_active}, failed: ${failedImages.has(slide.id)}`)
+      })
+    }
+  }
 
   // دالة لإعادة تشغيل auto-play
   const restartAutoPlay = useCallback(() => {
@@ -217,68 +232,56 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     touchEndX.current = 0
   }
 
-  // إذا لم توجد سلايدات نشطة، اعرض fallback
-  if (activeSlides.length === 0) {
-    console.warn('⚠️ لا توجد سلايدات نشطة - عرض fallback')
+  // إذا لم توجد سلايدات نشطة، اعرض fallback فقط بعد انتهاء التحميل
+  if (activeSlides.length === 0 && !loading) {
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ لا توجد سلايدات نشطة - عرض fallback')
+    }
     return (
       <section className="hero-slider">
         <div className="hero-slide">
-          {loading ? (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.1)',
-            }}>
-              <div style={{
-                width: '50px',
-                height: '50px',
-                border: '4px solid rgba(220, 38, 38, 0.2)',
-                borderTop: '4px solid #dc2626',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}></div>
-            </div>
-          ) : (
-            <>
-              <img 
-                src="/logo.jpg" 
-                alt="خوام للطباعة والتصميم"
-                onError={(e) => {
-                  console.error('❌ فشل تحميل اللوغو المحلي')
-                  const target = e.target as HTMLImageElement
-                  target.style.display = 'none'
-                }}
-                onLoad={() => {
-                  console.log('✅ تم تحميل اللوغو المحلي بنجاح')
-                }}
-              />
-              <img 
-                src="/hero-slides/slide-1.jpg" 
-                alt="سلايدة"
-                style={{ display: 'none' }}
-                onError={(e) => {
-                  console.error('❌ فشل تحميل slide-1.jpg المحلي')
-                }}
-                onLoad={() => {
-                  console.log('✅ تم تحميل slide-1.jpg المحلي بنجاح')
-                }}
-              />
-            </>
-          )}
+          <img 
+            src="/hero-slides/slide-1.jpg" 
+            alt="خوام للطباعة والتصميم"
+            onError={(e) => {
+              console.error('❌ فشل تحميل slide-1.jpg المحلي')
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+            }}
+            onLoad={() => {
+              console.log('✅ تم تحميل slide-1.jpg المحلي بنجاح')
+            }}
+          />
         </div>
       </section>
     )
   }
   
-  // تسجيل معلومات السلايدات النشطة
-  if (import.meta.env.DEV) {
-    console.log(`📸 السلايدات النشطة: ${activeSlides.length}`)
-    activeSlides.forEach((slide, idx) => {
-      console.log(`  ${idx + 1}. ID: ${slide.id}, is_logo: ${slide.is_logo}, is_active: ${slide.is_active}, URL: ${slide.image_url.substring(0, 50)}...`)
-    })
+  // إذا كان التحميل جارياً، اعرض loading
+  if (loading && activeSlides.length === 0) {
+    return (
+      <section className="hero-slider">
+        <div className="hero-slide">
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255, 255, 255, 0.1)',
+          }}>
+            <div style={{
+              width: '50px',
+              height: '50px',
+              border: '4px solid rgba(220, 38, 38, 0.2)',
+              borderTop: '4px solid #dc2626',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}></div>
+          </div>
+        </div>
+      </section>
+    )
   }
 
   return (

@@ -39,6 +39,8 @@
   z-index: 1;
   /* التأكد من أن ::before لا يغطي الصور */
   mix-blend-mode: normal;
+  /* إخفاء ::before إذا كانت الصور موجودة */
+  opacity: 0.3;
 }
 
 /* الوضع الليلي - خلفية شفافة زجاجية داكنة */
@@ -55,10 +57,12 @@
   height: 100%;
   will-change: transform;
   position: relative;
-  z-index: 3;
+  z-index: 5;
   /* التأكد من أن السلايدات تظهر بشكل صحيح */
   flex-wrap: nowrap;
   align-items: stretch;
+  /* التأكد من أن container فوق ::before */
+  isolation: isolate;
 }
 
 .hero-slide {
@@ -71,9 +75,11 @@
   overflow: hidden;
   /* خلفية بيضاء شفافة للصور */
   background: rgba(255, 255, 255, 0.1);
-  z-index: 3;
+  z-index: 5;
   /* التأكد من أن السلايدة تأخذ العرض الكامل */
   box-sizing: border-box;
+  /* التأكد من أن السلايدة فوق ::before */
+  isolation: isolate;
 }
 
 /* الوضع الليلي */
@@ -94,7 +100,9 @@
   /* تحسين الأداء */
   will-change: transform;
   position: relative;
-  z-index: 4;
+  z-index: 10;
+  /* التأكد من أن الصورة فوق كل شيء */
+  isolation: isolate;
   /* 
    * القياس الموصى به للصور في Hero Slider:
    * 1920 × 1080 بكسل (نسبة 16:9)

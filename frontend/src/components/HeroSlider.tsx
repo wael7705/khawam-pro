@@ -293,6 +293,101 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     )
   }
 
+  // تحليل شامل للبيانات وهيكل العرض
+  useEffect(() => {
+    if (import.meta.env.DEV && activeSlides.length > 0) {
+      const container = document.querySelector('.hero-slides-container') as HTMLElement
+      const slider = document.querySelector('.hero-slider') as HTMLElement
+      const slides = document.querySelectorAll('.hero-slide')
+      
+      if (container && slider && slides.length > 0) {
+        const containerStyles = window.getComputedStyle(container)
+        const sliderStyles = window.getComputedStyle(slider)
+        
+        console.group('🔍 تحليل شامل لهيكل العرض')
+        console.log('📊 معلومات Container:', {
+          width: containerStyles.width,
+          height: containerStyles.height,
+          display: containerStyles.display,
+          flexDirection: containerStyles.flexDirection,
+          transform: containerStyles.transform,
+          position: containerStyles.position,
+          zIndex: containerStyles.zIndex,
+          overflow: containerStyles.overflow,
+          clientWidth: container.clientWidth,
+          clientHeight: container.clientHeight,
+          offsetWidth: container.offsetWidth,
+          offsetHeight: container.offsetHeight,
+          scrollWidth: container.scrollWidth,
+          scrollHeight: container.scrollHeight,
+        })
+        
+        console.log('📊 معلومات Slider:', {
+          width: sliderStyles.width,
+          height: sliderStyles.height,
+          position: sliderStyles.position,
+          zIndex: sliderStyles.zIndex,
+          overflow: sliderStyles.overflow,
+          clientWidth: slider.clientWidth,
+          clientHeight: slider.clientHeight,
+          offsetWidth: slider.offsetWidth,
+          offsetHeight: slider.offsetHeight,
+        })
+        
+        console.log('📊 معلومات السلايدات:', {
+          totalSlides: slides.length,
+          currentIndex: currentIndex,
+          slides: Array.from(slides).map((slide, idx) => {
+            const slideEl = slide as HTMLElement
+            const slideStyles = window.getComputedStyle(slideEl)
+            const img = slideEl.querySelector('img') as HTMLImageElement
+            const imgStyles = img ? window.getComputedStyle(img) : null
+            
+            return {
+              index: idx,
+              slideId: slideEl.getAttribute('data-slide-id') || 'unknown',
+              slideWidth: slideStyles.width,
+              slideHeight: slideStyles.height,
+              slideFlex: slideStyles.flex,
+              slidePosition: slideStyles.position,
+              slideZIndex: slideStyles.zIndex,
+              slideClientWidth: slideEl.clientWidth,
+              slideClientHeight: slideEl.clientHeight,
+              slideOffsetWidth: slideEl.offsetWidth,
+              slideOffsetHeight: slideEl.offsetHeight,
+              slideOffsetLeft: slideEl.offsetLeft,
+              imgExists: !!img,
+              imgSrc: img ? (img.src.substring(0, 50) + '...') : 'none',
+              imgWidth: imgStyles?.width || 'none',
+              imgHeight: imgStyles?.height || 'none',
+              imgDisplay: imgStyles?.display || 'none',
+              imgVisibility: imgStyles?.visibility || 'none',
+              imgOpacity: imgStyles?.opacity || 'none',
+              imgZIndex: imgStyles?.zIndex || 'none',
+              imgNaturalWidth: img?.naturalWidth || 0,
+              imgNaturalHeight: img?.naturalHeight || 0,
+              imgComplete: img?.complete || false,
+            }
+          })
+        })
+        
+        // فحص ::before و ::after
+        const beforeStyles = window.getComputedStyle(slider, '::before')
+        const afterStyles = window.getComputedStyle(slider, '::after')
+        console.log('📊 معلومات Pseudo-elements:', {
+          beforeZIndex: beforeStyles.zIndex,
+          beforeDisplay: beforeStyles.display,
+          beforePosition: beforeStyles.position,
+          afterZIndex: afterStyles.zIndex,
+          afterDisplay: afterStyles.display,
+          afterPosition: afterStyles.position,
+        })
+        
+        console.groupEnd()
+      }
+    }
+  }, [activeSlides, currentIndex, isTransitioning])
+  
   return (
     <section 
       className="hero-slider"
@@ -325,6 +420,8 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
             <div 
               key={slide.id} 
               className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}
+              data-slide-id={slide.id}
+              data-slide-index={index}
             >
               <img 
                 src={imageUrl}
@@ -415,16 +512,42 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
               }}
               onLoad={(e) => {
                 const target = e.target as HTMLImageElement
-                if (import.meta.env.DEV) {
-                  console.log(`✅ Hero slide image loaded:`, {
-                    slideId: slide.id,
-                    slideIndex: index,
-                    currentIndex: currentIndex,
-                    isVisible: index === currentIndex,
-                    naturalWidth: target.naturalWidth,
-                    naturalHeight: target.naturalHeight,
-                  })
-                }
+                const slideEl = target.closest('.hero-slide') as HTMLElement
+                const computedStyles = window.getComputedStyle(target)
+                const slideComputedStyles = slideEl ? window.getComputedStyle(slideEl) : null
+                
+                console.log(`✅ Hero slide image loaded:`, {
+                  slideId: slide.id,
+                  slideIndex: index,
+                  currentIndex: currentIndex,
+                  isVisible: index === currentIndex,
+                  naturalWidth: target.naturalWidth,
+                  naturalHeight: target.naturalHeight,
+                  clientWidth: target.clientWidth,
+                  clientHeight: target.clientHeight,
+                  offsetWidth: target.offsetWidth,
+                  offsetHeight: target.offsetHeight,
+                  imgComputed: {
+                    display: computedStyles.display,
+                    visibility: computedStyles.visibility,
+                    opacity: computedStyles.opacity,
+                    width: computedStyles.width,
+                    height: computedStyles.height,
+                    zIndex: computedStyles.zIndex,
+                    position: computedStyles.position,
+                    objectFit: computedStyles.objectFit,
+                  },
+                  slideComputed: slideComputedStyles ? {
+                    display: slideComputedStyles.display,
+                    width: slideComputedStyles.width,
+                    height: slideComputedStyles.height,
+                    flex: slideComputedStyles.flex,
+                    zIndex: slideComputedStyles.zIndex,
+                    position: slideComputedStyles.position,
+                    offsetLeft: slideEl.offsetLeft,
+                    offsetTop: slideEl.offsetTop,
+                  } : null,
+                })
               }}
               />
             </div>

@@ -108,8 +108,16 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
   useEffect(() => {
     if (activeSlides.length === 0) return
     
+    console.log(`🔄 تحديث currentIndex:`, {
+      activeSlidesLength: activeSlides.length,
+      currentIndex: currentIndex,
+      needsReset: currentIndex >= activeSlides.length,
+      activeSlidesIds: activeSlides.map(s => s.id)
+    })
+    
     // التأكد من أن currentIndex صحيح
     if (currentIndex >= activeSlides.length) {
+      console.log(`⚠️ currentIndex (${currentIndex}) >= activeSlides.length (${activeSlides.length}) - إعادة تعيين إلى 0`)
       setCurrentIndex(0)
     }
     // إعادة تشغيل auto-play عند تغيير السلايدات
@@ -296,25 +304,34 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
         style={{
           transform: `translateX(-${currentIndex * 100}%)`,
           transition: isTransitioning ? 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          width: `${activeSlides.length * 100}%`,
         }}
       >
         {activeSlides.map((slide, index) => {
           const imageUrl = resolveImageUrl(slide.image_url)
           
-          if (import.meta.env.DEV) {
-            console.log(`🖼️ تحميل السلايدة ${index + 1}/${activeSlides.length}:`, {
-              id: slide.id,
-              url: slide.image_url.substring(0, 50) + (slide.image_url.length > 50 ? '...' : ''),
-              resolvedUrl: imageUrl.substring(0, 50) + (imageUrl.length > 50 ? '...' : ''),
-              is_logo: slide.is_logo,
-              is_active: slide.is_active
-            })
-          }
+          console.log(`🖼️ رندر السلايدة ${index + 1}/${activeSlides.length}:`, {
+            id: slide.id,
+            index: index,
+            currentIndex: currentIndex,
+            isVisible: index === currentIndex,
+            url: slide.image_url.substring(0, 50) + (slide.image_url.length > 50 ? '...' : ''),
+            resolvedUrl: imageUrl.substring(0, 50) + (imageUrl.length > 50 ? '...' : ''),
+            is_logo: slide.is_logo,
+            is_active: slide.is_active,
+            transform: `translateX(-${currentIndex * 100}%)`,
+            slideTransform: `translateX(${index * 100}%)`
+          })
           
           return (
             <div 
               key={slide.id} 
               className={`hero-slide ${slide.is_logo ? 'logo-slide' : ''}`}
+              style={{
+                minWidth: '100%',
+                width: '100%',
+                flexShrink: 0,
+              }}
             >
               <img 
                 src={imageUrl}
@@ -327,6 +344,8 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                   objectFit: 'contain',
                   objectPosition: 'center',
                   display: 'block',
+                  opacity: 1,
+                  visibility: 'visible',
                 }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement
@@ -396,12 +415,28 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                   target.onerror = null
                 }
               }}
-              onLoad={() => {
+              onLoad={(e) => {
+                const target = e.target as HTMLImageElement
                 console.log(`✅ Hero slide image loaded successfully:`, {
                   slideId: slide.id,
                   slideIndex: index,
+                  currentIndex: currentIndex,
+                  isVisible: index === currentIndex,
                   is_logo: slide.is_logo,
-                  url: slide.image_url.substring(0, 50) + (slide.image_url.length > 50 ? '...' : '')
+                  url: slide.image_url.substring(0, 50) + (slide.image_url.length > 50 ? '...' : ''),
+                  naturalWidth: target.naturalWidth,
+                  naturalHeight: target.naturalHeight,
+                  clientWidth: target.clientWidth,
+                  clientHeight: target.clientHeight,
+                  offsetWidth: target.offsetWidth,
+                  offsetHeight: target.offsetHeight,
+                  computedStyle: {
+                    display: window.getComputedStyle(target).display,
+                    visibility: window.getComputedStyle(target).visibility,
+                    opacity: window.getComputedStyle(target).opacity,
+                    width: window.getComputedStyle(target).width,
+                    height: window.getComputedStyle(target).height,
+                  }
                 })
               }}
               />

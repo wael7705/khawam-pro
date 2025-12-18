@@ -217,7 +217,9 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     touchEndX.current = 0
   }
 
+  // إذا لم توجد سلايدات نشطة، اعرض fallback
   if (activeSlides.length === 0) {
+    console.warn('⚠️ لا توجد سلايدات نشطة - عرض fallback')
     return (
       <section className="hero-slider">
         <div className="hero-slide">
@@ -240,11 +242,43 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
               }}></div>
             </div>
           ) : (
-            <img src="/logo.jpg" alt="خوام للطباعة والتصميم" />
+            <>
+              <img 
+                src="/logo.jpg" 
+                alt="خوام للطباعة والتصميم"
+                onError={(e) => {
+                  console.error('❌ فشل تحميل اللوغو المحلي')
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                }}
+                onLoad={() => {
+                  console.log('✅ تم تحميل اللوغو المحلي بنجاح')
+                }}
+              />
+              <img 
+                src="/hero-slides/slide-1.jpg" 
+                alt="سلايدة"
+                style={{ display: 'none' }}
+                onError={(e) => {
+                  console.error('❌ فشل تحميل slide-1.jpg المحلي')
+                }}
+                onLoad={() => {
+                  console.log('✅ تم تحميل slide-1.jpg المحلي بنجاح')
+                }}
+              />
+            </>
           )}
         </div>
       </section>
     )
+  }
+  
+  // تسجيل معلومات السلايدات النشطة
+  if (import.meta.env.DEV) {
+    console.log(`📸 السلايدات النشطة: ${activeSlides.length}`)
+    activeSlides.forEach((slide, idx) => {
+      console.log(`  ${idx + 1}. ID: ${slide.id}, is_logo: ${slide.is_logo}, is_active: ${slide.is_active}, URL: ${slide.image_url.substring(0, 50)}...`)
+    })
   }
 
   return (
@@ -263,6 +297,17 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
       >
         {activeSlides.map((slide, index) => {
           const imageUrl = resolveImageUrl(slide.image_url)
+          
+          if (import.meta.env.DEV) {
+            console.log(`🖼️ تحميل السلايدة ${index + 1}/${activeSlides.length}:`, {
+              id: slide.id,
+              url: slide.image_url.substring(0, 50) + (slide.image_url.length > 50 ? '...' : ''),
+              resolvedUrl: imageUrl.substring(0, 50) + (imageUrl.length > 50 ? '...' : ''),
+              is_logo: slide.is_logo,
+              is_active: slide.is_active
+            })
+          }
+          
           return (
             <div 
               key={slide.id} 
@@ -287,17 +332,17 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                 const maxRetries = 3
                 
                 // فقط في وضع التطوير
-                if (import.meta.env.DEV) {
-                  console.warn(`⚠️ Failed to load hero slide image (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
-                    resolved: imageUrl,
-                    original: originalUrl,
-                    isBase64: originalUrl?.startsWith('data:'),
-                    isExternal: originalUrl?.startsWith('http'),
-                    isLocal: originalUrl?.startsWith('/'),
-                    index: index,
-                    slideId: slide.id
-                  })
-                }
+                console.error(`❌ Failed to load hero slide image (attempt ${retryCount + 1}/${maxRetries + 1}):`, {
+                  slideId: slide.id,
+                  slideIndex: index,
+                  resolvedUrl: imageUrl.substring(0, 100) + (imageUrl.length > 100 ? '...' : ''),
+                  originalUrl: originalUrl?.substring(0, 100) + (originalUrl?.length > 100 ? '...' : ''),
+                  isBase64: originalUrl?.startsWith('data:'),
+                  isExternal: originalUrl?.startsWith('http'),
+                  isLocal: originalUrl?.startsWith('/'),
+                  imageUrlLength: imageUrl.length,
+                  originalUrlLength: originalUrl?.length
+                })
                 
                 // إعادة المحاولة
                 if (retryCount < maxRetries) {
@@ -349,10 +394,12 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                 }
               }}
               onLoad={() => {
-                // لا نطبع console.log في الإنتاج لتقليل الضوضاء
-                if (import.meta.env.DEV) {
-                  console.log('✅ Hero slide image loaded:', index)
-                }
+                console.log(`✅ Hero slide image loaded successfully:`, {
+                  slideId: slide.id,
+                  slideIndex: index,
+                  is_logo: slide.is_logo,
+                  url: slide.image_url.substring(0, 50) + (slide.image_url.length > 50 ? '...' : '')
+                })
               }}
               />
             </div>

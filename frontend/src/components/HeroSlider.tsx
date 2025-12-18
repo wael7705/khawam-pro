@@ -341,6 +341,9 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
                   visibility: 'visible',
                   maxWidth: '100%',
                   maxHeight: '100%',
+                  position: 'relative',
+                  zIndex: 4,
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement

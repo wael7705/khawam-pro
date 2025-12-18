@@ -37,6 +37,8 @@
   -webkit-backdrop-filter: blur(25px) saturate(180%);
   pointer-events: none;
   z-index: 1;
+  /* التأكد من أن ::before لا يغطي الصور */
+  mix-blend-mode: normal;
 }
 
 /* الوضع الليلي - خلفية شفافة زجاجية داكنة */
@@ -53,7 +55,7 @@
   height: 100%;
   will-change: transform;
   position: relative;
-  z-index: 2;
+  z-index: 3;
   /* التأكد من أن السلايدات تظهر بشكل صحيح */
   flex-wrap: nowrap;
   align-items: stretch;
@@ -67,9 +69,9 @@
   height: 100%;
   position: relative;
   overflow: hidden;
-  /* لا نضع blur هنا - فقط في hero-slider */
-  background: transparent;
-  z-index: 2;
+  /* خلفية بيضاء شفافة للصور */
+  background: rgba(255, 255, 255, 0.1);
+  z-index: 3;
   /* التأكد من أن السلايدة تأخذ العرض الكامل */
   box-sizing: border-box;
 }
@@ -84,11 +86,15 @@
   height: 100%;
   object-fit: contain;
   object-position: center;
-  display: block;
-  /* خلفية شفافة للصورة */
-  background: transparent;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  /* خلفية بيضاء شفافة للصور base64 */
+  background: rgba(255, 255, 255, 0.95);
   /* تحسين الأداء */
   will-change: transform;
+  position: relative;
+  z-index: 4;
   /* 
    * القياس الموصى به للصور في Hero Slider:
    * 1920 × 1080 بكسل (نسبة 16:9)
@@ -103,9 +109,9 @@
   loading: lazy;
 }
 
-/* الوضع الليلي - صورة بدون خلفية */
+/* الوضع الليلي - صورة بخلفية داكنة */
 [data-theme="dark"] .hero-slide img {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* معالجة خاصة للوغو - عرض أفضل */
@@ -113,12 +119,14 @@
   object-fit: contain;
   object-position: center;
   padding: 40px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.95);
   max-width: 100%;
   max-height: 100%;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  position: relative;
+  z-index: 4;
 }
 
 /* الوضع الليلي للوغو - شفاف */

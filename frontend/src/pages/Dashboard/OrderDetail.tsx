@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, type ReactNode, type CSSProperties } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, MessageSquare, Save, MapPin, ExternalLink, Download, FileText, Paperclip, Navigation, Share2, Plus } from 'lucide-react'
+import { ArrowRight, MessageSquare, Save, MapPin, ExternalLink, Download, FileText, Paperclip, Navigation, Share2, Plus, Copy } from 'lucide-react'
 import { adminAPI, ordersAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
 import SimpleMap from '../../components/SimpleMap'
@@ -1673,6 +1673,24 @@ export default function OrderDetail() {
     window.open(buildWhatsAppWebUrl(cleanPhone), 'whatsapp_web')
   }
 
+  const scrollToAttachments = () => {
+    const el = document.getElementById('order-attachments')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const copyCoords = async () => {
+    if (!order?.delivery_latitude || !order?.delivery_longitude) {
+      showError('لا توجد إحداثيات للنسخ')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(`${order.delivery_latitude},${order.delivery_longitude}`)
+      showSuccess('تم نسخ الإحداثيات')
+    } catch {
+      showError('فشل نسخ الإحداثيات')
+    }
+  }
+
   // دالة لبناء العنوان الكامل
   const buildFullAddress = (orderData: Order): string => {
     const parts: string[] = []
@@ -1981,14 +1999,51 @@ export default function OrderDetail() {
   return (
     <div className="order-detail-page">
       <div className="container">
-        <div className="order-detail-header">
+        <div className="order-detail-header order-detail-header-sticky">
           <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
             <ArrowRight size={20} />
             العودة للطلبات
           </button>
           <div className="order-header-meta">
-          <h1>تفاصيل الطلب: {order.order_number}</h1>
+            <h1>تفاصيل الطلب: {order.order_number}</h1>
             <span className="order-status-chip">{getStatusLabel(order.status || 'pending')}</span>
+          </div>
+
+          <div className="order-header-actions">
+            <button
+              className="header-action-btn"
+              onClick={() => openWhatsApp(order.customer_whatsapp || order.customer_phone)}
+              title="فتح واتساب"
+            >
+              <MessageSquare size={16} />
+              واتساب
+            </button>
+
+            {(order.delivery_latitude && order.delivery_longitude) && (
+              <button className="header-action-btn" onClick={copyCoords} title="نسخ الإحداثيات">
+                <Copy size={16} />
+                نسخ GPS
+              </button>
+            )}
+
+            {(order.delivery_latitude && order.delivery_longitude) && (
+              <button
+                className="header-action-btn"
+                onClick={() => {
+                  const gpsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`
+                  window.open(gpsUrl, '_blank')
+                }}
+                title="اتجاهات GPS"
+              >
+                <Navigation size={16} />
+                GPS
+              </button>
+            )}
+
+            <button className="header-action-btn" onClick={scrollToAttachments} title="الانتقال للمرفقات">
+              <Paperclip size={16} />
+              المرفقات
+            </button>
           </div>
         </div>
 
@@ -2245,7 +2300,9 @@ export default function OrderDetail() {
           </div>
         </div>
 
-          {attachmentsOverview}
+          <div id="order-attachments">
+            {attachmentsOverview}
+          </div>
 
         {/* Order Items */}
         <div className="detail-card items-card">

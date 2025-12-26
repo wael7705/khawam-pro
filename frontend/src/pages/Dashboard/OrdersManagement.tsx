@@ -708,161 +708,163 @@ export default function OrdersManagement() {
         <Bell size={16} />
         <span>{isConnected ? 'الإشعارات نشطة' : 'غير متصل'}</span>
       </div>
-      <div className="section-header">
-        <div>
-          <h1>إدارة الطلبات</h1>
-          <p>عرض وإدارة جميع الطلبات ({filteredOrders.length})</p>
+      <div className="orders-sticky-toolbar">
+        <div className="section-header">
+          <div>
+            <h1>إدارة الطلبات</h1>
+            <p>عرض وإدارة جميع الطلبات ({filteredOrders.length})</p>
+          </div>
+          {activeTab === 'archived' && archivedOrders.length > 0 && (
+            <button
+              className="export-archive-btn"
+              onClick={handleExportArchive}
+            >
+              <Download size={18} />
+              تصدير الأرشيف
+            </button>
+          )}
         </div>
-        {activeTab === 'archived' && archivedOrders.length > 0 && (
-          <button
-            className="export-archive-btn"
-            onClick={handleExportArchive}
+
+        <div className="orders-filters">
+          <div className="search-box">
+            <Search size={20} />
+            <input 
+              type="text" 
+              placeholder="ابحث عن طلب (رقم الطلب، اسم العميل، رقم الهاتف)..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <select
+            className="delivery-filter-select"
+            value={deliveryFilter}
+            onChange={(e) => setDeliveryFilter(e.target.value as 'all' | 'delivery' | 'self')}
+            title="فلترة حسب نوع التوصيل"
           >
-            <Download size={18} />
-            تصدير الأرشيف
-          </button>
-        )}
-      </div>
-
-      <div className="orders-filters">
-        <div className="search-box">
-          <Search size={20} />
-          <input 
-            type="text" 
-            placeholder="ابحث عن طلب (رقم الطلب، اسم العميل، رقم الهاتف)..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <select
-          className="delivery-filter-select"
-          value={deliveryFilter}
-          onChange={(e) => setDeliveryFilter(e.target.value as 'all' | 'delivery' | 'self')}
-          title="فلترة حسب نوع التوصيل"
-        >
-          <option value="all">كل الأنواع</option>
-          <option value="delivery">توصيل</option>
-          <option value="self">استلام ذاتي</option>
-        </select>
-        
-        {/* فلاتر الأرشيف */}
-        {activeTab === 'archived' && (
-          <div className="archive-filters" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <label style={{ fontSize: '14px', fontWeight: 500 }}>نوع الأرشيف:</label>
-              <select 
-                value={archiveMode} 
-                onChange={(e) => setArchiveMode(e.target.value as 'daily' | 'monthly')}
-                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
-              >
-                <option value="daily">يومي</option>
-                <option value="monthly">شهري</option>
-              </select>
-            </div>
-            
-            {archiveMode === 'daily' ? (
+            <option value="all">كل الأنواع</option>
+            <option value="delivery">توصيل</option>
+            <option value="self">استلام ذاتي</option>
+          </select>
+          
+          {/* فلاتر الأرشيف */}
+          {activeTab === 'archived' && (
+            <div className="archive-filters" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <label style={{ fontSize: '14px', fontWeight: 500 }}>التاريخ:</label>
-                <input
-                  type="date"
-                  value={archiveDate}
-                  onChange={(e) => setArchiveDate(e.target.value)}
+                <label style={{ fontSize: '14px', fontWeight: 500 }}>نوع الأرشيف:</label>
+                <select 
+                  value={archiveMode} 
+                  onChange={(e) => setArchiveMode(e.target.value as 'daily' | 'monthly')}
                   style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
-                />
-                {availableArchiveDates.length > 0 && (
-                  <select
+                >
+                  <option value="daily">يومي</option>
+                  <option value="monthly">شهري</option>
+                </select>
+              </div>
+              
+              {archiveMode === 'daily' ? (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 500 }}>التاريخ:</label>
+                  <input
+                    type="date"
                     value={archiveDate}
                     onChange={(e) => setArchiveDate(e.target.value)}
                     style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                  />
+                  {availableArchiveDates.length > 0 && (
+                    <select
+                      value={archiveDate}
+                      onChange={(e) => setArchiveDate(e.target.value)}
+                      style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                    >
+                      <option value="">اختر تاريخاً</option>
+                      {availableArchiveDates.map(date => (
+                        <option key={date} value={date}>{date}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 500 }}>السنة:</label>
+                  <input
+                    type="number"
+                    value={archiveYear}
+                    onChange={(e) => setArchiveYear(parseInt(e.target.value) || new Date().getFullYear())}
+                    min="2020"
+                    max={new Date().getFullYear()}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', width: '100px' }}
+                  />
+                  <label style={{ fontSize: '14px', fontWeight: 500 }}>الشهر:</label>
+                  <select
+                    value={archiveMonth}
+                    onChange={(e) => setArchiveMonth(parseInt(e.target.value))}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
                   >
-                    <option value="">اختر تاريخاً</option>
-                    {availableArchiveDates.map(date => (
-                      <option key={date} value={date}>{date}</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
+                      <option key={month} value={month}>
+                        {new Date(2000, month - 1, 1).toLocaleDateString('ar-SA', { month: 'long' })}
+                      </option>
                     ))}
                   </select>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <label style={{ fontSize: '14px', fontWeight: 500 }}>السنة:</label>
-                <input
-                  type="number"
-                  value={archiveYear}
-                  onChange={(e) => setArchiveYear(parseInt(e.target.value) || new Date().getFullYear())}
-                  min="2020"
-                  max={new Date().getFullYear()}
-                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', width: '100px' }}
-                />
-                <label style={{ fontSize: '14px', fontWeight: 500 }}>الشهر:</label>
-                <select
-                  value={archiveMonth}
-                  onChange={(e) => setArchiveMonth(parseInt(e.target.value))}
-                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => (
-                    <option key={month} value={month}>
-                      {new Date(2000, month - 1, 1).toLocaleDateString('ar-SA', { month: 'long' })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
+          )}
           </div>
-        )}
-        </div>
 
-      {/* Status Tabs */}
-      <div className="status-tabs" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        {statusTabs.map(tab => {
-          const count = getOrdersCountByStatus(tab.id)
-          return (
-            <button
-              key={tab.id}
-              className={`status-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="tab-label">{tab.label}</span>
-              <span className="tab-count">{count}</span>
-        </button>
-          )
-        })}
-        {activeTab === 'pending' && getOrdersCountByStatus('pending') > 0 && (
-          <button
-            onClick={() => setDeleteAllPendingModalOpen(true)}
-            style={{
-              marginLeft: 'auto',
-              padding: '12px 24px',
-              background: '#EF4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              cursor: deletingAllPending ? 'not-allowed' : 'pointer',
-              fontSize: '15px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-              transition: 'all 0.3s',
-              opacity: deletingAllPending ? 0.6 : 1
-            }}
-            disabled={deletingAllPending}
-            onMouseOver={(e) => {
-              if (!deletingAllPending) {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
-              }
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            <Trash2 size={18} />
-            {deletingAllPending ? 'جاري الحذف...' : `حذف جميع الطلبات في الانتظار (${getOrdersCountByStatus('pending')})`}
+        {/* Status Tabs */}
+        <div className="status-tabs" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+          {statusTabs.map(tab => {
+            const count = getOrdersCountByStatus(tab.id)
+            return (
+              <button
+                key={tab.id}
+                className={`status-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <span className="tab-label">{tab.label}</span>
+                <span className="tab-count">{count}</span>
           </button>
-        )}
+            )
+          })}
+          {activeTab === 'pending' && getOrdersCountByStatus('pending') > 0 && (
+            <button
+              onClick={() => setDeleteAllPendingModalOpen(true)}
+              style={{
+                marginLeft: 'auto',
+                padding: '12px 24px',
+                background: '#EF4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: deletingAllPending ? 'not-allowed' : 'pointer',
+                fontSize: '15px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.3s',
+                opacity: deletingAllPending ? 0.6 : 1
+              }}
+              disabled={deletingAllPending}
+              onMouseOver={(e) => {
+                if (!deletingAllPending) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
+                }
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <Trash2 size={18} />
+              {deletingAllPending ? 'جاري الحذف...' : `حذف جميع الطلبات في الانتظار (${getOrdersCountByStatus('pending')})`}
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (

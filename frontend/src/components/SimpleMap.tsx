@@ -17,6 +17,7 @@ interface SimpleMapProps {
   longitude?: number
   defaultCenter?: [number, number]
   defaultZoom?: number
+  height?: number | string
   markers?: Array<{
     lat: number
     lng: number
@@ -65,6 +66,7 @@ export default function SimpleMap({
   longitude,
   defaultCenter = [33.5138, 36.2765], // Damascus default
   defaultZoom = 12,
+  height = 500,
   markers = [],
   onLocationSelect
 }: SimpleMapProps) {
@@ -154,7 +156,12 @@ export default function SimpleMap({
         center={position}
         zoom={zoom}
         scrollWheelZoom={true}
-        style={{ height: '500px', width: '100%', borderRadius: '12px', zIndex: 1 }}
+        style={{
+          height: typeof height === 'number' ? `${height}px` : height,
+          width: '100%',
+          borderRadius: '12px',
+          zIndex: 1
+        }}
       >
         <MapViewUpdater center={position} zoom={zoom} />
         {onLocationSelect && <MapClickHandler onLocationSelect={onLocationSelect} />}

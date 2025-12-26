@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+import { buildWhatsAppWebUrl } from '../../utils/whatsapp'
+import { useEffect, useState } from 'react'
 import { Search, MessageSquare, Eye, Calendar, ShoppingCart, X, AlertCircle, CheckCircle, Package, Truck, MapPin, Download, Trash2, Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import './OrdersManagement.css'
@@ -6,7 +7,7 @@ import { adminAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
 import SimpleMap from '../../components/SimpleMap'
 import { useOrderNotifications } from '../../hooks/useOrderNotifications'
-import { useNotificationSound } from '../../hooks/useNotificationSound'
+import OrderQuickViewDrawer from '../../components/OrderQuickViewDrawer'
 
 interface Order {
   id: number
@@ -51,12 +52,14 @@ export default function OrdersManagement() {
   const [loading, setLoading] = useState<boolean>(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<string>('pending')
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'delivery' | 'self'>('all')
   const [cancelModalOpen, setCancelModalOpen] = useState<number | null>(null)
   const [rejectModalOpen, setRejectModalOpen] = useState<number | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [rejectReason, setRejectReason] = useState('')
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
   const [selectedOrderForMap, setSelectedOrderForMap] = useState<number | null>(null)
+  const [quickViewOrderId, setQuickViewOrderId] = useState<number | null>(null)
   const [archivedOrders, setArchivedOrders] = useState<Order[]>([])
   const [archiveDate, setArchiveDate] = useState<string>('') // تاريخ الأرشيف اليومي
   const [archiveYear, setArchiveYear] = useState<number>(new Date().getFullYear()) // سنة الأرشيف الشهري
@@ -68,8 +71,6 @@ export default function OrdersManagement() {
   const [deleteAllPendingModalOpen, setDeleteAllPendingModalOpen] = useState(false)
   const [deletingAllPending, setDeletingAllPending] = useState(false)
   
-  // نظام الإشعارات
-  const knownOrderIdsRef = useRef<Set<number>>(new Set())
   const { notifications, isConnected, notificationPermission } = useOrderNotifications({
     onNotificationClick: (orderId) => {
       navigate(`/dashboard/orders/${orderId}`)
@@ -78,7 +79,6 @@ export default function OrdersManagement() {
     enableDesktopNotifications: true,
     enableSoundNotifications: true,
   })
-  const { playSound } = useNotificationSound()
 
   const loadOrders = async (showLoading = false) => {
     try {
@@ -153,66 +153,9 @@ export default function OrdersManagement() {
     }
   }
 
-  // كشف الطلبات الجديدة وإظهار الإشعارات
-  useEffect(() => {
-    if (orders.length === 0) return
-
-    const currentOrderIds = new Set(orders.map((o) => o.id))
-    const newOrderIds = new Set<number>()
-
-    orders.forEach((order) => {
-      if (!knownOrderIdsRef.current.has(order.id)) {
-        newOrderIds.add(order.id)
-      }
-    })
-
-    if (newOrderIds.size > 0) {
-      const newOrders = orders.filter((o) => newOrderIds.has(o.id))
-
-      // تحديث قائمة الطلبات المعروفة
-      newOrderIds.forEach((id) => knownOrderIdsRef.current.add(id))
-
-      // إظهار إشعار لكل طلب جديد
-      newOrders.forEach((order) => {
-        playSound('new_order')
-
-        // إظهار إشعار المتصفح إذا كان مسموحاً
-        if ('Notification' in window && Notification.permission === 'granted') {
-          try {
-            const notification = new Notification('🆕 طلب جديد', {
-              body: `طلب ${order.order_number} من ${order.customer_name}`,
-              icon: order.image_url || '/logo.jpg',
-              badge: '/logo.jpg',
-              tag: `order-${order.id}`,
-              requireInteraction: false,
-            })
-
-            notification.onclick = () => {
-              window.focus()
-              navigate(`/dashboard/orders/${order.id}`)
-              notification.close()
-            }
-          } catch (error) {
-            console.warn('⚠️ فشل إظهار إشعار المتصفح:', error)
-          }
-        }
-
-        // إظهار toast notification
-        showSuccess(`طلب جديد: ${order.order_number}`)
-      })
-    }
-  }, [orders, navigate, playSound, showSuccess])
-
   useEffect(() => {
     loadOrders(true) // Show loading only on initial load
     loadArchivedOrders()
-    
-    // حفظ IDs الطلبات الحالية عند التحميل الأول
-    const initialLoadTimeout = setTimeout(() => {
-      orders.forEach((order) => {
-        knownOrderIdsRef.current.add(order.id)
-      })
-    }, 2000)
 
     // Refresh every 30 seconds in background - فقط إذا كانت الصفحة مرئية
     let interval: NodeJS.Timeout | null = null
@@ -228,13 +171,6 @@ export default function OrdersManagement() {
         if (!interval) {
           interval = setInterval(() => loadOrders(false), 30000)
         }
-      }
-    }
-    
-    return () => {
-      clearTimeout(initialLoadTimeout)
-      if (interval) {
-        clearInterval(interval)
       }
     }
     
@@ -295,8 +231,7 @@ export default function OrdersManagement() {
   }, [activeTab, archiveDate, archiveYear, archiveMonth, archiveMode])
 
   const openWhatsApp = (phone: string) => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '')
-    window.open(`https://wa.me/${cleanPhone}`, '_blank')
+    window.open(buildWhatsAppWebUrl(phone), 'whatsapp_web')
   }
 
   const getStatusLabel = (status: string) => {
@@ -363,10 +298,18 @@ export default function OrdersManagement() {
       order.customer_phone.includes(searchQuery)
     
     if (activeTab === 'archived') {
-      return matchesSearch
+      if (!matchesSearch) return false
+      if (deliveryFilter === 'all') return true
+      return order.delivery_type === deliveryFilter
     }
     
     const matchesTab = order.status === activeTab
+
+    if (activeTab !== 'shipping' && activeTab !== 'awaiting_pickup') {
+      if (deliveryFilter !== 'all' && order.delivery_type !== deliveryFilter) {
+        return false
+      }
+    }
     
     // Additional validation: shipping tab should only show delivery orders, not self-pickup
     if (activeTab === 'shipping' && order.delivery_type !== 'delivery') {
@@ -380,6 +323,10 @@ export default function OrdersManagement() {
     
     return matchesSearch && matchesTab
   })
+
+  const openQuickView = (orderId: number) => {
+    setQuickViewOrderId(orderId)
+  }
   
   // Debug logging for shipping tab
   useEffect(() => {
@@ -787,6 +734,17 @@ export default function OrdersManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        <select
+          className="delivery-filter-select"
+          value={deliveryFilter}
+          onChange={(e) => setDeliveryFilter(e.target.value as 'all' | 'delivery' | 'self')}
+          title="فلترة حسب نوع التوصيل"
+        >
+          <option value="all">كل الأنواع</option>
+          <option value="delivery">توصيل</option>
+          <option value="self">استلام ذاتي</option>
+        </select>
         
         {/* فلاتر الأرشيف */}
         {activeTab === 'archived' && (
@@ -989,7 +947,19 @@ export default function OrdersManagement() {
           
           <div className="orders-list">
             {filteredOrders.map((order) => (
-            <div key={order.id} className={`order-card-horizontal ${updatingOrderId === order.id ? 'updating' : ''}`}>
+            <div
+              key={order.id}
+              className={`order-card-horizontal ${updatingOrderId === order.id ? 'updating' : ''}`}
+              onClick={() => openQuickView(order.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openQuickView(order.id)
+                }
+              }}
+            >
               {order.image_url && (
                 <div className="order-image-container">
                   <img 
@@ -1038,7 +1008,7 @@ export default function OrdersManagement() {
                       <>
                         <button
                           className="action-btn icon-btn accept-btn"
-                          onClick={() => handleAcceptOrder(order.id)}
+                          onClick={(e) => { e.stopPropagation(); handleAcceptOrder(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="قبول الطلب"
                         >
@@ -1046,7 +1016,7 @@ export default function OrdersManagement() {
                         </button>
                         <button
                           className="action-btn icon-btn reject-btn"
-                          onClick={() => setRejectModalOpen(order.id)}
+                          onClick={(e) => { e.stopPropagation(); setRejectModalOpen(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="رفض الطلب"
                         >
@@ -1059,7 +1029,7 @@ export default function OrdersManagement() {
                       <>
                         <button
                           className="action-btn icon-btn finish-prep-btn"
-                          onClick={() => handleFinishPreparing(order.id)}
+                          onClick={(e) => { e.stopPropagation(); handleFinishPreparing(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="انتهاء التحضير"
                         >
@@ -1067,7 +1037,7 @@ export default function OrdersManagement() {
                         </button>
                         <button
                           className="action-btn cancel-btn-small"
-                          onClick={() => setCancelModalOpen(order.id)}
+                          onClick={(e) => { e.stopPropagation(); setCancelModalOpen(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="إلغاء الطلب"
                         >
@@ -1080,7 +1050,7 @@ export default function OrdersManagement() {
                       <>
                         <button
                           className="action-btn icon-btn complete-btn"
-                          onClick={() => handleCompleteOrder(order.id)}
+                          onClick={(e) => { e.stopPropagation(); handleCompleteOrder(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="تم الاستلام"
                         >
@@ -1088,7 +1058,7 @@ export default function OrdersManagement() {
                         </button>
                         <button
                           className="action-btn cancel-btn-small"
-                          onClick={() => setCancelModalOpen(order.id)}
+                          onClick={(e) => { e.stopPropagation(); setCancelModalOpen(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="إلغاء الطلب"
                         >
@@ -1101,7 +1071,7 @@ export default function OrdersManagement() {
                       <>
                         <button
                           className="action-btn icon-btn map-btn"
-                          onClick={() => setSelectedOrderForMap(order.id === selectedOrderForMap ? null : order.id)}
+                          onClick={(e) => { e.stopPropagation(); setSelectedOrderForMap(order.id === selectedOrderForMap ? null : order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="عرض على الخريطة"
                           style={{ backgroundColor: order.id === selectedOrderForMap ? '#8b5cf6' : undefined }}
@@ -1110,7 +1080,7 @@ export default function OrdersManagement() {
                         </button>
                         <button
                           className="action-btn icon-btn complete-btn"
-                          onClick={() => handleCompleteOrder(order.id)}
+                          onClick={(e) => { e.stopPropagation(); handleCompleteOrder(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="تم الاستلام"
                         >
@@ -1118,7 +1088,7 @@ export default function OrdersManagement() {
                         </button>
                         <button
                           className="action-btn cancel-btn-small"
-                          onClick={() => setCancelModalOpen(order.id)}
+                          onClick={(e) => { e.stopPropagation(); setCancelModalOpen(order.id) }}
                           disabled={updatingOrderId === order.id}
                           title="إلغاء الطلب"
                         >
@@ -1133,7 +1103,7 @@ export default function OrdersManagement() {
                      order.status !== 'cancelled' && order.status !== 'completed' && (
                       <button
                         className="action-btn cancel-btn-small"
-                        onClick={() => setCancelModalOpen(order.id)}
+                        onClick={(e) => { e.stopPropagation(); setCancelModalOpen(order.id) }}
                         disabled={updatingOrderId === order.id}
                         title="إلغاء الطلب"
                       >
@@ -1145,7 +1115,8 @@ export default function OrdersManagement() {
                     {order.delivery_type === 'delivery' && !order.delivery_address && !order.delivery_latitude && (
                       <button
                         className="action-btn icon-btn delete-btn"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setDeleteReason('')
                           setDeleteModalOpen(order.id)
                         }}
@@ -1160,7 +1131,8 @@ export default function OrdersManagement() {
                     {activeTab === 'archived' && (
                       <button
                         className="action-btn icon-btn delete-btn"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setDeleteReason('')
                           setDeleteModalOpen(order.id)
                         }}
@@ -1175,7 +1147,8 @@ export default function OrdersManagement() {
                     {order.status !== 'pending' && activeTab !== 'archived' && !(!order.delivery_address && order.delivery_type === 'delivery' && !order.delivery_latitude) && (
                       <button
                         className="action-btn icon-btn delete-btn"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setDeleteReason('')
                           setDeleteModalOpen(order.id)
                         }}
@@ -1294,8 +1267,15 @@ export default function OrdersManagement() {
                     <span className="total-amount">{order.final_amount.toLocaleString()} ل.س</span>
                   </div>
                   <button
+                    className="quick-view-btn"
+                    onClick={(e) => { e.stopPropagation(); openQuickView(order.id) }}
+                  >
+                    <Eye size={16} />
+                    عرض سريع
+                  </button>
+                  <button
                     className="view-details-btn"
-                    onClick={() => navigate(`/dashboard/orders/${order.id}`)}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/orders/${order.id}`) }}
                   >
                     <Eye size={16} />
                     عرض التفاصيل
@@ -1307,6 +1287,17 @@ export default function OrdersManagement() {
         </div>
         </>
       )}
+
+      <OrderQuickViewDrawer
+        open={quickViewOrderId !== null}
+        orderId={quickViewOrderId}
+        onClose={() => setQuickViewOrderId(null)}
+        onNavigateToFull={(id) => navigate(`/dashboard/orders/${id}`)}
+        onOrderPatched={(id, patch) => {
+          setOrders(prev => prev.map(o => o.id === id ? ({ ...o, ...patch } as any) : o))
+          setArchivedOrders(prev => prev.map(o => o.id === id ? ({ ...o, ...patch } as any) : o))
+        }}
+      />
 
       {/* Cancel Modal */}
       {cancelModalOpen && (

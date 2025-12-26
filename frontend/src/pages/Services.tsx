@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { servicesAPI } from '../lib/api'
 import OrderModal from '../components/OrderModal'
 import { fetchWithCache } from '../utils/dataCache'
+import { buildWhatsAppWebUrl } from '../utils/whatsapp'
 import './Services.css'
 
 interface Service {
@@ -18,6 +19,11 @@ export default function Services() {
   const [loading, setLoading] = useState(true)
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const WHATSAPP_NUMBER = '+963112134640'
+  const WHATSAPP_TARGET = 'whatsapp_web'
+  const missingServiceMessage = 'لم اجد خدمتي بين قائمة خدماتكم اريد التالي'
+  const missingServiceLink = buildWhatsAppWebUrl(WHATSAPP_NUMBER, missingServiceMessage + '\n')
 
   useEffect(() => {
     loadServices()
@@ -101,6 +107,18 @@ export default function Services() {
                 </button>
               </div>
             ))}
+
+            <div className="service-card missing-service-card" role="region" aria-label="لم تجد خدمتك؟">
+              <div className="service-icon">💬</div>
+              <h3>لم تجد خدمتك هنا؟</h3>
+              <p>
+                تواصل معنا عبر واتساب وسنساعدك بسرعة. سيتم فتح رسالة جاهزة لتكمل تفاصيل طلبك.
+              </p>
+              <a className="btn btn-primary whatsapp-btn" href={missingServiceLink} target={WHATSAPP_TARGET} rel="noreferrer">
+                تواصل سريع عبر واتساب
+                <span className="whatsapp-number">{WHATSAPP_NUMBER}</span>
+              </a>
+            </div>
           </div>
         )}
       </div>

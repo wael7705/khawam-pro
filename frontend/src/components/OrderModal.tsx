@@ -7,6 +7,7 @@ import ColorPicker from './ColorPicker'
 import { findServiceHandler } from '../services/serviceRegistry'
 import { getUserData, isAdmin, isEmployee } from '../lib/auth'
 import { normalizeNumber } from '../utils/arabicNumbers'
+import { getServiceKind } from '../utils/serviceClassifier'
 import './OrderModal.css'
 
 type PrintQuality = 'standard' | 'laser' | 'uv'
@@ -288,14 +289,6 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
       step.step_type !== 'invoice' && step.step_type !== 'summary'
     )
     
-    // تصفية المراحل لخدمة الفليكس - حذف print_options و colors
-    if (isFlexPrinting) {
-      filteredSteps = filteredSteps.filter((step: any) => 
-        step.step_type !== 'print_options' && step.step_type !== 'colors'
-      )
-      console.log('✅ Filtered flex printing steps - removed print_options and colors')
-    }
-    
     // إعادة ترقيم المراحل بعد الحذف
     filteredSteps = filteredSteps.map((step: any, index: number) => ({
       ...step,
@@ -350,6 +343,118 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
     } else {
       setStep(prev => Math.min(prev, steps.length || prev))
     }
+  }
+
+  const allowedSpecKeysFromWorkflow = useMemo(() => {
+    const allowed = new Set<string>()
+    if (!Array.isArray(workflowSteps) || workflowSteps.length === 0) return allowed
+
+    workflowSteps.forEach((step: any) => {
+      const stepType = String(step?.step_type || '').toLowerCase()
+      const cfg = step?.step_config && typeof step.step_config === 'object' ? step.step_config : {}
+
+      if (stepType === 'dimensions') {
+        allowed.add('dimensions')
+        return
+      }
+      if (stepType === 'colors') {
+        allowed.add('colors')
+        allowed.add('selected_colors')
+        allowed.add('auto_colors')
+        return
+      }
+      if (stepType === 'pages') {
+        allowed.add('number_of_pages')
+        allowed.add('total_pages')
+        return
+      }
+      if (stepType === 'notes') {
+        allowed.add('notes')
+        allowed.add('work_type')
+        return
+      }
+      if (stepType === 'quantity') {
+        allowed.add('quantity')
+        return
+      }
+      if (stepType === 'print_options') {
+        const hidePaperSize = cfg.hide_paper_size === true || cfg.hide_paper_size === 'true' || cfg.hidePaperSize === true
+        const showPaperType = cfg.show_paper_type === true || cfg.show_paper_type === 'true'
+        const hidePrintColorChoice = cfg.hide_print_color_choice === true || cfg.hide_print_color_choice === 'true'
+        const forceColor = cfg.force_color === true || cfg.force_color === 'true' || cfg.forceColor === true
+        const hidePrintSides = cfg.hide_print_sides === true || cfg.hide_print_sides === 'true'
+        const hideQualityOptions = cfg.hide_quality_options === true || cfg.hide_quality_options === 'true'
+        const showLamination = cfg.show_lamination === true || cfg.show_lamination === 'true'
+        const showFlexType = cfg.show_flex_type === true || cfg.show_flex_type === 'true'
+        const showRollupSource = cfg.show_rollup_source === true || cfg.show_rollup_source === 'true'
+        const showPrintTypeChoice = cfg.show_print_type_choice === true || cfg.show_print_type_choice === 'true'
+
+        if (!hidePaperSize) allowed.add('paper_size')
+        if (showPaperType) allowed.add('paper_type')
+        if (!hidePrintColorChoice || forceColor) allowed.add('print_color')
+
+        const hasQualityOptions = cfg.quality_options && typeof cfg.quality_options === 'object' && Object.keys(cfg.quality_options).length > 0
+        if (hasQualityOptions && !hideQualityOptions) allowed.add('print_quality')
+
+        if (!hidePrintSides) allowed.add('print_sides')
+        if (showLamination) allowed.add('lamination')
+        if (showFlexType) allowed.add('flex_type')
+        if (showRollupSource) allowed.add('rollup_source')
+        if (showPrintTypeChoice) allowed.add('print_type_choice')
+      }
+    })
+
+    return allowed
+  }, [workflowSteps])
+
+  const sanitizeSpecifications = (specs: any, fallbackServiceName?: string) => {
+    if (!specs || typeof specs !== 'object') return specs
+
+    // Always strip attachment keys from specifications (attachments live in design_files column)
+    const stripped: Record<string, any> = { ...specs }
+    ;['design_files', 'files', 'attachments', 'uploaded_files', 'documents', 'images', 'files_count'].forEach((k) => {
+      if (k in stripped) delete stripped[k]
+    })
+
+    // Prefer workflow-based allowlist
+    if (allowedSpecKeysFromWorkflow.size > 0) {
+      const filtered: Record<string, any> = {}
+      Object.entries(stripped).forEach(([k, v]) => {
+        if (allowedSpecKeysFromWorkflow.has(k) && v !== undefined && v !== null && v !== '') {
+          filtered[k] = v
+        }
+      })
+      return filtered
+    }
+
+    // Fallback: service-kind allowlist to prevent cross-service contamination
+    const kind = getServiceKind(fallbackServiceName || serviceName)
+    const allowed = new Set<string>(['dimensions', 'notes', 'quantity'])
+    if (kind === 'lecture_printing' || kind === 'brochure' || kind === 'business_cards' || kind === 'generic_printing') {
+      ;['paper_size', 'paper_type', 'print_color', 'print_quality', 'print_sides', 'lamination', 'number_of_pages', 'total_pages'].forEach((k) =>
+        allowed.add(k)
+      )
+    }
+    if (kind === 'flex_printing') {
+      ;['flex_type', 'print_type_choice', 'print_quality'].forEach((k) => allowed.add(k))
+    }
+    if (kind === 'banner_rollup') {
+      ;['rollup_source', 'print_type_choice'].forEach((k) => allowed.add(k))
+    }
+    if (kind === 'vinyl') {
+      ;['vinyl_type', 'vinyl_color', 'print_type_choice'].forEach((k) => allowed.add(k))
+    }
+    if (kind === 'clothing') {
+      ;['clothing_source', 'clothing_product', 'clothing_color', 'clothing_size', 'work_type'].forEach((k) => allowed.add(k))
+    }
+
+    const filtered: Record<string, any> = {}
+    Object.entries(stripped).forEach(([k, v]) => {
+      if (allowed.has(k) && v !== undefined && v !== null && v !== '') {
+        filtered[k] = v
+      }
+    })
+    return filtered
   }
   
   // Debug: للتأكد من أن ServiceHandler يتم العثور عليه
@@ -3722,7 +3827,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
             return {
               ...item,
               design_files: processedDesignFiles,
-              specifications,
+              specifications: sanitizeSpecifications(specifications, item.service_name || serviceName),
             }
           })
         )

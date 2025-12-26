@@ -4,6 +4,8 @@ import { ArrowRight, MessageSquare, Save, MapPin, ExternalLink, Download, FileTe
 import { adminAPI, ordersAPI } from '../../lib/api'
 import { showSuccess, showError } from '../../utils/toast'
 import SimpleMap from '../../components/SimpleMap'
+import { getServiceKind } from '../../utils/serviceClassifier'
+import { buildWhatsAppWebUrl } from '../../utils/whatsapp'
 import './OrderDetail.css'
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api').replace(/\/$/, '')
@@ -1344,6 +1346,7 @@ const isEmptyValue = (value: any): boolean => {
 // This filters out default/irrelevant data that doesn't belong to the service
 const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): Set<string> => {
   const allowed = new Set<string>()
+  const kind = getServiceKind(serviceName)
   
   // Always allow these core fields
   allowed.add('dimensions')
@@ -1357,7 +1360,7 @@ const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): 
   // Only show fields that have actual values and are relevant to the service
   
   // For banners/roll up service
-  if (serviceName.includes('بانرات') || serviceName.includes('Roll up') || serviceName.includes('roll up')) {
+  if (kind === 'banner_rollup') {
     if (specs.print_type_choice) allowed.add('print_type_choice')
     if (specs.rollup_source) allowed.add('rollup_source')
     if (specs.dimensions) allowed.add('dimensions')
@@ -1366,7 +1369,7 @@ const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): 
   }
   
   // For flex printing
-  if (serviceName.includes('فليكس') || serviceName.includes('Flex')) {
+  if (kind === 'flex_printing') {
     if (specs.flex_type) allowed.add('flex_type')
     if (specs.print_type_choice) allowed.add('print_type_choice')
     if (specs.dimensions) allowed.add('dimensions')
@@ -1376,7 +1379,7 @@ const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): 
   }
   
   // For vinyl printing (فينيل)
-  if (serviceName.includes('فينيل') || serviceName.includes('Vinyl') || serviceName.includes('vinyl')) {
+  if (kind === 'vinyl') {
     if (specs.vinyl_type) allowed.add('vinyl_type')
     if (specs.print_type_choice) allowed.add('print_type_choice')
     if (specs.dimensions) allowed.add('dimensions')
@@ -1386,7 +1389,7 @@ const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): 
   }
   
   // For business cards
-  if (serviceName.includes('كروت') || serviceName.includes('Business Cards')) {
+  if (kind === 'business_cards') {
     if (specs.print_sides) allowed.add('print_sides')
     if (specs.paper_type) allowed.add('paper_type')
     if (specs.dimensions) allowed.add('dimensions')
@@ -1400,21 +1403,21 @@ const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): 
   }
   
   // For brochures
-  if (serviceName.includes('بروشور') || serviceName.includes('Brochure')) {
+  if (kind === 'brochure') {
     if (specs.lamination) allowed.add('lamination')
     if (specs.dimensions) allowed.add('dimensions')
     if (specs.paper_size) allowed.add('paper_size')
   }
   
   // For lecture printing
-  if (serviceName.includes('محاضرات') || serviceName.includes('Lecture')) {
+  if (kind === 'lecture_printing') {
     if (specs.lamination) allowed.add('lamination')
     if (specs.paper_size) allowed.add('paper_size')
     if (specs.print_color) allowed.add('print_color')
   }
   
   // For clothing printing
-  if (serviceName.includes('ملابس') || serviceName.includes('Clothing')) {
+  if (kind === 'clothing') {
     if (specs.clothing_source) allowed.add('clothing_source')
     if (specs.clothing_product) allowed.add('clothing_product')
     if (specs.clothing_color) allowed.add('clothing_color')
@@ -1425,7 +1428,7 @@ const getAllowedSpecKeys = (serviceName?: string, specs?: Record<string, any>): 
   // Generic fields that might be relevant
   if (specs.print_color) allowed.add('print_color')
   if (specs.print_quality) allowed.add('print_quality')
-  if (specs.paper_size && !serviceName.includes('بانرات') && !serviceName.includes('فليكس')) {
+  if (specs.paper_size && kind !== 'banner_rollup' && kind !== 'flex_printing') {
     allowed.add('paper_size')
   }
   
@@ -1439,21 +1442,18 @@ const buildGenericSpecEntries = (specs: Record<string, any> | undefined, service
   const allowedKeys = getAllowedSpecKeys(serviceName, specs)
   
   // Service-specific exclusion lists - prevent showing data from other services
-  const serviceKey = (serviceName || '').toLowerCase()
+  const kind = getServiceKind(serviceName)
   const serviceSpecificExclusions = new Set<string>()
   
   // Exclude fields from other services
-  if (serviceKey.includes('فينيل') || serviceKey.includes('vinyl')) {
-    // Vinyl: exclude flex and banner fields
+  if (kind === 'vinyl') {
     serviceSpecificExclusions.add('flex_type')
     serviceSpecificExclusions.add('rollup_source')
-  } else if (serviceKey.includes('فليكس') || serviceKey.includes('flex')) {
-    // Flex: exclude vinyl and banner fields
+  } else if (kind === 'flex_printing') {
     serviceSpecificExclusions.add('vinyl_type')
     serviceSpecificExclusions.add('vinyl_color')
     serviceSpecificExclusions.add('rollup_source')
-  } else if (serviceKey.includes('بانرات') || serviceKey.includes('roll up')) {
-    // Banners: exclude flex and vinyl fields
+  } else if (kind === 'banner_rollup') {
     serviceSpecificExclusions.add('flex_type')
     serviceSpecificExclusions.add('vinyl_type')
     serviceSpecificExclusions.add('vinyl_color')
@@ -1670,7 +1670,7 @@ export default function OrderDetail() {
 
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '')
-    window.open(`https://wa.me/${cleanPhone}`, '_blank')
+    window.open(buildWhatsAppWebUrl(cleanPhone), 'whatsapp_web')
   }
 
   // دالة لبناء العنوان الكامل
@@ -2266,6 +2266,7 @@ export default function OrderDetail() {
               {order.items.map((item) => {
                 const specs = item.specifications || {}
                 const serviceName = item.service_name || item.product_name || ''
+                const kind = getServiceKind(serviceName)
                 const genericSpecEntries = buildGenericSpecEntries(specs, serviceName)
                 return (
               <div key={item.id} className="order-item-card">
@@ -2379,35 +2380,28 @@ export default function OrderDetail() {
                         </div>
                       )}
                           {/* Only show print_sides if it's relevant to the service */}
-                          {specs.print_sides && 
-                           (serviceName.includes('كروت') || serviceName.includes('Business Cards') || 
-                            serviceName.includes('بروشور') || serviceName.includes('Brochure')) && (
+                          {specs.print_sides && (kind === 'business_cards' || kind === 'brochure') && (
                         <div className="spec-group">
                           <label>الوجهين:</label>
                               <span>{specs.print_sides === 'double' ? 'وجهين' : 'وجه واحد'}</span>
                             </div>
                           )}
                           {/* Only show number_of_pages for services that use it */}
-                          {specs.number_of_pages && 
-                           (serviceName.includes('محاضرات') || serviceName.includes('Lecture') ||
-                            serviceName.includes('بروشور') || serviceName.includes('Brochure')) && (
+                          {specs.number_of_pages && (kind === 'lecture_printing' || kind === 'brochure') && (
                             <div className="spec-group">
                               <label>عدد الصفحات:</label>
                               <span>{specs.number_of_pages}</span>
                         </div>
                       )}
                           {specs.total_pages && !specs.number_of_pages && 
-                           (serviceName.includes('محاضرات') || serviceName.includes('Lecture') ||
-                            serviceName.includes('بروشور') || serviceName.includes('Brochure')) && (
+                           (kind === 'lecture_printing' || kind === 'brochure') && (
                         <div className="spec-group">
                           <label>عدد الصفحات:</label>
                               <span>{specs.total_pages}</span>
                         </div>
                       )}
                           {/* Only show paper_size for services that use it (not banners/flex) */}
-                          {specs.paper_size && 
-                           !serviceName.includes('بانرات') && !serviceName.includes('Roll up') &&
-                           !serviceName.includes('فليكس') && !serviceName.includes('Flex') && (
+                          {specs.paper_size && kind !== 'banner_rollup' && kind !== 'flex_printing' && (
                         <div className="spec-group">
                           <label>حجم الورق:</label>
                               <span>{specs.paper_size}</span>
@@ -2427,41 +2421,36 @@ export default function OrderDetail() {
                         </div>
                       )}
                           {/* Show flex_type only for Flex service */}
-                          {specs.flex_type && 
-                           (serviceName.includes('فليكس') || serviceName.includes('Flex')) && (
+                          {specs.flex_type && kind === 'flex_printing' && (
                         <div className="spec-group">
                           <label>نوع الفليكس:</label>
                               <span>{specs.flex_type === 'lighted' ? 'مضاء' : specs.flex_type === 'normal' ? 'عادي' : specs.flex_type}</span>
                         </div>
                       )}
                           {/* Show vinyl_type only for Vinyl service */}
-                          {specs.vinyl_type && 
-                           (serviceName.includes('فينيل') || serviceName.includes('Vinyl') || serviceName.includes('vinyl')) && (
+                          {specs.vinyl_type && kind === 'vinyl' && (
                         <div className="spec-group">
                           <label>نوع الفينيل:</label>
                               <span>{specs.vinyl_type}</span>
                         </div>
                       )}
                           {specs.vinyl_color && 
-                           (serviceName.includes('فينيل') || serviceName.includes('Vinyl') || serviceName.includes('vinyl')) && (
+                           kind === 'vinyl' && (
                         <div className="spec-group">
                           <label>لون الفينيل:</label>
                               <span>{specs.vinyl_color}</span>
                         </div>
                       )}
                           {/* Show print_type_choice for services that use it */}
-                          {specs.print_type_choice && 
-                           (serviceName.includes('فليكس') || serviceName.includes('Flex') ||
-                            serviceName.includes('فينيل') || serviceName.includes('Vinyl') ||
-                            serviceName.includes('بانرات') || serviceName.includes('Roll up')) && (
+                          {specs.print_type_choice &&
+                           (kind === 'flex_printing' || kind === 'vinyl' || kind === 'banner_rollup') && (
                         <div className="spec-group">
                           <label>نوع الطباعة:</label>
                               <span>{specs.print_type_choice === 'pvc' ? 'PVC' : specs.print_type_choice === 'flex' ? 'فليكس' : specs.print_type_choice === 'uv' ? 'دقة عالية (UV)' : specs.print_type_choice === 'normal' ? 'عادية' : specs.print_type_choice}</span>
                         </div>
                       )}
                           {/* Show rollup_source only for Banners/Roll up service */}
-                          {specs.rollup_source && 
-                           (serviceName.includes('بانرات') || serviceName.includes('Roll up') || serviceName.includes('roll up')) && (
+                          {specs.rollup_source && kind === 'banner_rollup' && (
                         <div className="spec-group">
                           <label>مصدر ال Roll up:</label>
                               <span>{specs.rollup_source === 'ours' ? 'من عندنا' : specs.rollup_source === 'yours' ? 'من عندك' : specs.rollup_source}</span>

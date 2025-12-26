@@ -1,3 +1,4 @@
+import { buildWhatsAppWebUrl } from '../../utils/whatsapp'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Search, User, Phone, ShoppingCart, DollarSign, MessageSquare, Eye, Calendar, TrendingUp, MapPin, ExternalLink } from 'lucide-react'
@@ -129,8 +130,7 @@ export default function CustomersManagement() {
   }
 
   const openWhatsApp = (phone: string) => {
-    const whatsappNumber = phone.replace(/[^0-9+]/g, '')
-    window.open(`https://wa.me/${whatsappNumber}`, '_blank')
+    window.open(buildWhatsAppWebUrl(phone), 'whatsapp_web')
   }
 
   const formatDate = (dateString?: string) => {

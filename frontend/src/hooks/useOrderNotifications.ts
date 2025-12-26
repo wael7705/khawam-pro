@@ -25,6 +25,7 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
   const reconnectAttemptsRef = useRef<number>(0)
   const knownOrderIdsRef = useRef<Set<number>>(new Set())
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
+  const allowedStatusesRef = useRef<Set<string>>(new Set(['pending']))
 
   // طلب إذن الإشعارات
   useEffect(() => {
@@ -107,6 +108,7 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
       totalAmount: notification.data.total_amount,
       finalAmount: notification.data.final_amount,
       deliveryType: notification.data.delivery_type,
+      status: notification.data.status,
       serviceName: notification.data.service_name,
       itemsCount: notification.data.items_count,
       createdAt: notification.data.created_at,
@@ -118,6 +120,13 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
   const handleNewOrder = useCallback(
     (notification: OrderNotification) => {
       const orderId = notification.data.order_id
+      const status = (notification.data.status || '').toLowerCase().trim()
+
+      // Only notify for allowed statuses (default: pending)
+      if (status && !allowedStatusesRef.current.has(status)) {
+        console.log(`⏭️ Order ${orderId} status '${status}' is not allowed for notifications, skipping`)
+        return
+      }
 
       // تجنب الإشعارات المكررة
       if (knownOrderIdsRef.current.has(orderId)) {

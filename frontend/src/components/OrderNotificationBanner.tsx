@@ -34,9 +34,10 @@ export default function OrderNotificationBanner({
   onDismiss,
   onViewOrder,
 }: OrderNotificationBannerProps) {
-  // فلترة الإشعارات: فقط الطلبات التي تم إنشاؤها في آخر 10 دقائق
+  // فلترة الإشعارات: فقط الطلبات التي تم إنشاؤها في آخر 10 دقائق + فقط pending إذا كانت الحالة متوفرة
   const filteredNotifications = notifications.filter((notification) => {
     if (!notification.createdAt) return false
+    if (notification.status && notification.status.toLowerCase().trim() !== 'pending') return false
     
     try {
       const orderDate = new Date(notification.createdAt)

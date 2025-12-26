@@ -80,6 +80,29 @@
   width: 100%;
 }
 
+.missing-service-card {
+  border: 2px dashed rgba(37, 211, 102, 0.5);
+  background: linear-gradient(180deg, rgba(37, 211, 102, 0.08), rgba(37, 211, 102, 0.02));
+}
+
+[data-theme="dark"] .missing-service-card {
+  border-color: rgba(37, 211, 102, 0.55);
+  background: linear-gradient(180deg, rgba(37, 211, 102, 0.10), rgba(37, 211, 102, 0.03));
+}
+
+.missing-service-card .whatsapp-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.missing-service-card .whatsapp-number {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
 /* Featured Works Section */
 .featured-works-section {
   margin-top: 80px;

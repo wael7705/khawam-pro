@@ -20,6 +20,133 @@ import asyncio
 from routers.auth import get_current_active_user, get_current_user_optional
 from io import BytesIO
 
+def _normalize_service_name(value: Optional[str]) -> str:
+    return (value or "").strip()
+
+def _safe_json_obj(value: Any) -> Dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+def _get_service_id_by_name(db: Session, service_name: Optional[str]) -> Optional[int]:
+    name = _normalize_service_name(service_name)
+    if not name:
+        return None
+    # Exact match first (Arabic/English)
+    row = db.execute(text("""
+        SELECT id
+        FROM services
+        WHERE LOWER(name_ar) = LOWER(:name) OR LOWER(name_en) = LOWER(:name)
+        LIMIT 1
+    """), {"name": name}).fetchone()
+    if row and row[0]:
+        return int(row[0])
+
+    # Fallback: loose match
+    row = db.execute(text("""
+        SELECT id
+        FROM services
+        WHERE name_ar ILIKE :pat OR name_en ILIKE :pat
+        ORDER BY id ASC
+        LIMIT 1
+    """), {"pat": f"%{name}%"}).fetchone()
+    return int(row[0]) if row and row[0] else None
+
+def _allowed_spec_keys_from_workflow_steps(steps: List[Tuple[str, Any]]) -> set:
+    allowed: set = set()
+    for step_type, step_config in steps:
+        t = (step_type or "").lower().strip()
+        cfg = _safe_json_obj(step_config)
+
+        if t == "dimensions":
+            allowed.add("dimensions")
+            continue
+        if t == "colors":
+            allowed.update(["colors", "selected_colors", "auto_colors"])
+            continue
+        if t == "pages":
+            allowed.update(["number_of_pages", "total_pages"])
+            continue
+        if t == "notes":
+            allowed.update(["notes", "work_type"])
+            continue
+        if t == "quantity":
+            allowed.add("quantity")
+            continue
+        if t == "print_options":
+            hide_paper_size = cfg.get("hide_paper_size") is True or str(cfg.get("hide_paper_size")).lower() == "true"
+            show_paper_type = cfg.get("show_paper_type") is True or str(cfg.get("show_paper_type")).lower() == "true"
+            hide_print_color_choice = cfg.get("hide_print_color_choice") is True or str(cfg.get("hide_print_color_choice")).lower() == "true"
+            force_color = cfg.get("force_color") is True or str(cfg.get("force_color")).lower() == "true"
+            hide_print_sides = cfg.get("hide_print_sides") is True or str(cfg.get("hide_print_sides")).lower() == "true"
+            hide_quality_options = cfg.get("hide_quality_options") is True or str(cfg.get("hide_quality_options")).lower() == "true"
+            show_lamination = cfg.get("show_lamination") is True or str(cfg.get("show_lamination")).lower() == "true"
+            show_flex_type = cfg.get("show_flex_type") is True or str(cfg.get("show_flex_type")).lower() == "true"
+            show_rollup_source = cfg.get("show_rollup_source") is True or str(cfg.get("show_rollup_source")).lower() == "true"
+            show_print_type_choice = cfg.get("show_print_type_choice") is True or str(cfg.get("show_print_type_choice")).lower() == "true"
+
+            if not hide_paper_size:
+                allowed.add("paper_size")
+            if show_paper_type:
+                allowed.add("paper_type")
+            if (not hide_print_color_choice) or force_color:
+                allowed.add("print_color")
+
+            quality_options = cfg.get("quality_options")
+            has_quality = isinstance(quality_options, dict) and len(quality_options.keys()) > 0
+            if has_quality and (not hide_quality_options):
+                allowed.add("print_quality")
+
+            if not hide_print_sides:
+                allowed.add("print_sides")
+            if show_lamination:
+                allowed.add("lamination")
+            if show_flex_type:
+                allowed.add("flex_type")
+            if show_rollup_source:
+                allowed.add("rollup_source")
+            if show_print_type_choice:
+                allowed.add("print_type_choice")
+            continue
+    return allowed
+
+def _sanitize_specs_by_workflow(db: Session, service_name: Optional[str], specs: Dict[str, Any]) -> Dict[str, Any]:
+    if not specs or not isinstance(specs, dict):
+        return {}
+
+    # Always remove file-like keys (files are stored in design_files column)
+    for k in ["design_files", "files", "attachments", "uploaded_files", "documents", "images", "files_count"]:
+        specs.pop(k, None)
+
+    service_id = _get_service_id_by_name(db, service_name)
+    if not service_id:
+        return specs
+
+    rows = db.execute(text("""
+        SELECT step_type, step_config
+        FROM service_workflows
+        WHERE service_id = :service_id AND is_active = true
+        ORDER BY step_number ASC, display_order ASC
+    """), {"service_id": service_id}).fetchall()
+
+    allowed = _allowed_spec_keys_from_workflow_steps([(r[0], r[1]) for r in rows]) if rows else set()
+    if not allowed:
+        return specs
+
+    filtered: Dict[str, Any] = {}
+    for k, v in specs.items():
+        if k in allowed and v is not None and v != "":
+            filtered[k] = v
+    return filtered
+
 router = APIRouter()
 
 # Pydantic Models
@@ -789,7 +916,39 @@ async def create_order(
             else:
                 print(f"✅ Order {order_number} linked to user ID: {customer_id}, using order phone: {customer_phone}")
         else:
-            print(f"⚠️ Order {order_number} created without user login, using order phone: {customer_phone}")
+            # محاولة ربط الطلب بحساب موجود عبر رقم الهاتف (حتى يظهر لاحقاً في "طلباتي")
+            try:
+                from routers.auth import normalize_phone
+                normalized = normalize_phone(customer_phone) if customer_phone else None
+                candidates = []
+                if customer_phone:
+                    candidates.append(customer_phone)
+                if normalized and normalized not in candidates:
+                    candidates.append(normalized)
+                if normalized and f"+{normalized}" not in candidates:
+                    candidates.append(f"+{normalized}")
+                # دعم أرقام تبدأ بـ0
+                if customer_phone and customer_phone.startswith("0"):
+                    candidates.append("963" + customer_phone[1:])
+                    candidates.append("+963" + customer_phone[1:])
+
+                # تنظيف التكرار
+                candidates = [c for c in dict.fromkeys([c for c in candidates if c])]
+
+                if candidates:
+                    row = db.execute(
+                        text("SELECT id FROM users WHERE phone = ANY(:phones) LIMIT 1"),
+                        {"phones": candidates},
+                    ).fetchone()
+                    if row and row[0]:
+                        customer_id = int(row[0])
+                        print(f"✅ Order {order_number} linked by phone to existing user ID: {customer_id} (phones: {candidates})")
+                    else:
+                        print(f"⚠️ Order {order_number} created without user login, no matching user for phones: {candidates}")
+                else:
+                    print(f"⚠️ Order {order_number} created without user login, using order phone: {customer_phone}")
+            except Exception as link_err:
+                print(f"⚠️ Order {order_number} created without user login, phone-link failed: {link_err}")
         
         order_dict = {
             'order_number': order_number,
@@ -978,6 +1137,13 @@ async def create_order(
             
             # لا نضيف design_files إلى specifications بعد الآن لتجنب التكرار
             
+            # 🔒 Sanitize specifications: remove irrelevant/default fields and keep only workflow-relevant keys
+            try:
+                effective_service_name = order_data.service_name or item_data.service_name or product_name
+                specs = _sanitize_specs_by_workflow(db, effective_service_name, specs)
+            except Exception as sanitize_error:
+                print(f"⚠️ Failed to sanitize specifications for order {order_number}, item {item_index}: {sanitize_error}")
+
             specs_json = json.dumps(specs) if specs else None
             
             # Get product name if product_id is provided
@@ -1064,6 +1230,7 @@ async def create_order(
             "total_amount": float(order_data.total_amount),
             "final_amount": float(order_data.final_amount),
             "delivery_type": order_data.delivery_type,
+            "status": order_result[7],
             "service_name": order_data.service_name or (first_item.service_name if first_item else None),
             "items_count": len(order_data.items),
             "created_at": order_result[14].isoformat() if order_result[14] else datetime.utcnow().isoformat(),

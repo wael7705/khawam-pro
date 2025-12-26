@@ -6,6 +6,8 @@ import { isAuthenticated } from '../lib/auth'
 import { Link } from 'react-router-dom'
 import OrderStatusTimeline from '../components/OrderStatusTimeline'
 import ReorderModal from '../components/ReorderModal'
+import { getServiceKind } from '../utils/serviceClassifier'
+import { buildWhatsAppWebUrl } from '../utils/whatsapp'
 import './Orders.css'
 
 type OrderItem = {
@@ -35,7 +37,7 @@ type Order = {
 }
 
 const WHATSAPP_NUMBER = '+963112134640'
-const WHATSAPP_BASE = 'https://wa.me/963112134640'
+const WHATSAPP_TARGET = 'whatsapp_web'
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://khawam-pro-production.up.railway.app/api').replace(/\/$/, '')
 const PUBLIC_BASE_URL = API_BASE_URL.replace(/\/api$/, '')
 
@@ -246,6 +248,7 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null)
   const [attachmentsMap, setAttachmentsMap] = useState<Record<number, OrderAttachment[]>>({})
   const [attachmentsLoading, setAttachmentsLoading] = useState(false)
+  const [reorderModalOpen, setReorderModalOpen] = useState<number | null>(null)
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -351,7 +354,7 @@ export default function Orders() {
     const orderId = order.order_number || order.id
     const phone = order.customer_whatsapp || order.customer_phone || WHATSAPP_NUMBER
     const message = `مرحباً، أود متابعة حالة طلبي رقم ${orderId}.`
-    return `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`
+    return buildWhatsAppWebUrl(phone, message)
   }
 
   const formatStatus = (status?: string) => {
@@ -435,8 +438,7 @@ export default function Orders() {
     // Always allow these core fields
     const alwaysAllowed = new Set(['dimensions', 'notes', 'quantity'])
     
-    // Service-specific filtering - only show data relevant to this service
-    const serviceKey = (serviceName || '').toLowerCase()
+    const kind = getServiceKind(serviceName)
     const filtered: Record<string, any> = {}
     
     Object.entries(specs).forEach(([key, value]) => {
@@ -450,29 +452,29 @@ export default function Orders() {
       }
       
       // Service-specific filtering
-      if (serviceKey.includes('فينيل') || serviceKey.includes('vinyl')) {
+      if (kind === 'vinyl') {
         // Vinyl: only show vinyl-specific fields
         if (['vinyl_type', 'vinyl_color', 'print_type_choice', 'dimensions'].includes(key)) {
           filtered[key] = value
         }
-      } else if (serviceKey.includes('فليكس') || serviceKey.includes('flex')) {
+      } else if (kind === 'flex_printing') {
         // Flex: only show flex-specific fields
         if (['flex_type', 'print_type_choice', 'dimensions'].includes(key)) {
           filtered[key] = value
         }
-      } else if (serviceKey.includes('بانرات') || serviceKey.includes('roll up')) {
+      } else if (kind === 'banner_rollup') {
         // Banners: only show banner-specific fields
         if (['rollup_source', 'print_type_choice', 'dimensions'].includes(key)) {
           filtered[key] = value
         }
-      } else if (serviceKey.includes('ملابس') || serviceKey.includes('clothing')) {
+      } else if (kind === 'clothing') {
         // Clothing: only show clothing-specific fields
         if (['clothing_source', 'clothing_product', 'clothing_color', 'clothing_size', 'work_type'].includes(key)) {
           filtered[key] = value
         }
       } else {
         // For other services, allow common fields
-        if (!['flex_type', 'vinyl_type', 'rollup_source'].includes(key)) {
+        if (!['flex_type', 'vinyl_type', 'vinyl_color', 'rollup_source'].includes(key)) {
           filtered[key] = value
         }
       }
@@ -674,7 +676,7 @@ export default function Orders() {
               <a
                 className={`order-card__action ${variant === 'done' ? 'secondary' : ''}`}
                 href={buildWhatsAppLink(order)}
-                target="_blank"
+                target={WHATSAPP_TARGET}
                 rel="noreferrer"
               >
                 {variant === 'done' ? 'اطلب نسخة عن الفاتورة' : 'متابعة عبر واتساب'}
@@ -724,7 +726,12 @@ export default function Orders() {
             <h1>طلباتي</h1>
             <p>تابع حالة طلباتك الحالية والسابقة بسهولة، وتواصل معنا مباشرة على واتساب لأي استفسار.</p>
           </div>
-          <a className="whatsapp-cta" href={`${WHATSAPP_BASE}?text=${encodeURIComponent('مرحباً، لدي استفسار حول طلباتي.')}`} target="_blank" rel="noreferrer">
+          <a
+            className="whatsapp-cta"
+            href={buildWhatsAppWebUrl(WHATSAPP_NUMBER, 'مرحباً، لدي استفسار حول طلباتي.')}
+            target={WHATSAPP_TARGET}
+            rel="noreferrer"
+          >
             تواصل معنا عبر واتساب
             <span>{WHATSAPP_NUMBER}</span>
           </a>

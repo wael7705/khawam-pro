@@ -9,6 +9,7 @@ export interface OrderNotification {
     total_amount: number
     final_amount: number
     delivery_type: string
+    status?: string
     service_name?: string
     items_count: number
     created_at: string
@@ -26,6 +27,7 @@ export interface OrderNotificationDisplay {
   totalAmount: number
   finalAmount: number
   deliveryType: string
+  status?: string
   serviceName?: string
   itemsCount: number
   createdAt: string

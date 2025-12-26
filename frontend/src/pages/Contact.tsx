@@ -1,9 +1,11 @@
 import GoogleMap from '../components/GoogleMap'
 import './Contact.css'
+import { buildWhatsAppWebUrl } from '../utils/whatsapp'
 
 const CONTACT_COORDINATES = { lat: 33.509361, lng: 36.287889 } // 33°30'33.7"N 36°17'16.4"E
 const WHATSAPP_NUMBER = '+963112134640'
-const WHATSAPP_LINK = `https://wa.me/963112134640?text=${encodeURIComponent('مرحباً، أرغب بمتابعة طلبي لدى شركة خوام.')}`
+const WHATSAPP_LINK = buildWhatsAppWebUrl(WHATSAPP_NUMBER, 'مرحباً، أرغب بمتابعة طلبي لدى شركة خوام.')
+const WHATSAPP_TARGET = 'whatsapp_web'
 
 export default function Contact() {
   return (
@@ -25,7 +27,7 @@ export default function Contact() {
                   <h3>دردشة واتساب</h3>
                   <p>متابعة فورية لحالة الطلبات والأسعار عبر واتساب.</p>
                 </div>
-                <a className="contact-card__action" href={WHATSAPP_LINK} target="_blank" rel="noreferrer">
+                <a className="contact-card__action" href={WHATSAPP_LINK} target={WHATSAPP_TARGET} rel="noreferrer">
                   ابدأ محادثة الآن
                   <span>{WHATSAPP_NUMBER}</span>
                 </a>

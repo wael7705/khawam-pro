@@ -2063,7 +2063,7 @@ async def update_order_status(order_id: int, status_data: OrderStatusUpdate, db:
                     # Clean phone number
                     clean_phone = ''.join(filter(str.isdigit, str(customer_whatsapp)))
                     if clean_phone:
-                        whatsapp_url = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(message)}"
+                        whatsapp_url = f"https://web.whatsapp.com/send?phone={clean_phone}&text={urllib.parse.quote(message)}&app_absent=0"
                         print(f"📱 Rating request WhatsApp URL: {whatsapp_url}")
                         print(f"📝 Message: {message}")
                         # Note: In production, integrate with WhatsApp Business API to send message automatically

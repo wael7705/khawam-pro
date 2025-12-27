@@ -39,6 +39,7 @@ async def lifespan(app: FastAPI):
         loop.create_task(_setup_glossy_poster_service())
         loop.create_task(_setup_flex_printing_service())
         loop.create_task(_setup_banners_service())
+        loop.create_task(_setup_quran_certificate_service())
         loop.create_task(_ensure_default_services())
         loop.create_task(_ensure_portfolio_images_column())
         loop.create_task(_ensure_order_archive_columns())
@@ -1187,6 +1188,173 @@ async def _setup_flex_printing_service():
         
     except Exception as e:
         print(f"❌ Error setting up flex printing service: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
+async def _setup_quran_certificate_service():
+    """إعداد خدمة طباعة إجازة حفظ القرآن الكريم تلقائياً عند بدء التطبيق"""
+    import json
+    import asyncio
+    await asyncio.sleep(12)  # انتظار أكثر حتى تكون قاعدة البيانات جاهزة
+    
+    conn = None
+    try:
+        print("🔄 Starting Quran Certificate service setup...")
+        conn = engine.connect()
+        
+        # التحقق من وجود الخدمة
+        existing_service = conn.execute(text("""
+            SELECT id, name_ar FROM services 
+            WHERE name_ar LIKE '%إجازة%' OR name_ar LIKE '%قرآن%' OR name_ar LIKE '%حفظ%'
+            LIMIT 1
+        """)).fetchone()
+        
+        if existing_service:
+            service_id = existing_service[0]
+            # حذف المراحل القديمة وإعادة إنشائها
+            conn.execute(text("DELETE FROM service_workflows WHERE service_id = :service_id"), {"service_id": service_id})
+            conn.commit()
+            print(f"✅ خدمة طباعة إجازة حفظ القرآن الكريم موجودة (ID: {service_id}) - إعادة بناء المراحل")
+        else:
+            # إنشاء الخدمة الجديدة
+            result = conn.execute(text("""
+                INSERT INTO services 
+                (name_ar, name_en, description_ar, icon, base_price, is_visible, is_active, display_order)
+                VALUES 
+                (:name_ar, :name_en, :description_ar, :icon, :base_price, :is_visible, :is_active, :display_order)
+                RETURNING id
+            """), {
+                "name_ar": "طباعة إجازة حفظ القرآن الكريم",
+                "name_en": "Quran Certificate Printing",
+                "description_ar": "خدمة طباعة إجازات حفظ القرآن الكريم بقياسات مخصصة وأنواع كرتون مختلفة",
+                "icon": "📜",
+                "base_price": 0.0,
+                "is_visible": True,
+                "is_active": True,
+                "display_order": 10
+            })
+            service_id = result.scalar()
+            conn.commit()
+            print(f"✅ تم إنشاء خدمة طباعة إجازة حفظ القرآن الكريم (ID: {service_id})")
+        
+        # إضافة المراحل المخصصة لخدمة طباعة إجازة حفظ القرآن الكريم
+        workflows = [
+            {
+                "step_number": 1,
+                "step_name_ar": "رفع الملف والكمية",
+                "step_name_en": "Upload File and Quantity",
+                "step_description_ar": "قم برفع ملف التصميم وحدد عدد النسخ المطلوبة",
+                "step_type": "files",
+                "step_config": {
+                    "required": True,
+                    "multiple": False,
+                    "accept": "image/*,.pdf,.ai,.psd,.png,.jpg,.jpeg,application/pdf",
+                    "show_quantity": True
+                }
+            },
+            {
+                "step_number": 2,
+                "step_name_ar": "قياس الإجازة",
+                "step_name_en": "Certificate Dimensions",
+                "step_description_ar": "حدد قياس الإجازة (الطول والعرض بالسنتيمتر). القياس الافتراضي هو 50×70 سم",
+                "step_type": "dimensions",
+                "step_config": {
+                    "required": True,
+                    "default_width": 50,
+                    "default_height": 70,
+                    "unit": "cm",
+                    "show_default": True
+                }
+            },
+            {
+                "step_number": 3,
+                "step_name_ar": "نوع الكرتون",
+                "step_name_en": "Card Type",
+                "step_description_ar": "اختر نوع الكرتون المطلوب للطباعة",
+                "step_type": "card_type",
+                "step_config": {
+                    "required": True,
+                    "default": "canson",
+                    "options": [
+                        {"value": "canson", "label_ar": "Canson (الافتراضي)", "label_en": "Canson (Default)"},
+                        {"value": "normal", "label_ar": "كرتون عادي", "label_en": "Normal Cardboard"},
+                        {"value": "glossy", "label_ar": "كرتون لامع", "label_en": "Glossy Cardboard"}
+                    ]
+                }
+            },
+            {
+                "step_number": 4,
+                "step_name_ar": "ملاحظات",
+                "step_name_en": "Notes",
+                "step_description_ar": "أضف أي ملاحظات إضافية حول طلبك",
+                "step_type": "notes",
+                "step_config": {
+                    "required": False,
+                    "placeholder": "أضف أي ملاحظات إضافية حول طلبك..."
+                }
+            },
+            {
+                "step_number": 5,
+                "step_name_ar": "معلومات العميل",
+                "step_name_en": "Customer Information",
+                "step_description_ar": "أدخل معلوماتك للتواصل معك",
+                "step_type": "customer_info",
+                "step_config": {
+                    "required": True,
+                    "fields": ["name", "whatsapp", "whatsapp_optional", "delivery_type"]
+                }
+            }
+        ]
+        
+        for workflow in workflows:
+            try:
+                step_config_json = json.dumps(workflow["step_config"])
+                result = conn.execute(text("""
+                    INSERT INTO service_workflows 
+                    (service_id, step_number, step_name_ar, step_name_en, step_description_ar, 
+                     step_type, step_config, display_order, is_active)
+                    VALUES 
+                    (:service_id, :step_number, :step_name_ar, :step_name_en, :step_description_ar,
+                     :step_type, CAST(:step_config AS jsonb), :display_order, :is_active)
+                """), {
+                    "service_id": service_id,
+                    "step_number": workflow["step_number"],
+                    "step_name_ar": workflow["step_name_ar"],
+                    "step_name_en": workflow["step_name_en"],
+                    "step_description_ar": workflow["step_description_ar"],
+                    "step_type": workflow["step_type"],
+                    "step_config": step_config_json,
+                    "display_order": workflow["step_number"],
+                    "is_active": True
+                })
+                print(f"  ✅ Added step {workflow['step_number']}: {workflow['step_name_ar']} ({workflow['step_type']})")
+            except Exception as step_error:
+                print(f"  ❌ Error adding step {workflow['step_number']}: {str(step_error)}")
+                import traceback
+                traceback.print_exc()
+        
+        conn.commit()
+        print(f"✅ تم إضافة {len(workflows)} مرحلة لخدمة طباعة إجازة حفظ القرآن الكريم (Service ID: {service_id})")
+        
+        # التحقق من أن المراحل تم إضافتها
+        verify = conn.execute(text("""
+            SELECT COUNT(*) FROM service_workflows WHERE service_id = :service_id
+        """), {"service_id": service_id}).scalar()
+        print(f"✅ Verified: {verify} workflow steps created for service ID {service_id}")
+        
+    except Exception as e:
+        print(f"❌ Error setting up Quran Certificate service: {str(e)}")
         import traceback
         traceback.print_exc()
         if conn:

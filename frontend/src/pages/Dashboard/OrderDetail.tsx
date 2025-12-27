@@ -1978,17 +1978,179 @@ export default function OrderDetail() {
     )
   }
 
+  // Collect all attachments from order
+  const getAllAttachments = useMemo(() => {
+    if (!order) return []
+    const allAttachments: NormalizedAttachment[] = []
+    
+    // Add API attachments
+    orderAttachments.forEach(att => allAttachments.push(att))
+    
+    // Add attachments from items
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        const collected = collectItemAttachments(item)
+        collected.forEach(att => {
+          if (!allAttachments.find(a => a.url === att.url)) {
+            allAttachments.push(att)
+          }
+        })
+      })
+    }
+    
+    return dedupeAttachments(allAttachments)
+  }, [order, orderAttachments])
+
+  // Download all attachments
+  const handleDownloadAllAttachments = async () => {
+    if (getAllAttachments.length === 0) {
+      showError('لا توجد مرفقات للتحميل')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Download files one by one (for now - could be improved with zip)
+      for (const attachment of getAllAttachments) {
+        try {
+          if (attachment.url.startsWith('data:')) {
+            // Data URL - create blob download
+            const response = await fetch(attachment.url)
+            const blob = await response.blob()
+            const downloadUrl = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = downloadUrl
+            a.download = attachment.filename || 'ملف'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            window.URL.revokeObjectURL(downloadUrl)
+          } else {
+            // Regular URL - open in new tab with token
+            const downloadUrl = `${attachment.url}${attachment.url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token || '')}`
+            window.open(downloadUrl, '_blank')
+          }
+          // Small delay between downloads
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch (error) {
+          console.error(`Error downloading ${attachment.filename}:`, error)
+        }
+      }
+      
+      showSuccess(`تم بدء تحميل ${getAllAttachments.length} ملف`)
+    } catch (error) {
+      console.error('Error downloading attachments:', error)
+      showError('حدث خطأ في تحميل المرفقات')
+    }
+  }
+
+  // Quick share location
+  const handleQuickShareLocation = async () => {
+    if (!order) return
+    
+    try {
+      const fullAddress = buildFullAddress(order)
+      const shareText = buildShareText(order, fullAddress)
+      const shareUrl = order.delivery_latitude && order.delivery_longitude
+        ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+      
+      if (navigator.share) {
+        await navigator.share({
+          title: `موقع التوصيل - ${order.order_number}`,
+          text: shareText,
+          url: shareUrl
+        })
+      } else {
+        await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`)
+        showSuccess('تم نسخ معلومات الموقع إلى الحافظة')
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        try {
+          const fullAddress = buildFullAddress(order)
+          const shareText = buildShareText(order, fullAddress)
+          const shareUrl = order.delivery_latitude && order.delivery_longitude
+            ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+          await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`)
+          showSuccess('تم نسخ معلومات الموقع إلى الحافظة')
+        } catch (copyError) {
+          showError('فشل مشاركة الموقع')
+        }
+      }
+    }
+  }
+
+  // Quick open Google Maps
+  const handleQuickOpenGoogleMaps = () => {
+    if (!order) return
+    
+    if (order.delivery_latitude && order.delivery_longitude) {
+      window.open(`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`, '_blank')
+    } else {
+      const fullAddress = buildFullAddress(order)
+      const address = encodeURIComponent(fullAddress)
+      window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+    }
+  }
+
   return (
     <div className="order-detail-page">
       <div className="container">
-        <div className="order-detail-header">
-          <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
-            <ArrowRight size={20} />
-            العودة للطلبات
-          </button>
-          <div className="order-header-meta">
-          <h1>تفاصيل الطلب: {order.order_number}</h1>
-            <span className="order-status-chip">{getStatusLabel(order.status || 'pending')}</span>
+        {/* Sticky Header Bar */}
+        <div className="order-detail-sticky-header">
+          <div className="sticky-header-content">
+            <div className="sticky-header-left">
+              <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
+                <ArrowRight size={20} />
+                العودة
+              </button>
+              <div className="sticky-header-title">
+                <h1>تفاصيل الطلب: {order?.order_number || ''}</h1>
+                {order && (
+                  <span className="order-status-chip">{getStatusLabel(order.status || 'pending')}</span>
+                )}
+              </div>
+            </div>
+            <div className="sticky-header-actions">
+              {/* Download All Attachments Button */}
+              {getAllAttachments.length > 0 && (
+                <button
+                  className="sticky-action-btn attachments-btn"
+                  onClick={handleDownloadAllAttachments}
+                  title={`تحميل جميع المرفقات (${getAllAttachments.length})`}
+                >
+                  <Download size={18} />
+                  تحميل الكل ({getAllAttachments.length})
+                </button>
+              )}
+              
+              {/* Quick Share Location */}
+              {order && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
+                <button
+                  className="sticky-action-btn share-btn"
+                  onClick={handleQuickShareLocation}
+                  title="مشاركة الموقع"
+                >
+                  <Share2 size={18} />
+                  مشاركة الموقع
+                </button>
+              )}
+              
+              {/* Quick Open Google Maps */}
+              {order && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
+                <button
+                  className="sticky-action-btn maps-btn"
+                  onClick={handleQuickOpenGoogleMaps}
+                  title="فتح في Google Maps"
+                >
+                  <MapPin size={18} />
+                  Google Maps
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

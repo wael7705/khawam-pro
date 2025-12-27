@@ -40,61 +40,29 @@ async function cleanupOldServiceWorkers() {
   }
 }
 
-// Register Service Worker
+// IMPORTANT:
+// Service Worker can cause stale index.html / chunk mismatch after deployments, leading to JS load loops.
+// Disable SW by default. Enable only by setting VITE_ENABLE_SW=true at build time.
+const shouldEnableSW = import.meta.env.VITE_ENABLE_SW === 'true'
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    try {
-    // تنظيف القديم أولاً
+    // Always cleanup old SW/caches to avoid stale deployments breaking JS loading
     await cleanupOldServiceWorkers()
-    
-    // انتظر قليلاً ثم سجل الجديد
-      setTimeout(async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js', { 
-            updateViaCache: 'none',
-            scope: '/' 
-          })
-          
-          console.log('✅ Service Worker registered:', registration.scope)
-          
-          // التحقق من التحديثات
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('🔄 New service worker available, reloading...')
-                  // انتظر قليلاً قبل إعادة التحميل
-                  setTimeout(() => {
-                  window.location.reload()
-                  }, 1000)
-                }
-              })
-            }
-          })
-          
-          // التحقق من التحديثات كل 60 ثانية (بعد التأكد من أن registration موجود)
-          if (registration) {
-          setInterval(() => {
-              try {
-                registration.update().catch((err) => {
-                  // تجاهل أخطاء التحديث - قد تكون طبيعية
-                  console.warn('⚠️ Service Worker update check failed (this is normal):', err.message)
-                })
-              } catch (err) {
-                // تجاهل الأخطاء
-              }
-          }, 60000)
-          }
-        } catch (error: any) {
-          // تجاهل أخطاء التسجيل - قد تكون طبيعية في بعض الحالات
-          if (error.message && !error.message.includes('already registered')) {
-            console.warn('⚠️ Service Worker registration failed:', error.message)
-          }
-        }
-      }, 1000) // زيادة الوقت للانتظار
-    } catch (error) {
-      console.warn('⚠️ Service Worker setup failed:', error)
+
+    if (!shouldEnableSW) {
+      console.log('ℹ️ Service Worker disabled (set VITE_ENABLE_SW=true to enable)')
+      return
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        updateViaCache: 'none',
+        scope: '/',
+      })
+      console.log('✅ Service Worker registered:', registration.scope)
+    } catch (error: any) {
+      console.warn('⚠️ Service Worker registration failed:', error?.message || error)
     }
   })
 }
@@ -132,12 +100,15 @@ window.addEventListener('unhandledrejection', (event) => {
     const message = String(event.reason.message)
     if (message.includes('Failed to fetch') || message.includes('ERR_CONNECTION_RESET')) {
       console.warn('⚠️ Chunk loading error detected, will retry...')
-      // إعادة تحميل الصفحة بعد تأخير قصير
-      setTimeout(() => {
+      // Clean caches/SW then reload once
+      setTimeout(async () => {
+        try {
+          await cleanupOldServiceWorkers()
+        } catch {}
         if (document.readyState === 'complete') {
           window.location.reload()
         }
-      }, 2000)
+      }, 1500)
     }
   }
 })

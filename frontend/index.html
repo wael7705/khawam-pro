@@ -16,39 +16,33 @@
     <script>
       // معالجة أخطاء تحميل الـ chunks قبل تحميل React
       (function() {
-        let retryCount = 0;
-        const maxRetries = 3;
+        let handled = false;
         
         function handleScriptError(event) {
           if (event.target && event.target.tagName === 'SCRIPT') {
             const script = event.target;
-            if (script.src && retryCount < maxRetries && !script.dataset.retried) {
-              retryCount++;
-              script.dataset.retried = 'true';
-              
+            if (handled || !script.src) return;
+            handled = true;
+            console.error('❌ Script load failed:', script.src);
+
+            // Try to recover from stale caches / SW mismatch after deployment
+            (async function() {
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  for (const r of regs) await r.unregister();
+                }
+                if ('caches' in window) {
+                  const names = await caches.keys();
+                  for (const n of names) await caches.delete(n);
+                }
+              } catch (e) {}
+
+              console.warn('🔄 Reloading page after clearing caches...');
               setTimeout(function() {
-                const newScript = document.createElement('script');
-                newScript.src = script.src;
-                newScript.type = script.type || 'module';
-                newScript.async = true;
-                newScript.crossOrigin = script.crossOrigin || '';
-                
-                newScript.onload = function() {
-                  console.log('✅ Script reloaded:', script.src);
-                };
-                
-                newScript.onerror = function() {
-                  console.error('❌ Script reload failed:', script.src);
-                  if (retryCount >= maxRetries) {
-                    console.error('❌ Max retries reached, reloading page...');
-                    setTimeout(function() {
-                      window.location.reload();
-                    }, 1000);
-                  }
-                };
-                
-                document.head.appendChild(newScript);
-              }, 1000 * retryCount);
+                window.location.reload();
+              }, 800);
+            })();
             }
           }
         }

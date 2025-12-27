@@ -42,32 +42,61 @@ export default function Services() {
 
   const loadServices = async () => {
     try {
-      const services = await fetchWithCache<Service[]>(
-        'services:all',
-        async () => {
+      setLoading(true)
       const response = await servicesAPI.getAll()
-          return response.data
-        },
-        15 * 60 * 1000 // Cache for 15 minutes
-      )
-      setServices(services)
-    } catch (error) {
-      console.error('Error loading services:', error)
-      // Try to get from cache even on error
-      try {
-        const cached = await fetchWithCache<Service[]>('services:all', async () => [])
-        if (cached && cached.length > 0) {
-          setServices(cached)
-        } else {
-          throw new Error('No cache available')
+      
+      // التحقق من بنية الاستجابة
+      let servicesData: Service[] = []
+      if (Array.isArray(response.data)) {
+        servicesData = response.data
+      } else if (response.data && Array.isArray(response.data.services)) {
+        servicesData = response.data.services
+      } else if (response.data && Array.isArray(response.data.results)) {
+        servicesData = response.data.results
+      }
+      
+      if (servicesData.length > 0) {
+        setServices(servicesData)
+        // حفظ في الكاش
+        try {
+          await fetchWithCache<Service[]>(
+            'services:all',
+            async () => servicesData,
+            15 * 60 * 1000
+          )
+        } catch (cacheError) {
+          console.warn('Failed to cache services:', cacheError)
         }
-      } catch {
+      } else {
+        // إذا لم توجد خدمات، استخدم القيم الافتراضية
+        throw new Error('No services found in response')
+      }
+    } catch (error: any) {
+      console.error('Error loading services:', error?.message || error)
+      
+      // محاولة جلب من الكاش
+      try {
+        const cached = localStorage.getItem('services:all')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (parsed.data && Array.isArray(parsed.data) && parsed.data.length > 0) {
+            const cacheAge = Date.now() - (parsed.timestamp || 0)
+            if (cacheAge < 15 * 60 * 1000) { // أقل من 15 دقيقة
+              setServices(parsed.data)
+              return
+            }
+          }
+        }
+      } catch (cacheError) {
+        console.warn('Failed to load from cache:', cacheError)
+      }
+      
+      // Fallback: استخدام الخدمات الافتراضية
       setServices([
         { id: 1, name_ar: 'طباعة البوسترات', name_en: 'Poster Printing', base_price: 0 },
         { id: 2, name_ar: 'طباعة الفليكس', name_en: 'Flex Printing', base_price: 0 },
         { id: 3, name_ar: 'البانرات الإعلانية', name_en: 'Advertising Banners', base_price: 0 },
       ])
-      }
     } finally {
       setLoading(false)
     }

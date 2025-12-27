@@ -156,7 +156,7 @@ export default function OrdersManagement() {
     }
   }
 
-  // كشف الطلبات الجديدة وإظهار الإشعارات
+  // كشف الطلبات الجديدة وإظهار الإشعارات (فقط للطلبات الجديدة، وليس المكتملة)
   useEffect(() => {
     if (orders.length === 0) return
 
@@ -164,6 +164,13 @@ export default function OrdersManagement() {
     const newOrderIds = new Set<number>()
 
     orders.forEach((order) => {
+      // تجاهل الطلبات المكتملة أو الملغاة أو المرفوضة
+      if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'rejected') {
+        // إضافة إلى المعروفة بدون إشعار
+        knownOrderIdsRef.current.add(order.id)
+        return
+      }
+
       if (!knownOrderIdsRef.current.has(order.id)) {
         newOrderIds.add(order.id)
       }
@@ -175,8 +182,13 @@ export default function OrdersManagement() {
       // تحديث قائمة الطلبات المعروفة
       newOrderIds.forEach((id) => knownOrderIdsRef.current.add(id))
 
-      // إظهار إشعار لكل طلب جديد
+      // إظهار إشعار لكل طلب جديد (فقط الطلبات النشطة)
       newOrders.forEach((order) => {
+        // تجاهل الطلبات المكتملة
+        if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'rejected') {
+          return
+        }
+
         playSound('new_order')
 
         // إظهار إشعار المتصفح إذا كان مسموحاً
@@ -207,15 +219,22 @@ export default function OrdersManagement() {
   }, [orders, navigate, playSound, showSuccess])
 
   useEffect(() => {
-    loadOrders(true) // Show loading only on initial load
-    loadArchivedOrders()
+    let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null
     
-    // حفظ IDs الطلبات الحالية عند التحميل الأول
-    const initialLoadTimeout = setTimeout(() => {
-      orders.forEach((order) => {
-        knownOrderIdsRef.current.add(order.id)
-      })
-    }, 2000)
+    const loadInitialOrders = async () => {
+      await loadOrders(true) // Show loading only on initial load
+      await loadArchivedOrders()
+      
+      // حفظ IDs جميع الطلبات الحالية فور التحميل الأول (قبل أي إشعارات)
+      // هذا يمنع إظهار إشعارات للطلبات الموجودة عند فتح الصفحة
+      initialLoadTimeout = setTimeout(() => {
+        orders.forEach((order) => {
+          knownOrderIdsRef.current.add(order.id)
+        })
+      }, 500) // وقت قصير بعد التحميل
+    }
+    
+    loadInitialOrders()
 
     // Refresh every 30 seconds in background - فقط إذا كانت الصفحة مرئية
     let interval: NodeJS.Timeout | null = null
@@ -234,13 +253,6 @@ export default function OrdersManagement() {
       }
     }
     
-    return () => {
-      clearTimeout(initialLoadTimeout)
-      if (interval) {
-        clearInterval(interval)
-      }
-    }
-    
     // بدء التحديث التلقائي فقط إذا كانت الصفحة مرئية
     if (!document.hidden) {
       interval = setInterval(() => loadOrders(false), 30000)
@@ -250,6 +262,9 @@ export default function OrdersManagement() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     
     return () => {
+      if (initialLoadTimeout) {
+        clearTimeout(initialLoadTimeout)
+      }
       if (interval) {
         clearInterval(interval)
       }

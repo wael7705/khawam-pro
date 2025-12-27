@@ -223,8 +223,21 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
 
           // معالجة إشعارات الطلبات الجديدة
           if (data.event === 'order_created' && data.data) {
-            // فلترة إضافية: التأكد من أن الطلب جديد (تم إنشاؤه في آخر 10 دقائق)
             const notification = data as OrderNotification
+            const orderId = notification.data?.order_id
+            const orderStatus = notification.data?.status
+            
+            // تجاهل الطلبات المكتملة أو الملغاة أو المرفوضة
+            if (orderStatus === 'completed' || orderStatus === 'cancelled' || orderStatus === 'rejected') {
+              console.log(`⏭️ WebSocket: Order ${orderId} is ${orderStatus}, skipping notification`)
+              // إضافة إلى المعروفة بدون إشعار
+              if (orderId) {
+                knownOrderIdsRef.current.add(orderId)
+              }
+              return
+            }
+            
+            // فلترة إضافية: التأكد من أن الطلب جديد (تم إنشاؤه في آخر 10 دقائق)
             const createdAt = notification.data?.created_at
             
             if (createdAt) {
@@ -235,7 +248,11 @@ export function useOrderNotifications(options: UseOrderNotificationsOptions = {}
                 
                 // تجاهل الطلبات الأقدم من 10 دقائق
                 if (diffMinutes > 10) {
-                  console.log(`⏭️ WebSocket: Order ${notification.data?.order_id} is too old (${Math.floor(diffMinutes)} minutes), skipping`)
+                  console.log(`⏭️ WebSocket: Order ${orderId} is too old (${Math.floor(diffMinutes)} minutes), skipping`)
+                  // إضافة إلى المعروفة بدون إشعار
+                  if (orderId) {
+                    knownOrderIdsRef.current.add(orderId)
+                  }
                   return
                 }
               } catch (error) {

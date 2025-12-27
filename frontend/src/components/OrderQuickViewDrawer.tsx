@@ -4,7 +4,7 @@ import { adminAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import SimpleMap from './SimpleMap'
 import { collectOrderAttachments, type NormalizedAttachment } from '../utils/orderAttachments'
-import { getStatusOptionsForOrder } from '../utils/orderStatus'
+import { getStatusOptionsForOrder, getAllowedNextStatuses } from '../utils/orderStatus'
 import './OrderQuickViewDrawer.css'
 
 interface Order {
@@ -111,7 +111,17 @@ export default function OrderQuickViewDrawer({ orderId, onClose, onStatusUpdate 
   }
 
   const handleStatusUpdate = async () => {
-    if (!orderId || !selectedStatus) return
+    if (!orderId || !selectedStatus || !order) return
+    
+    // التحقق من أن الانتقال مسموح
+    const allowedStatuses = getAllowedNextStatuses(order.status as any, order.delivery_type || '')
+    const isCurrentStatus = selectedStatus === order.status
+    const isAllowed = isCurrentStatus || allowedStatuses.includes(selectedStatus as any)
+    
+    if (!isAllowed) {
+      showError(`لا يمكن الانتقال من "${STATUS_LABELS[order.status] || order.status}" إلى "${STATUS_LABELS[selectedStatus] || selectedStatus}". الحالات المسموحة: ${allowedStatuses.map(s => STATUS_LABELS[s] || s).join(', ')}`)
+      return
+    }
     
     // For cancelled/rejected, require reason
     if ((selectedStatus === 'cancelled' || selectedStatus === 'rejected') && !statusReason.trim()) {

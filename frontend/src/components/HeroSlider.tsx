@@ -216,84 +216,7 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goToPrevious, goToNext, activeSlides.length])
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX
-  }
-
-  const handleTouchEnd = () => {
-    if (!touchStartX.current || !touchEndX.current) return
-    
-    const distance = touchStartX.current - touchEndX.current
-    const minSwipeDistance = 50
-
-    if (distance > minSwipeDistance) {
-      goToNext()
-    } else if (distance < -minSwipeDistance) {
-      goToPrevious()
-    }
-    
-    // إعادة تعيين قيم اللمس
-    touchStartX.current = 0
-    touchEndX.current = 0
-  }
-
-  // إذا لم توجد سلايدات نشطة، اعرض fallback فقط بعد انتهاء التحميل
-  if (activeSlides.length === 0 && !loading) {
-    if (import.meta.env.DEV) {
-      console.warn('⚠️ لا توجد سلايدات نشطة - عرض fallback')
-    }
-    return (
-      <section className="hero-slider">
-        <div className="hero-slide">
-          <img 
-            src="/hero-slides/slide-1.jpg" 
-            alt="خوام للطباعة والتصميم"
-            onError={(e) => {
-              console.error('❌ فشل تحميل slide-1.jpg المحلي')
-              const target = e.target as HTMLImageElement
-              target.style.display = 'none'
-            }}
-            onLoad={() => {
-              console.log('✅ تم تحميل slide-1.jpg المحلي بنجاح')
-            }}
-          />
-        </div>
-      </section>
-    )
-  }
-  
-  // إذا كان التحميل جارياً، اعرض loading
-  if (loading && activeSlides.length === 0) {
-    return (
-      <section className="hero-slider">
-        <div className="hero-slide">
-          <div style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(255, 255, 255, 0.1)',
-          }}>
-            <div style={{
-              width: '50px',
-              height: '50px',
-              border: '4px solid rgba(220, 38, 38, 0.2)',
-              borderTop: '4px solid #dc2626',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-            }}></div>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  // تحليل شامل للبيانات وهيكل العرض
+  // تحليل شامل للبيانات وهيكل العرض (يجب أن يكون قبل أي return مبكر)
   useEffect(() => {
     if (import.meta.env.DEV && activeSlides.length > 0) {
       const container = document.querySelector('.hero-slides-container') as HTMLElement
@@ -387,6 +310,83 @@ export default function HeroSlider({ slides, autoPlay = true, autoPlayInterval =
       }
     }
   }, [activeSlides, currentIndex, isTransitioning])
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX
+  }
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return
+    
+    const distance = touchStartX.current - touchEndX.current
+    const minSwipeDistance = 50
+
+    if (distance > minSwipeDistance) {
+      goToNext()
+    } else if (distance < -minSwipeDistance) {
+      goToPrevious()
+    }
+    
+    // إعادة تعيين قيم اللمس
+    touchStartX.current = 0
+    touchEndX.current = 0
+  }
+
+  // إذا لم توجد سلايدات نشطة، اعرض fallback فقط بعد انتهاء التحميل
+  if (activeSlides.length === 0 && !loading) {
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ لا توجد سلايدات نشطة - عرض fallback')
+    }
+    return (
+      <section className="hero-slider">
+        <div className="hero-slide">
+          <img 
+            src="/hero-slides/slide-1.jpg" 
+            alt="خوام للطباعة والتصميم"
+            onError={(e) => {
+              console.error('❌ فشل تحميل slide-1.jpg المحلي')
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+            }}
+            onLoad={() => {
+              console.log('✅ تم تحميل slide-1.jpg المحلي بنجاح')
+            }}
+          />
+        </div>
+      </section>
+    )
+  }
+  
+  // إذا كان التحميل جارياً، اعرض loading
+  if (loading && activeSlides.length === 0) {
+    return (
+      <section className="hero-slider">
+        <div className="hero-slide">
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255, 255, 255, 0.1)',
+          }}>
+            <div style={{
+              width: '50px',
+              height: '50px',
+              border: '4px solid rgba(220, 38, 38, 0.2)',
+              borderTop: '4px solid #dc2626',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}></div>
+          </div>
+        </div>
+      </section>
+    )
+  }
   
   return (
     <section 

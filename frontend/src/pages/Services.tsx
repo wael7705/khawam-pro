@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
+import { MessageSquare } from 'lucide-react'
 import { servicesAPI } from '../lib/api'
 import OrderModal from '../components/OrderModal'
 import { fetchWithCache } from '../utils/dataCache'
 import './Services.css'
+
+const WHATSAPP_NUMBER = '963112134640'
+const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('مرحباً، لم أجد الخدمة التي أبحث عنها. هل يمكنكم مساعدتي؟')}`
 
 interface Service {
   id: number
@@ -130,6 +134,22 @@ export default function Services() {
                 </button>
               </div>
             ))}
+            
+            {/* بطاقة التواصل عبر واتساب */}
+            <div className="service-card contact-card">
+              <div className="service-icon">💬</div>
+              <h3>لم تجد الخدمة التي تبحث عنها؟</h3>
+              <p>قم بالتواصل معنا عبر واتساب وسنقوم بمساعدتك في العثور على ما تحتاجه</p>
+              <a
+                href={WHATSAPP_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary whatsapp-btn"
+              >
+                <MessageSquare size={18} />
+                تواصل معنا عبر واتساب
+              </a>
+            </div>
           </div>
         )}
       </div>

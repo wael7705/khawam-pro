@@ -80,6 +80,37 @@
   width: 100%;
 }
 
+/* بطاقة التواصل عبر واتساب */
+.service-card.contact-card {
+  background: linear-gradient(135deg, rgba(37, 211, 102, 0.1), rgba(25, 186, 90, 0.1));
+  border: 2px solid rgba(37, 211, 102, 0.3);
+  cursor: default;
+}
+
+.service-card.contact-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(37, 211, 102, 0.2);
+  border-color: rgba(37, 211, 102, 0.5);
+}
+
+.service-card.contact-card .whatsapp-btn {
+  background: linear-gradient(135deg, #25D366, #20BA5A);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  border: none;
+  transition: all 0.3s;
+}
+
+.service-card.contact-card .whatsapp-btn:hover {
+  background: linear-gradient(135deg, #20BA5A, #1DA851);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+}
+
 /* Featured Works Section */
 .featured-works-section {
   margin-top: 80px;

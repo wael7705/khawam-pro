@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
-import ErrorBoundary from './components/ErrorBoundary.tsx'
+import RouteErrorBoundary from './components/RouteErrorBoundary.tsx'
 
 // Ensure React is available globally for libraries that expect it (like recharts)
 if (typeof window !== 'undefined') {
@@ -115,10 +115,10 @@ window.addEventListener('unhandledrejection', (event) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary>
-      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+      <RouteErrorBoundary>
         <App />
-      </BrowserRouter>
-    </ErrorBoundary>
+      </RouteErrorBoundary>
+    </BrowserRouter>
   </StrictMode>,
 )

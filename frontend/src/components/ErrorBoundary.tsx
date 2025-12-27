@@ -3,6 +3,11 @@ import React, { Component, ErrorInfo, ReactNode } from 'react'
 interface Props {
   children: ReactNode
   fallback?: ReactNode
+  /**
+   * When this value changes, the boundary will reset its error state.
+   * Useful to recover automatically on route changes.
+   */
+  resetKey?: string | number
 }
 
 interface State {
@@ -12,6 +17,8 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
+  private lastResetKey: Props['resetKey']
+
   constructor(props: Props) {
     super(props)
     this.state = {
@@ -19,6 +26,7 @@ class ErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
     }
+    this.lastResetKey = props.resetKey
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -48,6 +56,14 @@ class ErrorBoundary extends Component<Props, State> {
         window.location.reload()
       }, 2000)
     }
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    // Reset error state when resetKey changes (e.g. navigation)
+    if (this.props.resetKey !== prevProps.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null, errorInfo: null })
+    }
+    this.lastResetKey = this.props.resetKey
   }
 
   handleReload = () => {

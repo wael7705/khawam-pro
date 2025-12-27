@@ -1958,6 +1958,29 @@ export default function OrderDetail() {
     )
   }, [order, attachmentsByItem, attachmentsLoading, fallbackNamesByItem])
 
+  // Collect all attachments from order (must be declared before any early returns to respect Hooks rules)
+  const allAttachments = useMemo(() => {
+    if (!order) return []
+    const aggregated: NormalizedAttachment[] = []
+
+    // Add API attachments
+    orderAttachments.forEach((att) => aggregated.push(att))
+
+    // Add attachments from items
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach((item: any) => {
+        const collected = collectItemAttachments(item)
+        collected.forEach((att) => {
+          if (!aggregated.find((a) => a.url === att.url)) {
+            aggregated.push(att)
+          }
+        })
+      })
+    }
+
+    return dedupeAttachments(aggregated)
+  }, [order, orderAttachments])
+
   if (loading) {
     return (
       <div className="order-detail-page">
@@ -1978,32 +2001,9 @@ export default function OrderDetail() {
     )
   }
 
-  // Collect all attachments from order
-  const getAllAttachments = useMemo(() => {
-    if (!order) return []
-    const allAttachments: NormalizedAttachment[] = []
-    
-    // Add API attachments
-    orderAttachments.forEach(att => allAttachments.push(att))
-    
-    // Add attachments from items
-    if (order.items && Array.isArray(order.items)) {
-      order.items.forEach((item: any) => {
-        const collected = collectItemAttachments(item)
-        collected.forEach(att => {
-          if (!allAttachments.find(a => a.url === att.url)) {
-            allAttachments.push(att)
-          }
-        })
-      })
-    }
-    
-    return dedupeAttachments(allAttachments)
-  }, [order, orderAttachments])
-
   // Download all attachments
   const handleDownloadAllAttachments = async () => {
-    if (getAllAttachments.length === 0) {
+    if (allAttachments.length === 0) {
       showError('لا توجد مرفقات للتحميل')
       return
     }
@@ -2012,7 +2012,7 @@ export default function OrderDetail() {
       const token = localStorage.getItem('auth_token')
       
       // Download files one by one (for now - could be improved with zip)
-      for (const attachment of getAllAttachments) {
+      for (const attachment of allAttachments) {
         try {
           if (attachment.url.startsWith('data:')) {
             // Data URL - create blob download
@@ -2038,7 +2038,7 @@ export default function OrderDetail() {
         }
       }
       
-      showSuccess(`تم بدء تحميل ${getAllAttachments.length} ملف`)
+      showSuccess(`تم بدء تحميل ${allAttachments.length} ملف`)
     } catch (error) {
       console.error('Error downloading attachments:', error)
       showError('حدث خطأ في تحميل المرفقات')
@@ -2116,14 +2116,14 @@ export default function OrderDetail() {
             </div>
             <div className="sticky-header-actions">
               {/* Download All Attachments Button */}
-              {getAllAttachments.length > 0 && (
+              {allAttachments.length > 0 && (
                 <button
                   className="sticky-action-btn attachments-btn"
                   onClick={handleDownloadAllAttachments}
-                  title={`تحميل جميع المرفقات (${getAllAttachments.length})`}
+                  title={`تحميل جميع المرفقات (${allAttachments.length})`}
                 >
                   <Download size={18} />
-                  تحميل الكل ({getAllAttachments.length})
+                  تحميل الكل ({allAttachments.length})
                 </button>
               )}
               

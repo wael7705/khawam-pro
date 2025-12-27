@@ -4,6 +4,7 @@ import { adminAPI } from '../lib/api'
 import { showSuccess, showError } from '../utils/toast'
 import SimpleMap from './SimpleMap'
 import { collectOrderAttachments, type NormalizedAttachment } from '../utils/orderAttachments'
+import { getStatusOptionsForOrder } from '../utils/orderStatus'
 import './OrderQuickViewDrawer.css'
 
 interface Order {
@@ -81,6 +82,11 @@ export default function OrderQuickViewDrawer({ orderId, onClose, onStatusUpdate 
       setAttachments([])
     }
   }, [orderId])
+
+  useEffect(() => {
+    // Reset reason when switching status/order to avoid carrying text across updates
+    setStatusReason('')
+  }, [selectedStatus, orderId])
 
   const loadOrder = async () => {
     if (!orderId) return
@@ -263,9 +269,9 @@ export default function OrderQuickViewDrawer({ orderId, onClose, onStatusUpdate 
                     onChange={(e) => setSelectedStatus(e.target.value)}
                     className="status-select"
                   >
-                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                    {(order ? getStatusOptionsForOrder(order) : (Object.keys(STATUS_LABELS) as string[])).map((key) => (
                       <option key={key} value={key}>
-                        {label}
+                        {STATUS_LABELS[key] || key}
                       </option>
                     ))}
                   </select>

@@ -137,6 +137,16 @@ export default function OrdersManagement() {
       }
       
       setOrders(data)
+      
+      // حفظ IDs جميع الطلبات الحالية فور التحميل (إذا كان هذا التحميل الأولي)
+      // هذا يمنع إظهار إشعارات للطلبات الموجودة عند فتح الصفحة
+      if (showLoading && data.length > 0) {
+        setTimeout(() => {
+          data.forEach((order) => {
+            knownOrderIdsRef.current.add(order.id)
+          })
+        }, 100)
+      }
     } catch (e: any) {
       console.error('Error loading orders:', e)
       // لا نفرغ الطلبات إذا كانت موجودة بالفعل (للطلبات التلقائية)
@@ -219,22 +229,8 @@ export default function OrdersManagement() {
   }, [orders, navigate, playSound, showSuccess])
 
   useEffect(() => {
-    let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null
-    
-    const loadInitialOrders = async () => {
-      await loadOrders(true) // Show loading only on initial load
-      await loadArchivedOrders()
-      
-      // حفظ IDs جميع الطلبات الحالية فور التحميل الأول (قبل أي إشعارات)
-      // هذا يمنع إظهار إشعارات للطلبات الموجودة عند فتح الصفحة
-      initialLoadTimeout = setTimeout(() => {
-        orders.forEach((order) => {
-          knownOrderIdsRef.current.add(order.id)
-        })
-      }, 500) // وقت قصير بعد التحميل
-    }
-    
-    loadInitialOrders()
+    loadOrders(true) // Show loading only on initial load
+    loadArchivedOrders()
 
     // Refresh every 30 seconds in background - فقط إذا كانت الصفحة مرئية
     let interval: NodeJS.Timeout | null = null

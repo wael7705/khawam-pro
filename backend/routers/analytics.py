@@ -104,7 +104,8 @@ async def track_visit(
         
         # التحقق من وجود جدول visitor_tracking
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        # SQLAlchemy returns a list of table names (strings)
+        tables = list(inspector.get_table_names())
         
         if 'visitor_tracking' not in tables:
             # الجدول غير موجود - محاولة إنشائه تلقائياً
@@ -209,7 +210,7 @@ async def track_page_view(
     try:
         # التحقق من وجود جدول page_views
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        tables = list(inspector.get_table_names())
         
         if 'page_views' not in tables:
             # الجدول غير موجود - محاولة إنشائه تلقائياً
@@ -281,7 +282,7 @@ async def get_analytics_stats(
     try:
         # التحقق من وجود الجداول
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        tables = list(inspector.get_table_names())
         
         if 'visitor_tracking' not in tables or 'page_views' not in tables:
             # الجداول غير موجودة - إرجاع بيانات فارغة
@@ -356,7 +357,7 @@ async def get_exit_rates(
     try:
         # التحقق من وجود الجدول
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        tables = list(inspector.get_table_names())
         
         if 'visitor_tracking' not in tables:
             return {"period": period, "exit_rates": [], "message": "Analytics table not available"}
@@ -415,7 +416,7 @@ async def get_page_stats(
     try:
         # التحقق من وجود الجدول
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        tables = list(inspector.get_table_names())
         
         if 'page_views' not in tables:
             return {"period": period, "pages": [], "message": "Analytics table not available"}
@@ -471,7 +472,7 @@ async def get_visitor_count(
     try:
         # التحقق من وجود الجدول
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        tables = list(inspector.get_table_names())
         
         if 'visitor_tracking' not in tables:
             return {
@@ -529,7 +530,7 @@ async def get_funnel_analysis(
     try:
         # التحقق من وجود الجداول
         inspector = sql_inspect(db.bind)
-        tables = [table['name'] for table in inspector.get_table_names()]
+        tables = list(inspector.get_table_names())
         
         if 'visitor_tracking' not in tables or 'page_views' not in tables:
             return {

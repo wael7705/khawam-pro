@@ -165,6 +165,34 @@ def run_migration():
             print("✅ order_status_history table created")
         else:
             print("✅ order_status_history table already exists")
+
+        # Ensure required columns exist (older deployments may have created the table without created_at)
+        try:
+            cols = db.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'order_status_history'
+            """)).fetchall()
+            col_names = {c[0] for c in cols}
+            if 'created_at' not in col_names:
+                print("⚠️ order_status_history.created_at missing - adding column...")
+                db.execute(text("""
+                    ALTER TABLE order_status_history
+                    ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                """))
+                db.execute(text("""
+                    UPDATE order_status_history
+                    SET created_at = CURRENT_TIMESTAMP
+                    WHERE created_at IS NULL
+                """))
+                print("✅ order_status_history.created_at added")
+        except Exception as e:
+            print(f"⚠️ Warning ensuring order_status_history columns: {e}")
+            try:
+                db.rollback()
+            except:
+                pass
         
         # Create indexes for order_status_history
         print("📊 Creating indexes for order_status_history...")
@@ -180,6 +208,10 @@ def run_migration():
             print("✅ Indexes for order_status_history created")
         except Exception as e:
             print(f"⚠️ Warning creating indexes for order_status_history: {e}")
+            try:
+                db.rollback()
+            except:
+                pass
         
         # Migrate existing orders to order_status_history (only if table exists)
         if 'orders' in existing_table_names and 'order_status_history' in existing_table_names:
@@ -197,6 +229,10 @@ def run_migration():
                 print(f"✅ Migrated {result.rowcount} orders to order_status_history")
             except Exception as e:
                 print(f"⚠️ Warning migrating orders: {e}")
+                try:
+                    db.rollback()
+                except:
+                    pass
         
         db.commit()
         print("✅ Migration commit successful!")

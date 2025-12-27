@@ -2103,30 +2103,6 @@ export default function OrderDetail() {
         <div className="order-detail-sticky-header">
           <div className="sticky-header-content">
             <div className="sticky-header-left">
-              <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
-                <ArrowRight size={20} />
-                العودة
-              </button>
-              <div className="sticky-header-title">
-                <h1>تفاصيل الطلب: {order?.order_number || ''}</h1>
-                {order && (
-                  <span className="order-status-chip">{getStatusLabel(order.status || 'pending')}</span>
-                )}
-              </div>
-            </div>
-            <div className="sticky-header-actions">
-              {/* Download All Attachments Button */}
-              {allAttachments.length > 0 && (
-                <button
-                  className="sticky-action-btn attachments-btn"
-                  onClick={handleDownloadAllAttachments}
-                  title={`تحميل جميع المرفقات (${allAttachments.length})`}
-                >
-                  <Download size={18} />
-                  تحميل الكل ({allAttachments.length})
-                </button>
-              )}
-              
               {/* Quick Share Location */}
               {order && (order.delivery_address || (order.delivery_latitude && order.delivery_longitude)) && (
                 <button
@@ -2150,6 +2126,32 @@ export default function OrderDetail() {
                   Google Maps
                 </button>
               )}
+              
+              {/* Download All Attachments Button */}
+              {allAttachments.length > 0 && (
+                <button
+                  className="sticky-action-btn attachments-btn"
+                  onClick={handleDownloadAllAttachments}
+                  title={`تحميل جميع المرفقات (${allAttachments.length})`}
+                >
+                  <Download size={18} />
+                  تحميل الكل ({allAttachments.length})
+                </button>
+              )}
+            </div>
+            <div className="sticky-header-center">
+              <div className="sticky-header-title">
+                <h1>تفاصيل الطلب: {order?.order_number || ''}</h1>
+                {order && (
+                  <span className="order-status-chip">{getStatusLabel(order.status || 'pending')}</span>
+                )}
+              </div>
+            </div>
+            <div className="sticky-header-right">
+              <button className="back-button" onClick={() => navigate('/dashboard/orders')}>
+                <ArrowRight size={20} />
+                العودة
+              </button>
             </div>
           </div>
         </div>
@@ -2208,85 +2210,27 @@ export default function OrderDetail() {
             {/* عرض جميع بيانات العنوان */}
             {order.delivery_address || order.delivery_address_details || order.delivery_address_data || (order.delivery_latitude && order.delivery_longitude) ? (
               <div className="delivery-address-info">
-                {/* بيانات العنوان الكاملة من delivery_address_data */}
-                {order.delivery_address_data && (
-                  <>
-                    {order.delivery_address_data.street && (
-                      <div className="address-field">
-                        <label>اسم الشارع:</label>
-                        <p>{order.delivery_address_data.street}</p>
-                      </div>
-                    )}
-                    {order.delivery_address_data.neighborhood && (
-                      <div className="address-field">
-                        <label>الحي:</label>
-                        <p>{order.delivery_address_data.neighborhood}</p>
-                      </div>
-                    )}
-                    {order.delivery_address_data.building && (
-                      <div className="address-field">
-                        <label>البناء:</label>
-                        <p>{order.delivery_address_data.building}</p>
-                      </div>
-                    )}
-                    {order.delivery_address_data.floor && (
-                      <div className="address-field">
-                        <label>الطابق:</label>
-                        <p>{order.delivery_address_data.floor}</p>
-                      </div>
-                    )}
-                    {order.delivery_address_data.apartment && (
-                      <div className="address-field">
-                        <label>رقم الشقة:</label>
-                        <p>{order.delivery_address_data.apartment}</p>
-                      </div>
-                    )}
-                    {order.delivery_address_data.description && (
-                      <div className="address-field">
-                        <label>وصف إضافي:</label>
-                        <p>{order.delivery_address_data.description}</p>
-                      </div>
-                    )}
-                    {order.delivery_address_data.formattedAddress && (
-                      <div className="address-field">
-                        <label>العنوان الكامل:</label>
-                        <p>{order.delivery_address_data.formattedAddress}</p>
-                      </div>
-                    )}
-                  </>
-                )}
+                {/* العنوان - عرض مبسط */}
+                <div className="address-field">
+                  <label>العنوان:</label>
+                  <p>
+                    {order.delivery_address_data?.formattedAddress || 
+                     order.delivery_address_data?.street || 
+                     order.delivery_address || 
+                     buildFullAddress(order) || 
+                     'لا يوجد عنوان'}
+                  </p>
+                </div>
 
-                {/* العنوان الأساسي - إذا لم تكن هناك بيانات مفصلة */}
-                {!order.delivery_address_data && order.delivery_address && (
-                  <div className="address-field">
-                    <label>العنوان:</label>
-                    <p>{order.delivery_address}</p>
-                  </div>
-                )}
-
-                {/* البيانات الإضافية */}
-                {order.delivery_address_details && (
+                {/* تفاصيل إضافية */}
+                {(order.delivery_address_data?.description || order.delivery_address_data?.floor || order.delivery_address_details) && (
                   <div className="address-field">
                     <label>تفاصيل إضافية:</label>
-                    <p>{order.delivery_address_details}</p>
-                  </div>
-                )}
-
-                {/* صور إضافية للعنوان */}
-                {order.delivery_address_data?.images && Array.isArray(order.delivery_address_data.images) && order.delivery_address_data.images.length > 0 && (
-                  <div className="address-field">
-                    <label>صور إضافية للعنوان:</label>
-                    <div className="address-images-grid">
-                      {order.delivery_address_data.images.map((imageUrl: string, idx: number) => (
-                        <div key={idx} className="address-image-item">
-                          <img 
-                            src={imageUrl.startsWith('http') || imageUrl.startsWith('data:') ? imageUrl : `${PUBLIC_BASE_URL}${imageUrl}`} 
-                            alt={`صورة العنوان ${idx + 1}`}
-                            onClick={() => window.open(imageUrl.startsWith('http') || imageUrl.startsWith('data:') ? imageUrl : `${PUBLIC_BASE_URL}${imageUrl}`, '_blank')}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    <p>
+                      {order.delivery_address_data?.description || 
+                       (order.delivery_address_data?.floor ? `طابق ${order.delivery_address_data.floor}` : '') ||
+                       order.delivery_address_details}
+                    </p>
                   </div>
                 )}
 
@@ -2298,24 +2242,26 @@ export default function OrderDetail() {
                   </div>
                 )}
 
-                {/* أزرار الإجراءات: GPS، مشاركة، فتح الخريطة */}
+                {/* أزرار الإجراءات: فتح الخريطة، مشاركة، GPS */}
                 {(order.delivery_latitude && order.delivery_longitude) || order.delivery_address || order.delivery_address_data ? (
                   <div className="delivery-actions">
-                    {/* زر فتح GPS مع الاتجاهات */}
-                    {(order.delivery_latitude && order.delivery_longitude) && (
+                    {/* زر فتح في Google Maps */}
                     <button
-                      className="delivery-action-btn gps-btn"
+                      className="delivery-action-btn map-btn"
                       onClick={() => {
-                          // افتح Google Maps في GPS مع الاتجاهات
-                          const gpsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`
-                          window.open(gpsUrl, '_blank')
-                        }}
-                        title="فتح الموقع في تطبيق GPS مع الاتجاهات"
-                      >
-                        <Navigation size={18} />
-                        فتح في GPS
-                      </button>
-                    )}
+                        if (order.delivery_latitude && order.delivery_longitude) {
+                          window.open(`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`, '_blank')
+                        } else {
+                          const fullAddress = buildFullAddress(order)
+                          const address = encodeURIComponent(fullAddress)
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
+                        }
+                      }}
+                      title="فتح في Google Maps"
+                    >
+                      <MapPin size={18} />
+                      فتح في الخريطة
+                    </button>
                     
                     {/* زر مشاركة الموقع */}
                     <button
@@ -2366,23 +2312,21 @@ export default function OrderDetail() {
                       مشاركة الموقع
                     </button>
                     
-                    {/* زر فتح في Google Maps */}
+                    {/* زر فتح GPS مع الاتجاهات */}
+                    {(order.delivery_latitude && order.delivery_longitude) && (
                     <button
-                      className="delivery-action-btn map-btn"
+                      className="delivery-action-btn gps-btn"
                       onClick={() => {
-                        if (order.delivery_latitude && order.delivery_longitude) {
-                          window.open(`https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`, '_blank')
-                        } else {
-                          const fullAddress = buildFullAddress(order)
-                          const address = encodeURIComponent(fullAddress)
-                          window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank')
-                        }
-                      }}
-                      title="فتح في Google Maps"
-                    >
-                      <ExternalLink size={18} />
-                      فتح في الخريطة
-                    </button>
+                          // افتح Google Maps في GPS مع الاتجاهات
+                          const gpsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.delivery_latitude},${order.delivery_longitude}&travelmode=driving`
+                          window.open(gpsUrl, '_blank')
+                        }}
+                        title="فتح الموقع في تطبيق GPS مع الاتجاهات"
+                      >
+                        <Navigation size={18} />
+                        فتح في GPS
+                      </button>
+                    )}
                   </div>
                 ) : null}
 

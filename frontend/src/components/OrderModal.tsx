@@ -185,6 +185,7 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
   const [flexType, setFlexType] = useState<'normal' | 'lighted'>('normal')  // نوع الفليكس (عادي/مضاء)
   const [rollupSource, setRollupSource] = useState<'ours' | 'yours'>('ours')  // Roll up من عندنا/من عندك
   const [printTypeChoice, setPrintTypeChoice] = useState<'flex' | 'pvc'>('flex')  // نوع الطباعة (فليكس/PVC)
+  const [cardType, setCardType] = useState<'canson' | 'normal' | 'glossy'>('canson')  // نوع الكرتون لإجازة القرآن
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   
@@ -543,6 +544,20 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
         navigate,
         selectedColors, setSelectedColors,
         autoExtractedColors, setAutoExtractedColors,
+        width: width ? parseFloat(String(width)) || 50 : 50,
+        setWidth: (val: number) => {
+          const widthState = useRef(50)
+          widthState.current = val
+          setWidth(String(val))
+        },
+        height: height ? parseFloat(String(height)) || 70 : 70,
+        setHeight: (val: number) => {
+          const heightState = useRef(70)
+          heightState.current = val
+          setHeight(String(val))
+        },
+        cardType,
+        setCardType,
         step // إضافة step إلى serviceData
       }
       
@@ -3581,7 +3596,8 @@ export default function OrderModal({ isOpen, onClose, serviceName, serviceId }: 
           lamination,
           flexType,
           printTypeChoice,
-          rollupSource
+          rollupSource,
+          cardType
         }
         
         orderData = serviceHandler.prepareOrderData(serviceData, baseOrderData)

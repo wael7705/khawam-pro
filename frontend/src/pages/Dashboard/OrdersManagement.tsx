@@ -7,6 +7,7 @@ import { showSuccess, showError } from '../../utils/toast'
 import SimpleMap from '../../components/SimpleMap'
 import { useOrderNotifications } from '../../hooks/useOrderNotifications'
 import { useNotificationSound } from '../../hooks/useNotificationSound'
+import OrderQuickViewDrawer from '../../components/OrderQuickViewDrawer'
 
 interface Order {
   id: number
@@ -67,6 +68,8 @@ export default function OrdersManagement() {
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteAllPendingModalOpen, setDeleteAllPendingModalOpen] = useState(false)
   const [deletingAllPending, setDeletingAllPending] = useState(false)
+  const [quickViewOrderId, setQuickViewOrderId] = useState<number | null>(null)
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'delivery' | 'self'>('all')
   
   // نظام الإشعارات
   const knownOrderIdsRef = useRef<Set<number>>(new Set())
@@ -355,12 +358,12 @@ export default function OrdersManagement() {
     return orders
   }
 
-  // Filter orders by active tab and search
+  // Filter orders by active tab, search, and delivery type
   const filteredOrders = getDisplayOrders().filter(order => {
     const matchesSearch = searchQuery === '' || 
-      order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer_phone.includes(searchQuery)
+      (order.order_number && String(order.order_number).toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (order.customer_name && String(order.customer_name).toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (order.customer_phone && String(order.customer_phone).includes(searchQuery))
     
     if (activeTab === 'archived') {
       return matchesSearch
@@ -376,6 +379,16 @@ export default function OrdersManagement() {
     // Additional validation: awaiting_pickup tab should only show self-pickup orders
     if (activeTab === 'awaiting_pickup' && order.delivery_type !== 'self') {
       return false
+    }
+    
+    // Delivery type filter
+    if (deliveryFilter !== 'all') {
+      if (deliveryFilter === 'delivery' && order.delivery_type !== 'delivery') {
+        return false
+      }
+      if (deliveryFilter === 'self' && order.delivery_type !== 'self') {
+        return false
+      }
     }
     
     return matchesSearch && matchesTab
@@ -761,32 +774,48 @@ export default function OrdersManagement() {
         <Bell size={16} />
         <span>{isConnected ? 'الإشعارات نشطة' : 'غير متصل'}</span>
       </div>
-      <div className="section-header">
-        <div>
-          <h1>إدارة الطلبات</h1>
-          <p>عرض وإدارة جميع الطلبات ({filteredOrders.length})</p>
+      <div className="orders-sticky-toolbar">
+        <div className="section-header">
+          <div>
+            <h1>إدارة الطلبات</h1>
+            <p>عرض وإدارة جميع الطلبات ({filteredOrders.length})</p>
+          </div>
+          {activeTab === 'archived' && archivedOrders.length > 0 && (
+            <button
+              className="export-archive-btn"
+              onClick={handleExportArchive}
+            >
+              <Download size={18} />
+              تصدير الأرشيف
+            </button>
+          )}
         </div>
-        {activeTab === 'archived' && archivedOrders.length > 0 && (
-          <button
-            className="export-archive-btn"
-            onClick={handleExportArchive}
-          >
-            <Download size={18} />
-            تصدير الأرشيف
-          </button>
-        )}
-      </div>
 
-      <div className="orders-filters">
-        <div className="search-box">
-          <Search size={20} />
-          <input 
-            type="text" 
-            placeholder="ابحث عن طلب (رقم الطلب، اسم العميل، رقم الهاتف)..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+        <div className="orders-filters">
+          <div className="search-box">
+            <Search size={20} />
+            <input 
+              type="text" 
+              placeholder="ابحث عن طلب (رقم الطلب، اسم العميل، رقم الهاتف)..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          {/* Delivery Type Filter */}
+          {activeTab !== 'archived' && (
+            <div className="delivery-filter-box">
+              <select
+                value={deliveryFilter}
+                onChange={(e) => setDeliveryFilter(e.target.value as 'all' | 'delivery' | 'self')}
+                className="delivery-filter-select"
+              >
+                <option value="all">كل الأنواع</option>
+                <option value="delivery">🚚 توصيل</option>
+                <option value="self">🏪 استلام ذاتي</option>
+              </select>
+            </div>
+          )}
         
         {/* فلاتر الأرشيف */}
         {activeTab === 'archived' && (
@@ -854,8 +883,8 @@ export default function OrdersManagement() {
         )}
         </div>
 
-      {/* Status Tabs */}
-      <div className="status-tabs" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {/* Status Tabs */}
+        <div className="status-tabs" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         {statusTabs.map(tab => {
           const count = getOrdersCountByStatus(tab.id)
           return (
@@ -905,6 +934,7 @@ export default function OrdersManagement() {
             {deletingAllPending ? 'جاري الحذف...' : `حذف جميع الطلبات في الانتظار (${getOrdersCountByStatus('pending')})`}
           </button>
         )}
+        </div>
       </div>
 
       {loading ? (
@@ -989,7 +1019,19 @@ export default function OrdersManagement() {
           
           <div className="orders-list">
             {filteredOrders.map((order) => (
-            <div key={order.id} className={`order-card-horizontal ${updatingOrderId === order.id ? 'updating' : ''}`}>
+            <div 
+              key={order.id} 
+              className={`order-card-horizontal ${updatingOrderId === order.id ? 'updating' : ''}`}
+              onClick={(e) => {
+                // Prevent opening drawer when clicking on buttons/links
+                const target = e.target as HTMLElement
+                if (target.closest('button') || target.closest('a')) {
+                  return
+                }
+                setQuickViewOrderId(order.id)
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               {order.image_url && (
                 <div className="order-image-container">
                   <img 
@@ -1307,6 +1349,16 @@ export default function OrdersManagement() {
         </div>
         </>
       )}
+
+      {/* Quick View Drawer */}
+      <OrderQuickViewDrawer
+        orderId={quickViewOrderId}
+        onClose={() => setQuickViewOrderId(null)}
+        onStatusUpdate={() => {
+          loadOrders(false)
+          setQuickViewOrderId(null)
+        }}
+      />
 
       {/* Cancel Modal */}
       {cancelModalOpen && (

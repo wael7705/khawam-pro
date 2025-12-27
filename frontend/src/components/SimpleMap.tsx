@@ -24,6 +24,7 @@ interface SimpleMapProps {
     description?: string
   }>
   onLocationSelect?: (lat: number, lng: number) => void
+  height?: number | string
 }
 
 // Component to update map view when props change
@@ -66,7 +67,8 @@ export default function SimpleMap({
   defaultCenter = [33.5138, 36.2765], // Damascus default
   defaultZoom = 12,
   markers = [],
-  onLocationSelect
+  onLocationSelect,
+  height = 500
 }: SimpleMapProps) {
   const [position, setPosition] = useState<[number, number]>(defaultCenter)
   const [zoom, setZoom] = useState(defaultZoom)
@@ -154,7 +156,7 @@ export default function SimpleMap({
         center={position}
         zoom={zoom}
         scrollWheelZoom={true}
-        style={{ height: '500px', width: '100%', borderRadius: '12px', zIndex: 1 }}
+        style={{ height: typeof height === 'number' ? `${height}px` : height, width: '100%', borderRadius: '12px', zIndex: 1 }}
       >
         <MapViewUpdater center={position} zoom={zoom} />
         {onLocationSelect && <MapClickHandler onLocationSelect={onLocationSelect} />}
